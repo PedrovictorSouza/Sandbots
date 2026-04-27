@@ -1,0 +1,37 @@
+{
+  "name": "small-island",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "test": "vitest run",
+    "test:security": "vitest run tests/security.security.test.js",
+    "test:accessibility": "PLAYWRIGHT_BROWSERS_PATH=.playwright playwright test e2e/accessibility.spec.js --workers=1",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=.playwright playwright test e2e/handbook.spec.js e2e/smoke.spec.js e2e/regression.spec.js --workers=1",
+    "test:smoke": "PLAYWRIGHT_BROWSERS_PATH=.playwright playwright test e2e/smoke.spec.js",
+    "test:regression": "PLAYWRIGHT_BROWSERS_PATH=.playwright playwright test e2e/regression.spec.js",
+    "test:performance": "PLAYWRIGHT_BROWSERS_PATH=.playwright playwright test e2e/performance.spec.js --workers=1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@pragt/css-tool": "file:./packages/pragt-css",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "@playwright/test": "^1.58.2",
+    "axe-core": "^4.11.1",
+    "jsdom": "^27.0.1",
+    "vite": "^8.0.1",
+    "vitest": "^3.2.4"
+  }
+}

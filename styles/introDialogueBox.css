@@ -1,0 +1,275 @@
+/* introDialogueBox.css */
+
+/* Fixed logical size.
+   The game/stage scales this component globally.
+   This file should not respond to viewport size. */
+
+.intro-dialogue-motion,
+.intro-dialogue {
+  --intro-dialogue-width: 1120px;
+  --intro-dialogue-height: 288px;
+}
+
+/* Motion wrapper */
+
+.intro-dialogue-motion {
+  position: relative;
+  width: var(--intro-dialogue-width);
+  height: var(--intro-dialogue-height);
+  transform-origin: 50% 100%;
+  animation: intro-dialogue-motion-root-in 260ms steps(4, end) both;
+}
+
+.intro-dialogue-motion__frame {
+  position: relative;
+  z-index: 2;
+  width: var(--intro-dialogue-width);
+  height: var(--intro-dialogue-height);
+  overflow: hidden;
+  transform-origin: 50% 100%;
+  animation: intro-dialogue-frame-in 360ms steps(6, end) both;
+}
+
+.intro-dialogue-motion__shadow {
+  position: absolute;
+  left: 80px;
+  right: 80px;
+  bottom: -12px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  filter: blur(7px);
+  opacity: 0;
+  z-index: 0;
+  animation: intro-dialogue-shadow-in 360ms steps(5, end) both;
+}
+
+.intro-dialogue-motion__scanline {
+  position: absolute;
+  left: 48px;
+  right: 48px;
+  top: 24px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.48);
+  opacity: 0;
+  z-index: 3;
+  pointer-events: none;
+  animation: intro-dialogue-scanline-in 360ms steps(5, end) 80ms both;
+}
+
+.intro-dialogue-motion[data-dialogue-motion="stable"],
+.intro-dialogue-motion[data-dialogue-motion="stable"] .intro-dialogue-motion__frame,
+.intro-dialogue-motion[data-dialogue-motion="stable"] .intro-dialogue__canvas {
+  animation: none;
+  opacity: 1;
+  filter: none;
+  clip-path: none;
+  transform: none;
+}
+
+.intro-dialogue-motion[data-dialogue-motion="stable"] .intro-dialogue-motion__shadow {
+  animation: none;
+  opacity: 0.28;
+  transform: scaleX(1);
+}
+
+.intro-dialogue-motion[data-dialogue-motion="stable"] .intro-dialogue-motion__scanline {
+  display: none;
+}
+
+/* Dialogue box */
+
+.intro-dialogue {
+  justify-self: center;
+  width: var(--intro-dialogue-width);
+  height: var(--intro-dialogue-height);
+  display: grid;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #31425b;
+}
+
+/* Canvas bitmap */
+
+.intro-dialogue__canvas {
+  display: block;
+  width: var(--intro-dialogue-width);
+  height: var(--intro-dialogue-height);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Text layer */
+
+.intro-dialogue__text {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.18;
+}
+
+.intro-dialogue__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.intro-dialogue__voice {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(49, 66, 91, 0.72);
+}
+
+.intro-dialogue__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(129, 96, 219, 0.14);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5c49ad;
+}
+
+.intro-dialogue__arrow {
+  font-weight: 700;
+  transform: translateY(-1px);
+}
+
+/* Layered entrance */
+
+.intro-dialogue-motion .intro-dialogue__canvas {
+  animation: intro-dialogue-canvas-in 260ms steps(4, end) both;
+}
+
+.intro-dialogue-motion .intro-dialogue__text {
+  animation: intro-dialogue-text-in 260ms steps(4, end) 180ms both;
+}
+
+.intro-dialogue-motion .intro-dialogue__hint {
+  animation: intro-dialogue-hint-in 220ms steps(3, end) 320ms both;
+}
+
+/* Keyframes */
+
+@keyframes intro-dialogue-motion-root-in {
+  0% {
+    opacity: 0;
+    filter: brightness(1.7);
+  }
+
+  35% {
+    opacity: 1;
+    filter: brightness(1.35);
+  }
+
+  100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+@keyframes intro-dialogue-frame-in {
+  0% {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(18px);
+  }
+
+  35% {
+    opacity: 1;
+    clip-path: inset(42% 0 0 0);
+    transform: translateY(10px);
+  }
+
+  70% {
+    opacity: 1;
+    clip-path: inset(8% 0 0 0);
+    transform: translateY(2px);
+  }
+
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes intro-dialogue-shadow-in {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.45);
+  }
+
+  55% {
+    opacity: 0.38;
+    transform: scaleX(1.08);
+  }
+
+  100% {
+    opacity: 0.28;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes intro-dialogue-scanline-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scaleX(0.2);
+  }
+
+  25% {
+    opacity: 0.85;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(26px) scaleX(1);
+  }
+}
+
+@keyframes intro-dialogue-canvas-in {
+  0% {
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 1;
+    filter: brightness(1.3);
+  }
+
+  100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+@keyframes intro-dialogue-text-in {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes intro-dialogue-hint-in {
+  0% {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

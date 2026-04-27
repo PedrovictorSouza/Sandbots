@@ -1,0 +1,17 @@
+{
+  "snap_is_default":true,
+  "auto_save_frequency":10,
+  "warn_on_exit":true,
+  "invert_mouse_controls":false,
+  "os_mouse":false,
+  "window_width":1440,
+  "window_height":900,
+  "last_path":"",
+  "recent_files":["unnamed_4.txt","unnamed_5.txt","ground-dead.txt","ground.txt","truck.txt"],
+  "invert_zoom":false,
+  "texture_grid_size":16,
+  "show_grid":true,
+  "gif_file_increment":true,
+  "rmb_action":1,
+  "theme":"classic"
+}

@@ -1,0 +1,285 @@
+export function createWorldRenderer({
+  gl,
+  worldCanvas,
+  camera,
+  program,
+  uniforms,
+  attribs,
+  spriteProgram,
+  spriteUniforms,
+  spriteAttribs,
+  spriteQuadBuffer,
+  spriteQuadIndices,
+  jitterState
+}) {
+  const pixelSnap = new Float32Array(2);
+
+  function syncPixelSnap() {
+    pixelSnap[0] = worldCanvas.width * 0.5;
+    pixelSnap[1] = worldCanvas.height * 0.5;
+  }
+
+  function configureScenePass(viewProjection) {
+    gl.viewport(0, 0, worldCanvas.width, worldCanvas.height);
+    gl.clearColor(0.5294, 0.8078, 0.9216, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(program);
+    gl.uniformMatrix4fv(uniforms.viewProjection, false, viewProjection);
+    gl.uniform1f(uniforms.jitterAmount, jitterState.amount);
+    syncPixelSnap();
+    gl.uniform2fv(uniforms.pixelSnap, pixelSnap);
+    gl.uniform1f(uniforms.time, performance.now() * 0.001);
+    gl.uniform1i(uniforms.texture, 0);
+  }
+
+  function bindScenePrimitive(primitive) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, primitive.vertexBuffer);
+    gl.enableVertexAttribArray(attribs.position);
+    gl.vertexAttribPointer(attribs.position, 3, gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(attribs.texCoord);
+    gl.vertexAttribPointer(attribs.texCoord, 2, gl.FLOAT, false, 20, 12);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, primitive.indexBuffer);
+  }
+
+  function drawSceneObject(sceneObject) {
+    gl.uniform3fv(uniforms.modelOffset, sceneObject.model.offset);
+    gl.uniform1f(uniforms.modelScale, sceneObject.model.scale);
+    gl.uniform1f(uniforms.modelHeight, sceneObject.model.size[1]);
+    gl.uniform1f(uniforms.brightness, sceneObject.brightness ?? 1);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneObject.model.texture);
+
+    for (const instance of sceneObject.instances) {
+      if (instance.active === false) {
+        continue;
+      }
+
+      gl.uniform3fv(uniforms.instanceOffset, instance.offset);
+      gl.uniform1f(uniforms.instanceScale, instance.scale);
+      gl.uniform1f(uniforms.instanceYaw, instance.yaw || 0);
+      gl.uniform1f(uniforms.instancePitch, instance.pitch || 0);
+      gl.uniform1f(uniforms.instanceRoll, instance.roll || 0);
+      if (uniforms.localYaw) {
+        gl.uniform1f(uniforms.localYaw, instance.localYaw || 0);
+      }
+
+      if (uniforms.localPivot) {
+        gl.uniform3fv(uniforms.localPivot, instance.localPivot || [0, 0, 0]);
+      }
+      gl.uniform1f(uniforms.swayStrength, instance.swayStrength || 0);
+
+      for (const primitive of sceneObject.model.primitives) {
+        bindScenePrimitive(primitive);
+        gl.drawElements(gl.TRIANGLES, primitive.indexCount, primitive.indexType, 0);
+      }
+    }
+  }
+
+  function prepareSpritePass(viewProjection) {
+    const { right: quadRight, up: quadUp } = camera.getBillboardAxes();
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.useProgram(spriteProgram);
+    gl.uniformMatrix4fv(spriteUniforms.viewProjection, false, viewProjection);
+    syncPixelSnap();
+    gl.uniform2fv(spriteUniforms.pixelSnap, pixelSnap);
+    gl.uniform3fv(spriteUniforms.quadRight, quadRight);
+    gl.uniform3fv(spriteUniforms.quadUp, quadUp);
+    gl.uniform1i(spriteUniforms.spriteTexture, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, spriteQuadBuffer);
+    gl.enableVertexAttribArray(spriteAttribs.corner);
+    gl.vertexAttribPointer(spriteAttribs.corner, 2, gl.FLOAT, false, 16, 0);
+    gl.enableVertexAttribArray(spriteAttribs.texCoord);
+    gl.vertexAttribPointer(spriteAttribs.texCoord, 2, gl.FLOAT, false, 16, 8);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, spriteQuadIndices);
+  }
+
+  function drawSpriteQuad(texture, position, size, uvRect) {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform3fv(spriteUniforms.worldPosition, position);
+    gl.uniform2fv(spriteUniforms.spriteSize, size);
+    gl.uniform4fv(spriteUniforms.uvRect, uvRect);
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+  }
+
+  function drawSpriteBillboards(viewProjection, billboards) {
+    if (!Array.isArray(billboards) || billboards.length === 0) {
+      return;
+    }
+
+    prepareSpritePass(viewProjection);
+
+    for (const billboard of billboards) {
+      if (!billboard?.texture || !billboard?.position || !billboard?.size) {
+        continue;
+      }
+
+      drawSpriteQuad(
+        billboard.texture,
+        billboard.position,
+        billboard.size,
+        billboard.uvRect || [0, 0, 1, 1]
+      );
+    }
+  }
+
+  return {
+    drawScene(viewProjection, sceneObjects) {
+      if (!sceneObjects.length) {
+        return;
+      }
+
+      configureScenePass(viewProjection);
+
+      for (const sceneObject of sceneObjects) {
+        drawSceneObject(sceneObject);
+      }
+    },
+
+    drawWoodDrops(viewProjection, woodTexture, woodDrops) {
+      if (!woodTexture || !woodDrops.some((woodDrop) => !woodDrop.collected)) {
+        return;
+      }
+
+      prepareSpritePass(viewProjection);
+
+      for (const woodDrop of woodDrops) {
+        if (woodDrop.collected) {
+          continue;
+        }
+
+        drawSpriteQuad(woodTexture, woodDrop.position, woodDrop.size, woodDrop.uvRect);
+      }
+    },
+
+    drawWorldMarkers(viewProjection, {
+      storyState,
+      resourceNodes,
+      npcActors,
+      interactables,
+      markerTextures,
+      worldMarkerHeight,
+      worldMarkerSize,
+      npcMarkerOffset,
+      npcMarkerSize,
+      fullUvRect,
+      isNpcActive,
+      isInteractableActive,
+      isResourceNodeActive
+    }) {
+      const markers = [];
+
+      for (const npcActor of npcActors) {
+        if (!isNpcActive(npcActor, storyState)) {
+          continue;
+        }
+
+        const position = npcActor.character.getPosition();
+        markers.push({
+          texture: markerTextures[npcActor.markerKey],
+          position: [position[0], position[1] + npcMarkerOffset, position[2]],
+          size: npcMarkerSize
+        });
+      }
+
+      for (const interactable of interactables) {
+        if (!isInteractableActive(interactable, storyState)) {
+          continue;
+        }
+
+        markers.push({
+          texture: markerTextures[interactable.markerKey],
+          position: [
+            interactable.position[0],
+            interactable.position[1] + worldMarkerHeight,
+            interactable.position[2]
+          ],
+          size: worldMarkerSize
+        });
+      }
+
+      for (const resourceNode of resourceNodes) {
+        if (!isResourceNodeActive(resourceNode, storyState)) {
+          continue;
+        }
+
+        markers.push({
+          texture: markerTextures[resourceNode.markerKey],
+          position: [
+            resourceNode.position[0],
+            resourceNode.position[1] + worldMarkerHeight,
+            resourceNode.position[2]
+          ],
+          size: worldMarkerSize
+        });
+      }
+
+      if (!markers.length) {
+        return;
+      }
+
+      prepareSpritePass(viewProjection);
+
+      for (const marker of markers) {
+        drawSpriteQuad(marker.texture, marker.position, marker.size, fullUvRect);
+      }
+    },
+
+    drawCharacters(viewProjection, {
+      storyState,
+      playerCharacter,
+      npcActors,
+      characterTextures,
+      isNpcActive
+    }) {
+      const visibleCharacters = [];
+
+      if (playerCharacter) {
+        visibleCharacters.push(playerCharacter);
+      }
+
+      for (const npcActor of npcActors) {
+        if (!isNpcActive(npcActor, storyState)) {
+          continue;
+        }
+
+        if (npcActor.renderCharacter === false) {
+          continue;
+        }
+
+        visibleCharacters.push(npcActor.character);
+      }
+
+      if (!visibleCharacters.length) {
+        return;
+      }
+
+      prepareSpritePass(viewProjection);
+
+      for (const character of visibleCharacters) {
+        const renderState = character.getRenderState();
+        const texture = characterTextures[renderState.textureKey];
+
+        drawSpriteQuad(texture, renderState.position, renderState.size, renderState.uvRect);
+      }
+    },
+
+    drawBillboard(viewProjection, texture, position, size, uvRect = [0, 0, 1, 1]) {
+      if (!texture) {
+        return;
+      }
+
+      prepareSpritePass(viewProjection);
+      drawSpriteQuad(texture, position, size, uvRect);
+    },
+
+    drawBillboards: drawSpriteBillboards
+  };
+}

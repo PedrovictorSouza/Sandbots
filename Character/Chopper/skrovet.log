@@ -1,0 +1,69 @@
+
+SKROVET VERSION 0.2.1
+----------------------------------------------------
+love2d version: Version 11.4.0 - Mysterious Mysteries
+timestamp: 2026-04-22 06:34:44
+OS: OS X
+processor count: 8
+power: charged 100%
+----------------------------------------------------
+id: picocad2
+version 2.0.9, build 73
+----------------------------------------------------
+initializing debug
+initializing graphics
+loaded 32 colors from skrovet/assets/rom/palette_pico8.png
+initializing sprites
+extracted 256 sprites from skrovet/assets/rom/spritesheet_skrovet.png
+Could not open file: skrovet_tilemap.txt
+Trying internal file system...
+Could not load internal file: skrovet_tilemap.txt
+initializing text
+loading skrovet/assets/rom/fonts/Skrovet-Regular.png
+loading skrovet/assets/rom/fonts/Skrovet-Tiny.png
+loading skrovet/assets/rom/fonts/Skrovet-Mono.png
+loading skrovet/assets/rom/fonts/Skrovet-Thin.png
+loading skrovet/assets/rom/fonts/Skrovet-Small.png
+loading skrovet/assets/rom/fonts/Skrovet-Retro.png
+initializing input
+initializing gui
+setting UI theme to skrovet_default
+ loading theme details from skrovet/assets/rom/themes/skrovet_default.json
+ loading sprites from skrovet/assets/rom/themes/skrovet_default.png
+extracted 256 sprites from skrovet/assets/rom/themes/skrovet_default.png
+skrovet initialization complete
+----------------------------------------------------
+
+picoCAD 2 starting up (2.0.9)
+loading settings
+saving settings
+checking folders
+ examples folder created
+ .picocad folder created
+ backups folder created
+initializing gifcat
+ gifcatlib.so found on disk
+ gifcatlib.so found in data files
+ gifcatlib.so copied from data files to disk
+loading themes
+setting UI theme to classic
+ loading theme details from assets/themes/classic.json
+ loading sprites from assets/themes/classic.png
+extracted 512 sprites from assets/themes/classic.png
+theme classic set
+extracted 256 sprites from assets/sprites.png
+Creating main window
+setting up modeling mode
+loading texture: .picocad/default_texture.png
+setting default export settings
+loading texture: .picocad/default_texture.png
+setting default export settings
+project loaded: unnamed_4.txt
+saving settings
+setting up modeling mode
+saving settings
+exporting model to gltf
+ writing unnamed_4.bin
+ writing unnamed_4.gltf
+exporting png: unnamed_4.png
+opening folder: /Users/pedrovictor/Library/Application Support/picocad2/

@@ -1,0 +1,119 @@
+:root {
+  --game-stage-width: 1600px;
+  --game-stage-height: 900px;
+  --game-scale: 1;
+  --render-frame-scale: 1;
+  --console-display-scale: 1;
+  --scene-scale: 1;
+}
+
+.game-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.render-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.pause-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.5);
+  animation: pause-overlay-in 180ms steps(3, end) forwards;
+}
+
+.pause-overlay[hidden] {
+  display: none;
+}
+
+.pause-overlay__label {
+  color: #fff1e8;
+  font-family: var(--game-ui-font, "Courier New", monospace);
+  font-size: 128px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow:
+    6px 0 0 #050307,
+    0 6px 0 #050307,
+    -6px 0 0 #050307,
+    0 -6px 0 #050307;
+  animation: pause-label-pop 220ms steps(4, end) forwards;
+}
+
+@keyframes pause-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pause-label-pop {
+  0% {
+    transform: scale(0.82);
+  }
+
+  70% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--game-stage-width);
+  height: var(--game-stage-height);
+  transform: translate(-50%, -50%) scale(var(--render-frame-scale));
+  transform-origin: center center;
+  display: block;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#viewport {
+  z-index: 0;
+}
+
+#warm-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--game-stage-width);
+  height: var(--game-stage-height);
+  transform: translate(-50%, -50%) scale(var(--render-frame-scale));
+  transform-origin: center center;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255, 208, 132, 0.22), transparent 42%),
+    linear-gradient(180deg, rgba(255, 142, 61, 0.14), rgba(255, 104, 35, 0.28));
+  mix-blend-mode: screen;
+}
+
+#sprite-layer {
+  display: none;
+}

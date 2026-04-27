@@ -1,0 +1,959 @@
+/* PRAGT writes app-level CSS overrides here. */
+
+:root {
+  --ui-gap: 20px;
+  --hud-width: 520px;
+  --status-width: 420px;
+  --skills-width: 280px;
+  --inventory-width: 460px;
+  --missions-width: 420px;
+  --hud-scale: 1;
+  --overlay-scale: 1;
+  --guide-scale: 1;
+  --ui-stage-width: 1600px;
+  --ui-stage-height: 900px;
+  --ui-stage-scale: 1;
+  --missions-card-gap: 14px;
+  --missions-meta-gap: 8px;
+}
+
+.ui-layer {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  width: var(--ui-stage-width);
+  height: var(--ui-stage-height);
+  overflow: hidden;
+  transform: translate(-50%, -50%) scale(var(--ui-stage-scale));
+  transform-origin: center center;
+  display: grid;
+  grid-template-columns: var(--missions-width) minmax(0, 1fr) var(--status-width);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--ui-gap);
+  padding: var(--ui-gap);
+  align-items: start;
+  justify-items: start;
+}
+
+.ui-layer[data-mode="intro"] {
+  transform: translate(-50%, -50%) scale(var(--game-scale));
+}
+
+.ui-layer[data-mode="game"][data-gameplay-ui-hud="hidden"] .hud,
+.ui-layer[data-mode="game"][data-gameplay-ui-quest="hidden"] .quest-focus-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-bag-onboarding="hidden"] .bag-onboarding-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-bag-details="hidden"] .bag-details-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-missions="hidden"] .missions-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-nearby-habitats="hidden"] .nearby-habitats-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-skills="hidden"] .skills-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-inventory="hidden"] .inventory,
+.ui-layer[data-mode="game"][data-gameplay-ui-status="hidden"] .status,
+.ui-layer[data-mode="game"][data-gameplay-ui-builder="hidden"] .builder-panel {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.quest-focus-panel,
+.nearby-habitats-panel,
+.bag-onboarding-panel,
+.bag-details-panel {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  align-self: start;
+  min-width: 0;
+  padding: 18px 22px;
+  border: 2px solid rgba(196, 192, 255, 0.28);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(94, 90, 212, 0.96), rgba(74, 70, 176, 0.94));
+  box-shadow:
+    0 20px 30px rgba(10, 8, 24, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: #f4f3ff;
+  transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
+}
+
+.ui-layer[data-mode="game"][data-gameplay-ui-quest="visible"] .quest-focus-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-nearby-habitats="visible"] .nearby-habitats-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-bag-onboarding="visible"] .bag-onboarding-panel,
+.ui-layer[data-mode="game"][data-gameplay-ui-bag-details="visible"] .bag-details-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.nearby-habitats-panel {
+  grid-column: 1;
+  grid-row: 1;
+  width: 360px;
+  transform: translateY(-8px);
+}
+
+.nearby-habitats-panel__header {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.nearby-habitats-panel__value {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.quest-focus-panel {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  width: 420px;
+  transform: translateY(-8px);
+}
+
+.quest-focus-panel__title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.quest-focus-panel__body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.bag-onboarding-panel {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  width: 420px;
+  transform: translateY(-8px);
+}
+
+.bag-onboarding-panel__title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.bag-onboarding-panel__body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.bag-onboarding-panel__body p + p {
+  margin-top: 10px;
+}
+
+.bag-onboarding-panel__key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.55em;
+  height: 1.55em;
+  margin: 0 0.12em;
+  padding: 0 0.3em;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  font-size: 0.88em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bag-details-panel {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  width: 520px;
+  min-height: 144px;
+  transform: translateY(-8px);
+}
+
+.bag-details-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bag-details-panel__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.bag-details-panel__icon {
+  --bag-icon-color: #ffffff;
+  --bag-icon-ink: #141414;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 215, 96, 0.86);
+  background: var(--bag-icon-color);
+  color: var(--bag-icon-ink);
+  font-size: 12px;
+  line-height: 1;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.12),
+    0 6px 14px rgba(12, 8, 24, 0.18);
+}
+
+.bag-details-panel__name,
+.bag-details-panel__count {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.bag-details-panel__count {
+  min-width: 48px;
+  text-align: right;
+}
+
+.bag-details-panel__body {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.hud {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: var(--hud-width);
+  transform: none;
+  grid-column: 1;
+  grid-row: 1;
+  gap: 8px;
+  padding: 18px 20px;
+}
+
+.hud strong {
+  font-size: 18px;
+}
+
+.hud span {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.hud-control label {
+  font-size: 13px;
+}
+
+.status {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: var(--status-width);
+  transform: none;
+  grid-column: 3;
+  grid-row: 3;
+  justify-self: end;
+  align-self: end;
+  padding: 16px 18px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.skills-panel strong,
+.inventory strong,
+.missions-header {
+  font-size: 13px;
+}
+
+.skills-panel {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  width: var(--skills-width);
+  transform: none;
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: center;
+  align-self: end;
+}
+
+.skill-slot__label {
+  font-size: 11px;
+}
+
+.missions-panel {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: var(--missions-width);
+  transform: none;
+  grid-column: 1;
+  grid-row: 2 / span 2;
+  align-self: start;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.missions-header {
+  margin-bottom: 0;
+}
+
+.missions-stack {
+  position: relative;
+  height: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, auto);
+  gap: var(--missions-card-gap);
+  align-content: start;
+}
+
+.mission-card {
+  position: relative;
+  inset: auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+  transform: none;
+  opacity: 1;
+}
+
+.mission-card:nth-child(1),
+.mission-card:nth-child(2),
+.mission-card:nth-child(3) {
+  transform: none;
+  opacity: 1;
+  z-index: auto;
+}
+
+.mission-card__copy {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.mission-card__eyebrow {
+  font-size: 12px;
+}
+
+.mission-card__title {
+  font-size: 24px;
+}
+
+.mission-card__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--missions-meta-gap);
+  margin-top: 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.mission-card__meta span {
+  display: grid;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+@media (max-width: 560px), (max-height: 720px) {
+  .missions-panel {
+    gap: 8px;
+  }
+
+  .mission-card {
+    gap: 10px;
+  }
+
+  .mission-card__meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.inventory {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  width: var(--inventory-width);
+  transform: none;
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: center;
+  align-self: end;
+}
+
+.inventory-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.inventory-slot__label {
+  font-size: 11px;
+}
+
+.inventory-count {
+  font-size: 18px;
+}
+
+.inventory-slot[data-empty="true"] {
+  background: rgba(10, 14, 22, 0.44);
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.inventory-slot__icon--empty {
+  width: 58%;
+  aspect-ratio: 1 / 1;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Pixel-perfect game HUD pass. Keep gameplay UI in logical pixels and let the stage scale it. */
+:root {
+  --ui-gap: 24px;
+  --hud-width: 520px;
+  --status-width: 420px;
+  --skills-width: 260px;
+  --inventory-width: 460px;
+  --missions-width: 360px;
+  --game-ui-font: "Jersey 10", "Courier New", monospace;
+  --game-ui-panel: #15101a;
+  --game-ui-panel-alt: #1c1420;
+  --game-ui-border: #f5c16a;
+  --game-ui-border-dark: #38202a;
+  --game-ui-text: #fff1cf;
+  --game-ui-muted: #d6b68a;
+  --game-ui-accent: #8ee8ff;
+}
+
+.ui-layer {
+  font-family: var(--game-ui-font);
+  color: var(--game-ui-text);
+  image-rendering: pixelated;
+  text-rendering: geometricPrecision;
+  letter-spacing: 0;
+}
+
+.hud,
+.missions-panel,
+.inventory,
+.status,
+.skills-panel {
+  transition:
+    opacity 120ms steps(2, end),
+    visibility 120ms steps(2, end),
+    transform 120ms steps(2, end);
+}
+
+.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .hud,
+.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .missions-panel,
+.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .inventory,
+.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .status,
+.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .skills-panel,
+.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .quest-focus-panel,
+.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .nearby-habitats-panel {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.hud,
+.inventory,
+.skills-panel,
+.status,
+.mission-card,
+.quest-focus-panel,
+.nearby-habitats-panel,
+.bag-onboarding-panel,
+.bag-details-panel,
+.act-two-dialogue__body,
+.act-two-dialogue__speaker {
+  border-radius: 0;
+  backdrop-filter: none;
+  box-shadow:
+    4px 0 0 #050307,
+    0 4px 0 #050307,
+    -4px 0 0 #050307,
+    0 -4px 0 #050307;
+}
+
+.act-two-tutorial__speech {
+  transform: translate(-50%, -100%) scale(var(--overlay-scale));
+  transform-origin: bottom center;
+  transition: opacity 120ms steps(2, end);
+}
+
+.act-two-tutorial__speech-bubble {
+  max-width: 780px;
+  padding: 22px 28px;
+  border: 4px solid #f18b27;
+  border-radius: 0;
+  background: #693600;
+  box-shadow:
+    4px 0 0 #050307,
+    0 4px 0 #050307,
+    -4px 0 0 #050307,
+    0 -4px 0 #050307;
+  color: #fff1cf;
+  font-family: var(--game-ui-font);
+  font-size: 68px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.act-two-tutorial__speech-bubble::after {
+  bottom: -14px;
+  width: 18px;
+  height: 18px;
+  border-right: 4px solid #f18b27;
+  border-bottom: 4px solid #f18b27;
+  border-radius: 0;
+  background: #693600;
+}
+
+.act-two-tutorial__speech[data-world-speech-variant="player-prompt"] .act-two-tutorial__speech-bubble {
+  min-width: 256px;
+  padding: 18px 24px;
+  border-color: #1e2339;
+  background: #e6c755;
+  color: #4b3508;
+  font-size: 68px;
+  text-transform: uppercase;
+}
+
+.act-two-tutorial__speech[data-world-speech-variant="player-prompt"] .act-two-tutorial__speech-bubble::after {
+  border-right-color: #1e2339;
+  border-bottom-color: #1e2339;
+  background: #e6c755;
+}
+
+.hud {
+  width: var(--hud-width);
+  padding: 12px 14px 14px;
+  border: 4px solid var(--game-ui-border-dark);
+  background: var(--game-ui-panel);
+  gap: 8px;
+  transform-origin: top left;
+  transition: opacity 120ms steps(2, end), visibility 120ms steps(2, end);
+}
+
+.hud strong {
+  font-size: 34px;
+  line-height: 0.9;
+  font-weight: 400;
+  color: #fff7d7;
+  text-transform: uppercase;
+}
+
+.hud span {
+  font-size: 24px;
+  line-height: 1;
+  color: var(--game-ui-muted);
+}
+
+.hud-context {
+  padding-top: 8px;
+  border-top: 3px solid #2b202c;
+  color: var(--game-ui-muted);
+  font-family: var(--game-ui-font);
+  font-size: 22px;
+  line-height: 1.04;
+}
+
+.hud-checklist {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.hud-checklist__item {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: start;
+  gap: 8px;
+  color: #fff7d7;
+  font-family: var(--game-ui-font);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.hud .hud-checklist__item span {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.hud-checklist__item[data-done="true"] {
+  color: #b6ef8f;
+}
+
+.hud-checklist__box {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 3px solid #695c71;
+  background: #0f0b13;
+  box-shadow: 2px 2px 0 #050307;
+}
+
+.hud-checklist__item[data-done="true"] .hud-checklist__box {
+  border-color: #b6ef8f;
+  background:
+    linear-gradient(45deg, transparent 0 38%, #1f3c1a 38% 62%, transparent 62%),
+    linear-gradient(-45deg, transparent 0 38%, #b6ef8f 38% 62%, transparent 62%),
+    #22381f;
+}
+
+.hud #hud-meta,
+.hud .hud__signals,
+.hud .hud-control {
+  display: none;
+}
+
+.ui-layer[data-mode="game"][data-gameplay-ui-hud="visible"] .hud {
+  animation: hud-pop-in 180ms steps(3, end) both;
+}
+
+.hud[data-notice-flash="true"] {
+  animation: hud-notice-flash 3s steps(2, end) both;
+}
+
+@keyframes hud-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+
+  66% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hud-notice-flash {
+  0%,
+  12%,
+  24%,
+  36%,
+  48%,
+  60%,
+  72%,
+  84% {
+    border-color: #ffe45f;
+    box-shadow:
+      6px 0 0 #ffe45f,
+      0 6px 0 #ffe45f,
+      -6px 0 0 #ffe45f,
+      0 -6px 0 #ffe45f,
+      0 0 0 10px rgba(255, 228, 95, 0.18);
+  }
+
+  6%,
+  18%,
+  30%,
+  42%,
+  54%,
+  66%,
+  78%,
+  90%,
+  100% {
+    border-color: var(--game-ui-border-dark);
+    box-shadow:
+      4px 0 0 #050307,
+      0 4px 0 #050307,
+      -4px 0 0 #050307,
+      0 -4px 0 #050307;
+  }
+}
+
+.hud__signals {
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.hud-alert {
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 3px solid #466180;
+  border-radius: 0;
+  background: #20243b;
+  box-shadow: 3px 3px 0 #050307;
+  color: #e9fbff;
+  font-family: var(--game-ui-font);
+  font-size: 22px;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.hud-alert::before {
+  width: 10px;
+  height: 10px;
+  border-radius: 0;
+  box-shadow: 0 0 0 3px #324d65;
+}
+
+.hud-control {
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.hud-control label {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.hud-control input[type="range"] {
+  height: 16px;
+  accent-color: var(--game-ui-border);
+}
+
+.missions-panel {
+  width: var(--missions-width);
+  gap: 8px;
+}
+
+.missions-header,
+.inventory strong,
+.skills-panel strong {
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--game-ui-border);
+}
+
+.missions-stack {
+  gap: 12px;
+}
+
+.mission-card {
+  padding: 12px;
+  border: 4px solid var(--game-ui-border-dark);
+  background: var(--game-ui-panel-alt);
+  gap: 8px;
+}
+
+.mission-card::after {
+  display: none;
+}
+
+.mission-card__eyebrow {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--game-ui-border);
+}
+
+.mission-card__title {
+  font-size: 36px;
+  line-height: 0.95;
+  font-weight: 400;
+  color: #fff7d7;
+}
+
+.mission-card__copy {
+  font-size: 24px;
+  line-height: 1.08;
+  color: var(--game-ui-muted);
+}
+
+.mission-card__meta {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 3px solid #2b202c;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.mission-card__meta span {
+  min-height: 48px;
+  padding: 8px;
+  border: 3px solid #2b202c;
+  background: #11111b;
+  color: var(--game-ui-muted);
+}
+
+.inventory {
+  width: var(--inventory-width);
+  padding: 10px;
+  border: 4px solid var(--game-ui-border-dark);
+  background: var(--game-ui-panel);
+  gap: 8px;
+}
+
+.inventory-grid {
+  grid-template-columns: repeat(5, 72px);
+  gap: 8px;
+}
+
+.inventory-slot {
+  width: 72px;
+  height: 72px;
+  aspect-ratio: auto;
+  border: 4px solid #2b202c;
+  background: #11111b;
+  box-shadow: none;
+}
+
+.inventory-slot[data-filled="true"] {
+  border-color: var(--game-ui-border);
+  background: #231827;
+}
+
+.inventory-slot[data-empty="true"] {
+  border-style: dashed;
+  border-color: #3b3340;
+  background: #0b0b12;
+}
+
+.inventory-slot__icon {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #2b202c;
+  font-size: 24px;
+}
+
+.inventory-slot__label {
+  left: 4px;
+  right: 4px;
+  bottom: 3px;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.inventory-count {
+  right: 4px;
+  top: 3px;
+  bottom: auto;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--game-ui-border);
+}
+
+.status {
+  width: var(--status-width);
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 4px solid var(--game-ui-border-dark);
+  background: var(--game-ui-panel);
+  color: var(--game-ui-border);
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.skills-panel {
+  width: var(--skills-width);
+  padding: 10px;
+  border: 4px solid var(--game-ui-border-dark);
+  background: var(--game-ui-panel);
+}
+
+.skill-slot {
+  min-height: 68px;
+  border: 4px solid #2b202c;
+  background: #11111b;
+}
+
+.skill-slot[data-unlocked="true"] {
+  border-color: var(--game-ui-accent);
+  background: #142a34;
+}
+
+.skill-slot__icon {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #2b202c;
+  font-size: 24px;
+}
+
+.skill-slot__label {
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.act-two-dialogue {
+  --dialogue-base-width: 1120px;
+  left: 50%;
+  right: auto;
+  bottom: 28px;
+  width: var(--dialogue-base-width);
+  transform: translateX(-50%);
+  gap: 0;
+  font-family: var(--game-ui-font);
+}
+
+.act-two-dialogue__speaker {
+  margin-left: 0;
+  padding: 6px 16px;
+  border: 4px solid #050307;
+  background: #4558c9;
+  color: #fff7d7;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.act-two-dialogue__body,
+.act-two-dialogue__body[data-speakerless="true"] {
+  min-height: 196px;
+  padding: 22px 28px;
+  border: 6px solid #f18b27;
+  background: #693600;
+  color: #fff1cf;
+}
+
+.act-two-dialogue__text,
+.act-two-dialogue__body[data-speakerless="true"] .act-two-dialogue__text {
+  width: 800px;
+  margin: 0;
+  padding-bottom: 0;
+  font-size: 38px;
+  line-height: 1.05;
+}
+
+.act-two-dialogue__hint {
+  right: 26px;
+  bottom: 22px;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 4px solid #1e2339;
+  border-radius: 0;
+  background: #e6c755;
+  color: #4b3508;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.act-two-dialogue__hint span:first-child {
+  min-width: 32px;
+  height: 28px;
+  padding: 0 8px;
+  border: 3px solid #8d6c13;
+  border-radius: 0;
+  background: #ffe889;
+}

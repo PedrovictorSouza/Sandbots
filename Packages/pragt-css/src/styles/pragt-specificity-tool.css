@@ -1,0 +1,860 @@
+.pragt-specificity-tool {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  pointer-events: none;
+  font-family: var(--font-ui, "IBM Plex Sans", "Segoe UI", system-ui, sans-serif);
+}
+
+.pragt-specificity-tool.is-detached {
+  inset: 0;
+  right: auto;
+  bottom: auto;
+}
+
+.pragt-specificity-tool button,
+.pragt-specificity-tool input,
+.pragt-specificity-tool textarea,
+.pragt-specificity-tool code {
+  font-family: inherit;
+}
+
+.pragt-specificity-launcher,
+.pragt-specificity-panel {
+  pointer-events: auto;
+}
+
+.pragt-specificity-launcher {
+  border: 2px solid #111111;
+  background: #f7f7f7;
+  color: #111111;
+  padding: 0.85rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 0.9rem 1.6rem rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.pragt-specificity-panel {
+  width: min(25rem, calc(100vw - 2rem));
+  max-height: min(82vh, 48rem);
+  overflow: auto;
+  border: 2px solid #111111;
+  background: rgba(247, 247, 247, 0.98);
+  color: #111111;
+  box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.24);
+  padding: 1rem;
+  display: grid;
+  gap: 0.9rem;
+  backdrop-filter: blur(10px);
+}
+
+.pragt-specificity-panel.is-detached {
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border: 0;
+  box-shadow: none;
+  padding: 1rem;
+}
+
+.pragt-specificity-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pragt-specificity-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Header buttons (Styles / AST) visual tweaks to match panel mock */
+.pragt-specificity-panel-actions .pragt-specificity-action {
+  padding: 0.35rem 0.6rem;
+  min-height: 2rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border-radius: 2px;
+  background: #ffffff;
+  border: 2px solid #111111;
+}
+
+.pragt-specificity-panel-actions .pragt-specificity-action.is-active {
+  background: #111111;
+  color: #f7f7f7;
+}
+
+.pragt-specificity-panel-actions .pragt-specificity-close {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.pragt-specificity-panel-header h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.pragt-specificity-eyebrow,
+.pragt-specificity-block-label,
+.pragt-specificity-field span {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pragt-specificity-close,
+.pragt-specificity-action,
+.pragt-specificity-chip {
+  border: 2px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  cursor: pointer;
+}
+
+.pragt-specificity-close {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pragt-specificity-toolbar,
+.pragt-specificity-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pragt-specificity-toolbar--navbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin: -0.1rem 0 0.15rem;
+  padding: 0.2rem 0 0.8rem;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.16);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(247, 247, 247, 0.98) 0%,
+      rgba(247, 247, 247, 0.96) 72%,
+      rgba(247, 247, 247, 0) 100%
+    );
+  backdrop-filter: blur(12px);
+}
+
+.pragt-specificity-accordion {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0.8rem;
+}
+
+.pragt-specificity-accordion-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pragt-specificity-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.pragt-specificity-accordion-meta {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: rgba(17, 17, 17, 0.65);
+}
+
+.pragt-specificity-chip-row--tight {
+  gap: 0.35rem;
+}
+
+.pragt-specificity-action,
+.pragt-specificity-chip {
+  min-height: 2.2rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pragt-specificity-action.is-active,
+.pragt-specificity-chip.is-active {
+  background: #111111;
+  color: #f7f7f7;
+}
+
+.pragt-specificity-chip.is-disabled,
+.pragt-specificity-chip:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.pragt-specificity-action.is-danger {
+  border-color: #8f1f1f;
+  background: #8f1f1f;
+  color: #f7f7f7;
+}
+
+.pragt-specificity-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pragt-specificity-hint,
+.pragt-specificity-element-meta,
+.pragt-specificity-empty,
+.pragt-specificity-rule-source,
+.pragt-specificity-rule-reason,
+.pragt-specificity-rule-value,
+.pragt-specificity-winner p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.pragt-specificity-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pragt-specificity-field input,
+.pragt-specificity-field textarea {
+  width: 100%;
+  border: 2px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  padding: 0.7rem 0.8rem;
+  outline: none;
+}
+
+.pragt-specificity-textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.pragt-specificity-color-controls {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.pragt-specificity-color-picker {
+  width: 3rem;
+  height: 3rem;
+  border: 2px solid #111111;
+  padding: 0;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.pragt-specificity-color-value {
+  width: 100%;
+  border: 2px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  padding: 0.7rem 0.8rem;
+  outline: none;
+}
+
+.pragt-specificity-block {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.pragt-specificity-element-code,
+.pragt-specificity-winner code,
+.pragt-specificity-rule code {
+  overflow-wrap: anywhere;
+}
+
+.pragt-specificity-element-code {
+  font-size: 0.82rem;
+}
+
+.pragt-specificity-winner {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pragt-specificity-rule-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.pragt-specificity-subproperty-editor-list {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+}
+
+.pragt-specificity-subproperty-editor {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  background: #ffffff;
+}
+
+.pragt-specificity-rule {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  background: #ffffff;
+}
+
+.pragt-specificity-rule.is-winner {
+  border-color: #1d6e48;
+  background: #edf8f1;
+}
+
+.pragt-selector-health.is-warning {
+  border-color: #b57a00;
+  background: #fff6dd;
+}
+
+.pragt-selector-health.is-high {
+  border-color: #9e1c1c;
+  background: #ffe6e6;
+}
+
+.pragt-specificity-rule-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+}
+
+.pragt-specificity-rule-topline span {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.pragt-selector-health-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid #1d6e48;
+  background: #edf8f1;
+  color: #1d6e48;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pragt-selector-health-badge.is-warning {
+  border-color: #b57a00;
+  background: #fff0c7;
+  color: #7a5200;
+}
+
+.pragt-selector-health-badge.is-high {
+  border-color: #9e1c1c;
+  background: #ffd9d9;
+  color: #7a1111;
+}
+
+.pragt-selector-suggestion {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.2rem;
+  padding-top: 0.2rem;
+}
+
+.pragt-selector-matching {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  padding: 0.65rem;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  background: rgba(17, 17, 17, 0.03);
+}
+
+.pragt-separation-audit {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  background: #ffffff;
+}
+
+.pragt-separation-audit.is-warning {
+  border-color: #b57a00;
+  background: #fff8e4;
+}
+
+.pragt-separation-audit.is-high {
+  border-color: #9e1c1c;
+  background: #ffe8e8;
+}
+
+.pragt-separation-group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pragt-separation-token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pragt-separation-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  background: rgba(17, 17, 17, 0.04);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pragt-separation-token.is-style {
+  border-color: #1d6e48;
+  background: #edf8f1;
+  color: #1d6e48;
+}
+
+.pragt-separation-token.is-state {
+  border-color: #48639c;
+  background: #eaf0ff;
+  color: #24427d;
+}
+
+.pragt-separation-token.is-behavior {
+  border-color: #9e1c1c;
+  background: #ffe0e0;
+  color: #7a1111;
+}
+
+.pragt-selector-suggestion-code {
+  margin: 0;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  background: rgba(17, 17, 17, 0.04);
+  padding: 0.75rem;
+  overflow: auto;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.pragt-specificity-rule-source,
+.pragt-specificity-rule-reason {
+  color: rgba(17, 17, 17, 0.7);
+}
+
+.pragt-specificity-inline-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pragt-specificity-inline-unit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pragt-specificity-inline-input {
+  width: 100%;
+  border: 2px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  padding: 0.55rem 0.7rem;
+  outline: none;
+}
+
+.pragt-specificity-range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.pragt-specificity-range-input {
+  width: 100%;
+  margin: 0;
+}
+
+.pragt-specificity-range-value {
+  min-width: 3.8rem;
+  text-align: right;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.pragt-specificity-diagnostics {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  background: rgba(17, 17, 17, 0.04);
+}
+
+.pragt-specificity-highlight {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid #ff5c86;
+  background: rgba(255, 92, 134, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.2);
+}
+
+.pragt-specificity-highlight-label {
+  position: absolute;
+  top: -1.8rem;
+  left: -2px;
+  max-width: min(22rem, 70vw);
+  padding: 0.25rem 0.45rem;
+  background: #111111;
+  color: #f7f7f7;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .pragt-specificity-tool {
+    right: 0.65rem;
+    left: 0.65rem;
+    bottom: 0.65rem;
+  }
+
+  .pragt-specificity-launcher {
+    width: 100%;
+  }
+
+  .pragt-specificity-panel {
+    width: 100%;
+    max-height: 72vh;
+  }
+
+  .pragt-specificity-inline-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .pragt-specificity-inline-unit-row {
+    gap: 0.35rem;
+  }
+
+  .pragt-specificity-range-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pragt-specificity-range-value {
+    text-align: left;
+  }
+
+  .pragt-specificity-highlight-label {
+    max-width: 60vw;
+  }
+}
+
+.pragt-grid-tool {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 2147483645;
+  pointer-events: none;
+  font-family: var(--font-ui, "IBM Plex Sans", "Segoe UI", system-ui, sans-serif);
+}
+
+.pragt-grid-tool button,
+.pragt-grid-tool input,
+.pragt-grid-tool code {
+  font-family: inherit;
+}
+
+.pragt-grid-launcher,
+.pragt-grid-panel {
+  pointer-events: auto;
+}
+
+.pragt-grid-launcher {
+  border: 2px solid #111111;
+  background: #111111;
+  color: #f7f7f7;
+  padding: 0.85rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 0.9rem 1.6rem rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.pragt-grid-panel {
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: min(82vh, 54rem);
+  overflow: auto;
+  border: 2px solid #111111;
+  background: rgba(247, 247, 247, 0.98);
+  color: #111111;
+  box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.24);
+  padding: 1rem;
+  display: grid;
+  gap: 0.9rem;
+  backdrop-filter: blur(10px);
+}
+
+.pragt-grid-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pragt-grid-panel-header h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.pragt-grid-panel-actions,
+.pragt-grid-chip-row,
+.pragt-grid-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pragt-grid-eyebrow,
+.pragt-grid-block-label,
+.pragt-grid-field span {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pragt-grid-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.pragt-grid-block {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0.8rem;
+}
+
+.pragt-grid-chip,
+.pragt-grid-action,
+.pragt-grid-close {
+  border: 2px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  cursor: pointer;
+}
+
+.pragt-grid-chip,
+.pragt-grid-action {
+  min-height: 2.2rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pragt-grid-chip.is-active,
+.pragt-grid-action.is-active {
+  background: #111111;
+  color: #f7f7f7;
+}
+
+.pragt-grid-close {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pragt-grid-close--small {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+
+.pragt-grid-preset-list,
+.pragt-grid-custom-presets {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.pragt-grid-preset {
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.pragt-grid-preset strong {
+  font-size: 0.9rem;
+}
+
+.pragt-grid-preset span {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(17, 17, 17, 0.72);
+}
+
+.pragt-grid-custom-preset {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pragt-grid-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.pragt-grid-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pragt-grid-field input {
+  width: 100%;
+  border: 2px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  padding: 0.7rem 0.8rem;
+}
+
+.pragt-grid-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pragt-grid-overlay-target,
+.pragt-grid-overlay-frame {
+  position: fixed;
+}
+
+.pragt-grid-overlay-bounds,
+.pragt-grid-overlay-columns,
+.pragt-grid-overlay-rows,
+.pragt-grid-overlay-baseline,
+.pragt-grid-overlay-safe-area {
+  position: absolute;
+}
+
+.pragt-grid-overlay-target {
+  border: 1px dashed rgba(38, 86, 255, 0.3);
+  background: rgba(38, 86, 255, 0.03);
+}
+
+.pragt-grid-overlay-frame {
+  overflow: hidden;
+}
+
+.pragt-grid-overlay-bounds {
+  inset: 0;
+  border: 1px solid rgba(20, 44, 138, 0.65);
+}
+
+.pragt-grid-overlay-label {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  background: rgba(20, 44, 138, 0.88);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pragt-grid-overlay-columns {
+  inset: 0;
+  display: grid;
+}
+
+.pragt-grid-overlay-column {
+  background: rgba(38, 86, 255, 0.14);
+  border-left: 1px solid rgba(20, 44, 138, 0.4);
+  border-right: 1px solid rgba(20, 44, 138, 0.4);
+}
+
+.pragt-grid-overlay-columns.is-flat .pragt-grid-overlay-column {
+  border-right: 0;
+}
+
+.pragt-grid-overlay-rows {
+  inset: 0;
+  display: grid;
+}
+
+.pragt-grid-overlay-row {
+  border-top: 1px dashed rgba(255, 102, 0, 0.48);
+}
+
+.pragt-grid-overlay-baseline {
+  inset: 0;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 102, 0, 0.18) 1px,
+    transparent 1px
+  );
+}
+
+.pragt-grid-overlay-safe-area {
+  top: env(safe-area-inset-top);
+  right: env(safe-area-inset-right);
+  bottom: env(safe-area-inset-bottom);
+  left: env(safe-area-inset-left);
+  border: 2px solid rgba(0, 166, 118, 0.72);
+}
+
+@media (max-width: 560px) {
+  .pragt-grid-tool {
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .pragt-grid-panel {
+    width: calc(100vw - 1.5rem);
+  }
+
+  .pragt-grid-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
