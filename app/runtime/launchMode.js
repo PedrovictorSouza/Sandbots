@@ -89,7 +89,7 @@ export function applyLaunchModeRuntime(launchMode, {
     session.actTwoRepairPlant.fixed = true;
   }
 
-  if (session?.actTwoSquirtle && session.squirtleRecoveredTexture) {
-    session.actTwoSquirtle.texture = session.squirtleRecoveredTexture;
+  if (session?.actTwoSquirtle) {
+    session.actTwoSquirtle.recovered = true;
   }
 }

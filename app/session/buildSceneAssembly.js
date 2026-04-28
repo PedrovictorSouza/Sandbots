@@ -11,6 +11,7 @@ export function buildSceneAssembly(session, assets) {
     palmModel,
     chopperBodyModel,
     chopperPropellerModel,
+    robot1Model,
     characterFactory
   } = assets;
 
@@ -68,6 +69,14 @@ export function buildSceneAssembly(session, assets) {
         brightness: 1
       }
     );
+  }
+
+  if (robot1Model && session.actTwoSquirtle?.modelInstance) {
+    session.sceneObjects.push({
+      model: robot1Model,
+      instances: [session.actTwoSquirtle.modelInstance],
+      brightness: 1
+    });
   }
 
   session.introRoomScene = buildIntroRoomScene(assets);

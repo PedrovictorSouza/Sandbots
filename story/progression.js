@@ -24,7 +24,8 @@ export function createStoryState() {
       restoredFlowerCount: 0,
       tangrowthFlowerCommentSeen: false,
       bulbasaurRevealed: false,
-      bagOnboardingSeen: false
+      bagOnboardingSeen: false,
+      chopperSecondTalkApproachSeen: false
     }
   };
 }

@@ -1,8 +1,6 @@
 import { STORY_QUESTS } from "../gameplayContent.js";
-import {
-  FLOWER_BED_POKEDEX_ENTRY_ID,
-  TALL_GRASS_POKEDEX_ENTRY_ID
-} from "../pokedexEntries.js";
+import { QUEST_EVENT } from "../app/quest/questData.js";
+import { HABITAT_EVENT } from "../app/sandbox/habitatData.js";
 
 export function createGameplayInteractions({
   npcProfiles,
@@ -10,7 +8,6 @@ export function createGameplayInteractions({
   startDialogue = null,
   unlockPlayerAbility = () => {},
   unlockPokedexReward = () => {},
-  showPokedexEntry = () => {},
   onFirstGrassRestored = () => {},
   onFlowersRecovered = () => {},
   onBulbasaurRevealed = () => {},
@@ -30,7 +27,9 @@ export function createGameplayInteractions({
   reviveGroundGrass = () => {},
   strikeNearbyPalm,
   syncInventoryUi,
-  pushNotice
+  pushNotice,
+  questSystem = null,
+  habitatSystem = null
 }) {
   let nextWoodDropId = 1;
 
@@ -53,6 +52,11 @@ export function createGameplayInteractions({
     syncInventoryUi(inventory);
     onGroundItemCollected({
       itemId: resourceNode.itemId,
+      amount: resourceNode.yield
+    });
+    questSystem?.emit?.({
+      type: QUEST_EVENT.COLLECT,
+      targetId: resourceNode.itemId,
       amount: resourceNode.yield
     });
     pushNotice(`+${resourceNode.yield} ${getItemLabel(resourceNode.itemId)}`);
@@ -84,17 +88,52 @@ export function createGameplayInteractions({
     }
 
     syncInventoryUi(inventory);
+    questSystem?.emit?.({
+      type: QUEST_EVENT.BUILD,
+      targetId: recipe.id,
+      amount: 1
+    });
     advanceQuest(storyState, `${recipe.title} pronto.`);
     return true;
   }
 
   function handleNpcInteraction(npcId, storyState, onDialogueOpen = () => {}) {
     const quest = getActiveQuest(storyState);
+    const activeSystemQuest = questSystem?.getActiveQuest?.();
     const npcProfile = npcProfiles[npcId];
 
     if (npcId === "tangrowth") {
+      if (activeSystemQuest?.id === "chopper-first-habitat-report") {
+        const completeFirstHabitatReport = () => {
+          questSystem.emit({
+            type: QUEST_EVENT.TALK,
+            targetId: "chopper-first-habitat-report"
+          });
+        };
+
+        if (typeof startDialogue === "function") {
+          const opened = startDialogue({
+            targetId: npcId,
+            dialogueId: "firstHabitatReport",
+            onComplete: completeFirstHabitatReport
+          });
+
+          if (opened) {
+            onDialogueOpen();
+            return true;
+          }
+        }
+
+        completeFirstHabitatReport();
+        return true;
+      }
+
       if (quest.id === "meetTangrowth") {
         const completeOnboarding = () => {
+          questSystem?.emit?.({
+            type: QUEST_EVENT.TALK,
+            targetId: npcId
+          });
           advanceQuest(
             storyState,
             quest.resolveLine || "Tangrowth te apontou para o burrow e para a Aunty."
@@ -152,12 +191,20 @@ export function createGameplayInteractions({
 
     if (npcId === "aunty") {
       if (quest.id === "meetAunty") {
+        questSystem?.emit?.({
+          type: QUEST_EVENT.TALK,
+          targetId: npcId
+        });
         advanceQuest(storyState, quest.resolveLine || "Aunty marcou a ponte e liberou o Workbench.");
         return true;
       }
 
       if (quest.id === "hostDinner") {
         storyState.flags.dinnerHosted = true;
+        questSystem?.emit?.({
+          type: QUEST_EVENT.TALK,
+          targetId: npcId
+        });
         advanceQuest(storyState, quest.resolveLine || "Grand Dinner concluido. Free-roam liberado.");
         return true;
       }
@@ -171,6 +218,10 @@ export function createGameplayInteractions({
 
     if (npcId === "bufo") {
       if (quest.id === "meetBufo") {
+        questSystem?.emit?.({
+          type: QUEST_EVENT.TALK,
+          targetId: npcId
+        });
         advanceQuest(storyState, quest.resolveLine || "Bufo quer um Marsh Pie antes de liberar o blueprint.");
         return true;
       }
@@ -181,6 +232,10 @@ export function createGameplayInteractions({
 
     if (npcId === "willow") {
       if (quest.id === "meetWillow") {
+        questSystem?.emit?.({
+          type: QUEST_EVENT.TALK,
+          targetId: npcId
+        });
         advanceQuest(
           storyState,
           quest.resolveLine || "Willow marcou o repair kit final para o velho burrow."
@@ -205,6 +260,10 @@ export function createGameplayInteractions({
       }
 
       const completeDiscovery = () => {
+        questSystem?.emit?.({
+          type: QUEST_EVENT.TALK,
+          targetId
+        });
         unlockPlayerAbility("waterGun");
         unlockPokedexReward();
         advanceQuest(
@@ -350,7 +409,7 @@ export function createGameplayInteractions({
       groundGrassPatches
     );
     if (!nearbyTarget?.target) {
-      pushNotice("Nada para interagir por perto.");
+      pushNotice("Nothing to talk to nearby. Move closer to a marker or character, then press E.");
       return false;
     }
 
@@ -438,9 +497,23 @@ export function createGameplayInteractions({
         if (revivedGrass) {
           storyState.flags.restoredGrassCount =
             (storyState.flags.restoredGrassCount || 0) + 1;
+          questSystem?.emit?.({
+            type: QUEST_EVENT.BUILD,
+            targetId: "revived-grass"
+          });
+          if (questSystem?.hasUnlocked?.("leafage")) {
+            questSystem.emit({
+              type: QUEST_EVENT.PLACE,
+              targetId: "leafy-home-patch"
+            });
+          }
           onNaturePatchRevived({
             patch: revivedGrass,
             type: "grass"
+          });
+          habitatSystem?.recordEvent?.({
+            type: HABITAT_EVENT.REVIVE_PATCH,
+            targetId: "grass"
           });
         }
 
@@ -461,19 +534,16 @@ export function createGameplayInteractions({
         if (revivedGrass && !storyState.flags.firstGrassRestored) {
           storyState.flags.firstGrassRestored = true;
           pushNotice("You've restored a dead grass!");
-          showPokedexEntry(FLOWER_BED_POKEDEX_ENTRY_ID);
           onFirstGrassRestored();
           return true;
         }
 
         if (
           revivedGrass &&
-          !storyState.flags.tallGrassDiscovered &&
-          (storyState.flags.restoredGrassCount || 0) >= 4
+          storyState.flags.tallGrassDiscovered &&
+          !storyState.flags.rustlingGrassCellId
         ) {
-          storyState.flags.tallGrassDiscovered = true;
           storyState.flags.rustlingGrassCellId = nearbyHarvestTarget.groundCell.id;
-          showPokedexEntry(TALL_GRASS_POKEDEX_ENTRY_ID);
           return true;
         }
 
@@ -502,8 +572,8 @@ export function createGameplayInteractions({
     if (!palmStrike.hit) {
       pushNotice(
         canPurifyGround ?
-          "Nenhum recurso ou chao corrompido na area." :
-          "Nenhum recurso na area."
+          "No target in range. Move closer to dry ground, grass, a tree, or a marker, then press Enter." :
+          "No resource in range. Move closer to a tree or drop, then press Enter."
       );
       return false;
     }
@@ -521,6 +591,9 @@ export function createGameplayInteractions({
     findNearbyActionTarget,
     performHarvestAction,
     performInteractAction,
+    recordQuestEvent(event) {
+      return questSystem?.emit?.(event) || { changed: false, completedQuestIds: [] };
+    },
     resetRuntimeState
   };
 }

@@ -9,6 +9,7 @@ import {
   getNatureRevivalScale,
   updateNatureRevivalEffects
 } from "../session/natureRevivalEffects.js";
+import { getColliderGizmoBillboards } from "../session/colliderGizmos.js";
 import { updateIntroRoomFrame } from "../scenes/introRoom/introRoomSequence.js";
 import { updateChopperNpcActor } from "../session/chopperNpcActor.js";
 
@@ -18,6 +19,7 @@ export function startGameLoop({
   worldCanvas,
   worldRenderer,
   worldSpeech,
+  colliderGizmos,
   groundCellHighlight,
   gameplayDialogue,
   dialogueCamera,
@@ -35,11 +37,14 @@ export function startGameLoop({
   rendering
 }) {
   let previousTime = performance.now();
+  let movementQuestReported = false;
+  let movementQuestDistance = 0;
   const frameSnapshotController = createFrameSnapshotController({
     camera,
     mount,
     worldRenderer,
     worldSpeech,
+    colliderGizmos,
     groundCellHighlight,
     actTwoTutorial,
     hud
@@ -48,6 +53,66 @@ export function startGameLoop({
     camera,
     presets: cameraZoomPresets
   });
+
+  function getYawToward(fromPosition, toPosition) {
+    const deltaX = toPosition[0] - fromPosition[0];
+    const deltaZ = toPosition[2] - fromPosition[2];
+    return Math.atan2(deltaX, deltaZ);
+  }
+
+  function faceInteractionTargetTowardPlayer({
+    targetId,
+    playerPosition,
+    npcActors = [],
+    interactables = []
+  } = {}) {
+    const npcActor = npcActors.find((actor) => actor.id === targetId);
+    if (npcActor?.character?.faceToward) {
+      const npcPosition = npcActor.character.getPosition();
+      npcActor.character.faceToward(playerPosition);
+      npcActor.faceYaw = getYawToward(npcPosition, playerPosition);
+      return;
+    }
+
+    const interactable = interactables.find((entry) => entry.id === targetId);
+    if (
+      interactable?.id === "squirtle" &&
+      session.actTwoSquirtle?.modelInstance &&
+      playerPosition
+    ) {
+      session.actTwoSquirtle.modelInstance.yaw = getYawToward(
+        session.actTwoSquirtle.position,
+        playerPosition
+      );
+    }
+  }
+
+  function normalizeMarkerTargetId(targetId) {
+    if (targetId === "chopper" || targetId === "chopper-first-habitat-report") {
+      return "tangrowth";
+    }
+
+    return targetId;
+  }
+
+  function getQuestAttentionTargetIds({ systemQuest, storyQuest }) {
+    const targetIds = new Set();
+
+    for (const objective of systemQuest?.objectives || []) {
+      if (objective.type === "TALK") {
+        targetIds.add(normalizeMarkerTargetId(objective.targetId));
+      }
+    }
+
+    if (storyQuest?.targetId) {
+      targetIds.add(normalizeMarkerTargetId(storyQuest.targetId));
+    }
+
+    targetIds.delete(undefined);
+    targetIds.delete(null);
+    targetIds.delete("");
+    return [...targetIds];
+  }
 
   function updateBulbasaurEncounter(deltaTime) {
     const encounter = session.bulbasaurEncounter;
@@ -88,6 +153,8 @@ export function startGameLoop({
     const tutorialMovementLocked = tutorialActive ? actTwoTutorial.isMovementLocked() : false;
     const pokedexModalOpen = pokedexUiState.open;
     const dialogueActive = gameplayDialogue.isActive();
+    const skillLearnActive = Boolean(controls.isSkillLearnActive?.());
+    const scriptedInteractionActive = Boolean(controls.isScriptedInteractionActive?.());
     const tutorialCameraFocus = tutorialActive ? actTwoTutorial.getCameraFocusTarget() : null;
 
     if (session.actTwoRepairPlant && actTwoTutorial.isRepairPlantFixed()) {
@@ -121,11 +188,17 @@ export function startGameLoop({
       return;
     }
 
-    if (tutorialActive || pokedexModalOpen) {
+    if (tutorialActive || pokedexModalOpen || skillLearnActive || scriptedInteractionActive) {
       controls.clearPendingActions();
     }
 
-    if (tutorialMovementLocked || pokedexModalOpen || dialogueActive) {
+    if (
+      tutorialMovementLocked ||
+      pokedexModalOpen ||
+      dialogueActive ||
+      skillLearnActive ||
+      scriptedInteractionActive
+    ) {
       controls.clearMovementInput();
     }
 
@@ -134,6 +207,8 @@ export function startGameLoop({
       !cinematicActive &&
       !controls.isBuilderPanelOpen() &&
       !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
       !dialogueActive &&
       actTwoTutorial.allowsCameraLook();
     const canCycleCameraZoom =
@@ -142,6 +217,8 @@ export function startGameLoop({
       !tutorialActive &&
       !controls.isBuilderPanelOpen() &&
       !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
       !dialogueActive;
 
     while (controls.consumeCameraZoomCycleRequest?.()) {
@@ -174,9 +251,35 @@ export function startGameLoop({
       !cinematicActive &&
       !tutorialMovementLocked &&
       !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
       !dialogueActive
     ) {
+      const previousPlayerPosition = session.playerCharacter.getPosition();
       session.playerCharacter.update(deltaTime);
+      const nextPlayerPosition = session.playerCharacter.getPosition();
+      const movedDistance = Math.hypot(
+        nextPlayerPosition[0] - previousPlayerPosition[0],
+        nextPlayerPosition[2] - previousPlayerPosition[2]
+      );
+
+      if (
+        !movementQuestReported &&
+        gameplay.getActiveSystemQuest?.()?.id === "learn-to-move" &&
+        movedDistance > 0.0005
+      ) {
+        movementQuestDistance += movedDistance;
+        if (movementQuestDistance >= 0.04) {
+          const movementResult = gameplay.recordQuestEvent?.({
+            type: "MOVE",
+            targetId: "player"
+          });
+          movementQuestReported = Boolean(
+            movementResult?.changed ||
+            movementResult?.completedQuestIds?.length
+          );
+        }
+      }
     }
 
     updatePlayerDustParticles(session.playerDust, {
@@ -186,6 +289,8 @@ export function startGameLoop({
         !cinematicActive &&
         !tutorialMovementLocked &&
         !pokedexModalOpen &&
+        !skillLearnActive &&
+        !scriptedInteractionActive &&
         !dialogueActive
     });
     updateNatureRevivalEffects(session.natureRevivalEffects, deltaTime);
@@ -213,7 +318,9 @@ export function startGameLoop({
       harvestRequested &&
       session.playerCharacter &&
       !cinematicActive &&
-      !tutorialActive
+      !tutorialActive &&
+      !skillLearnActive &&
+      !scriptedInteractionActive
     ) {
       const playerPosition = session.playerCharacter.getPosition();
       const primaryInteractTarget =
@@ -236,6 +343,15 @@ export function startGameLoop({
           inventory: controls.inventory,
           groundGrassPatches: session.groundGrassPatches,
           onNpcInteractionStart({ targetId, playerPosition, npcActors, interactables }) {
+            faceInteractionTargetTowardPlayer({
+              targetId,
+              playerPosition,
+              npcActors,
+              interactables
+            });
+            if (controls.isScriptedInteractionActive?.()) {
+              return;
+            }
             dialogueCamera?.focusNpcConversation({
               targetId,
               playerPosition,
@@ -254,6 +370,8 @@ export function startGameLoop({
       !cinematicActive &&
       !tutorialActive &&
       !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
       !dialogueActive
     ) {
       const playerPosition = session.playerCharacter.getPosition();
@@ -277,6 +395,8 @@ export function startGameLoop({
       session.playerCharacter &&
       !cinematicActive &&
       !tutorialActive &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
       !dialogueActive
     ) {
       gameplay.performInteractAction({
@@ -287,6 +407,15 @@ export function startGameLoop({
         inventory: controls.inventory,
         groundGrassPatches: session.groundGrassPatches,
         onNpcInteractionStart({ targetId, playerPosition, npcActors, interactables }) {
+          faceInteractionTargetTowardPlayer({
+            targetId,
+            playerPosition,
+            npcActors,
+            interactables
+          });
+          if (controls.isScriptedInteractionActive?.()) {
+            return;
+          }
           dialogueCamera?.focusNpcConversation({
             targetId,
             playerPosition,
@@ -314,7 +443,7 @@ export function startGameLoop({
     }
 
     if (session.playerCharacter && !cinematicActive) {
-      if (!tutorialActive && !pokedexModalOpen) {
+      if (!tutorialActive && !pokedexModalOpen && !skillLearnActive && !scriptedInteractionActive) {
         const collectedWoodCount = gameplay.collectWoodDrops(
           session.playerCharacter.getPosition(),
           session.woodDrops,
@@ -340,7 +469,7 @@ export function startGameLoop({
     }
 
     const nearbyHarvestTarget =
-      session.playerCharacter && !cinematicActive && !tutorialActive ?
+      session.playerCharacter && !cinematicActive && !tutorialActive && !skillLearnActive && !scriptedInteractionActive ?
         gameplay.findNearbyActionTarget({
           playerPosition: session.playerCharacter.getPosition(),
           palmModel: session.palmModel,
@@ -352,7 +481,7 @@ export function startGameLoop({
         }) :
         null;
     const nearbyInteractable =
-      session.playerCharacter && !cinematicActive && !tutorialActive ?
+      session.playerCharacter && !cinematicActive && !tutorialActive && !skillLearnActive && !scriptedInteractionActive ?
         gameplay.findNearbyInteractable(
           session.playerCharacter.getPosition(),
           session.npcActors,
@@ -362,7 +491,8 @@ export function startGameLoop({
         ) :
         null;
     const activeQuest = gameplay.getActiveQuest(controls.storyState);
-    const promptCopy = cinematicActive || tutorialActive ?
+    const activeSystemQuest = gameplay.getActiveSystemQuest?.() || null;
+    const promptCopy = cinematicActive || tutorialActive || skillLearnActive || scriptedInteractionActive ?
       "" :
       gameplay.buildNearbyPrompt({
         harvestTarget: nearbyHarvestTarget,
@@ -375,10 +505,12 @@ export function startGameLoop({
       !cinematicActive &&
       !tutorialActive &&
       !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
       !gameplayDialogue.isActive() &&
       Boolean(nearbyHarvestTarget?.groundCell);
 
-    if (!cinematicActive && !tutorialActive && !pokedexModalOpen) {
+    if (!cinematicActive && !tutorialActive && !pokedexModalOpen && !skillLearnActive) {
       nextFrame.hud.active = true;
       nextFrame.hud.storyState = controls.storyState;
       nextFrame.hud.inventory = controls.inventory;
@@ -402,6 +534,7 @@ export function startGameLoop({
       !cinematicActive &&
       !tutorialActive &&
       !pokedexModalOpen &&
+      !skillLearnActive &&
       !gameplayDialogue.isActive() &&
       activeQuest?.id === "meetTangrowth" &&
       tangrowthPosition;
@@ -425,6 +558,19 @@ export function startGameLoop({
     if (shouldShowGroundCellHighlight) {
       nextFrame.groundCellHighlight.visible = true;
       nextFrame.groundCellHighlight.groundCell = nearbyHarvestTarget.groundCell;
+    }
+
+    const questCompletionPop = gameplay.getQuestCompletionPop?.();
+    if (
+      questCompletionPop?.text &&
+      session.playerCharacter &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen
+    ) {
+      nextFrame.taskPop.visible = true;
+      nextFrame.taskPop.text = questCompletionPop.text;
+      nextFrame.taskPop.worldPosition = session.playerCharacter.getPosition();
     }
 
     for (const groundGrassPatch of session.groundGrassPatches) {
@@ -476,6 +622,10 @@ export function startGameLoop({
         npcMarkerOffset: rendering.npcMarkerOffset,
         npcMarkerSize: rendering.npcMarkerSize,
         fullUvRect: rendering.fullUvRect,
+        attentionTargetIds: getQuestAttentionTargetIds({
+          systemQuest: activeSystemQuest,
+          storyQuest: activeQuest
+        }),
         isNpcActive: rendering.isNpcActive,
         isInteractableActive: rendering.isInteractableActive,
         isResourceNodeActive: rendering.isResourceNodeActive
@@ -508,12 +658,9 @@ export function startGameLoop({
       actTwoTutorial.hasStarted() || controls.storyState.questIndex >= 1 ?
         session.actTwoSquirtle :
         null;
-    nextFrame.render.genericBillboards.push({
-      texture: visibleActTwoSquirtle?.texture || null,
-      position: visibleActTwoSquirtle?.position || null,
-      size: visibleActTwoSquirtle?.size || null,
-      uvRect: rendering.fullUvRect
-    });
+    if (session.actTwoSquirtle?.modelInstance) {
+      session.actTwoSquirtle.modelInstance.active = Boolean(visibleActTwoSquirtle);
+    }
     nextFrame.render.genericBillboards.push({
       texture: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.texture : null,
       position: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.position : null,
@@ -530,6 +677,16 @@ export function startGameLoop({
         rendering.fullUvRect
       )
     );
+    if (rendering.debugColliders) {
+      nextFrame.colliderGizmos.visible = true;
+      nextFrame.colliderGizmos.colliders = session.elevatedTerrainColliders || [];
+      nextFrame.render.genericBillboards.push(
+        ...getColliderGizmoBillboards({
+          colliders: session.elevatedTerrainColliders,
+          textures: session.colliderGizmoTextures
+        })
+      );
+    }
     nextFrame.render.characters = {
       storyState: controls.storyState,
       playerCharacter: session.playerCharacter,

@@ -18,6 +18,7 @@ export function createWorldSpeechController({ mount } = {}) {
     const speechElement = document.createElement("div");
     speechElement.className = "act-two-tutorial__speech";
     speechElement.dataset.worldSpeechVariant = variant;
+    speechElement.hidden = true;
 
     const bubbleElement = document.createElement("div");
     bubbleElement.className = "act-two-tutorial__speech-bubble";
@@ -31,11 +32,13 @@ export function createWorldSpeechController({ mount } = {}) {
 
   const npcSpeech = createSpeechElement("npc");
   const playerPrompt = createSpeechElement("player-prompt");
+  const taskPop = createSpeechElement("task-pop");
 
   const speech = npcSpeech.speech;
   const bubble = npcSpeech.bubble;
   layer.append(speech);
   layer.append(playerPrompt.speech);
+  layer.append(taskPop.speech);
   mount.append(layer);
 
   const state = {
@@ -44,7 +47,10 @@ export function createWorldSpeechController({ mount } = {}) {
     worldPosition: [0, 0, 0],
     promptActive: false,
     promptAnchorHeight: 1.95,
-    promptWorldPosition: [0, 0, 0]
+    promptWorldPosition: [0, 0, 0],
+    taskPopActive: false,
+    taskPopAnchorHeight: 2.68,
+    taskPopWorldPosition: [0, 0, 0]
   };
 
   function show({ text, worldPosition, anchorHeight = 2.35 } = {}) {
@@ -59,7 +65,7 @@ export function createWorldSpeechController({ mount } = {}) {
   function hide() {
     state.active = false;
     speech.hidden = true;
-    layer.hidden = !state.promptActive;
+    layer.hidden = !state.promptActive && !state.taskPopActive;
   }
 
   function showPrompt({ text, worldPosition, anchorHeight = 1.95 } = {}) {
@@ -74,7 +80,26 @@ export function createWorldSpeechController({ mount } = {}) {
   function hidePrompt() {
     state.promptActive = false;
     playerPrompt.speech.hidden = true;
-    layer.hidden = !state.active;
+    layer.hidden = !state.active && !state.taskPopActive;
+  }
+
+  function showTaskPop({ text, worldPosition, anchorHeight = 2.68 } = {}) {
+    state.taskPopActive = true;
+    state.taskPopAnchorHeight = anchorHeight;
+    state.taskPopWorldPosition = worldPosition ? [...worldPosition] : [0, 0, 0];
+    taskPop.bubble.textContent = text || "";
+    taskPop.speech.hidden = false;
+    layer.hidden = false;
+
+    taskPop.bubble.style.animation = "none";
+    void taskPop.bubble.offsetWidth;
+    taskPop.bubble.style.animation = "";
+  }
+
+  function hideTaskPop() {
+    state.taskPopActive = false;
+    taskPop.speech.hidden = true;
+    layer.hidden = !state.active && !state.promptActive;
   }
 
   function setWorldPosition(worldPosition) {
@@ -91,6 +116,14 @@ export function createWorldSpeechController({ mount } = {}) {
     }
 
     state.promptWorldPosition = [...worldPosition];
+  }
+
+  function setTaskPopWorldPosition(worldPosition) {
+    if (!worldPosition) {
+      return;
+    }
+
+    state.taskPopWorldPosition = [...worldPosition];
   }
 
   function updateSpeechElement({
@@ -146,8 +179,24 @@ export function createWorldSpeechController({ mount } = {}) {
     });
   }
 
+  function updateTaskPop(camera, viewportWidth, viewportHeight) {
+    if (!state.taskPopActive) {
+      return;
+    }
+
+    updateSpeechElement({
+      camera,
+      viewportWidth,
+      viewportHeight,
+      worldPosition: state.taskPopWorldPosition,
+      anchorHeight: state.taskPopAnchorHeight,
+      speechElement: taskPop.speech
+    });
+  }
+
   return {
     hide,
+    hideTaskPop,
     hidePrompt,
     isVisible() {
       return state.active;
@@ -155,10 +204,16 @@ export function createWorldSpeechController({ mount } = {}) {
     isPromptVisible() {
       return state.promptActive;
     },
+    isTaskPopVisible() {
+      return state.taskPopActive;
+    },
     setPromptWorldPosition,
+    setTaskPopWorldPosition,
     setWorldPosition,
     show,
+    showTaskPop,
     showPrompt,
+    updateTaskPop,
     updatePrompt,
     update
   };

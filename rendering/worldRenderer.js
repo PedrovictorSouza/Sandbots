@@ -170,11 +170,14 @@ export function createWorldRenderer({
       npcMarkerOffset,
       npcMarkerSize,
       fullUvRect,
+      attentionTargetIds = [],
       isNpcActive,
       isInteractableActive,
       isResourceNodeActive
     }) {
       const markers = [];
+      const attentionTargets = new Set(attentionTargetIds);
+      const markerTime = performance.now() * 0.001;
 
       for (const npcActor of npcActors) {
         if (!isNpcActive(npcActor, storyState)) {
@@ -183,9 +186,11 @@ export function createWorldRenderer({
 
         const position = npcActor.character.getPosition();
         markers.push({
+          id: npcActor.id,
           texture: markerTextures[npcActor.markerKey],
           position: [position[0], position[1] + npcMarkerOffset, position[2]],
-          size: npcMarkerSize
+          size: npcMarkerSize,
+          attention: attentionTargets.has(npcActor.id)
         });
       }
 
@@ -195,13 +200,15 @@ export function createWorldRenderer({
         }
 
         markers.push({
+          id: interactable.id,
           texture: markerTextures[interactable.markerKey],
           position: [
             interactable.position[0],
             interactable.position[1] + worldMarkerHeight,
             interactable.position[2]
           ],
-          size: worldMarkerSize
+          size: worldMarkerSize,
+          attention: attentionTargets.has(interactable.id)
         });
       }
 
@@ -211,13 +218,15 @@ export function createWorldRenderer({
         }
 
         markers.push({
+          id: resourceNode.id,
           texture: markerTextures[resourceNode.markerKey],
           position: [
             resourceNode.position[0],
             resourceNode.position[1] + worldMarkerHeight,
             resourceNode.position[2]
           ],
-          size: worldMarkerSize
+          size: worldMarkerSize,
+          attention: attentionTargets.has(resourceNode.id)
         });
       }
 
@@ -228,7 +237,33 @@ export function createWorldRenderer({
       prepareSpritePass(viewProjection);
 
       for (const marker of markers) {
-        drawSpriteQuad(marker.texture, marker.position, marker.size, fullUvRect);
+        if (!marker.attention) {
+          drawSpriteQuad(marker.texture, marker.position, marker.size, fullUvRect);
+          continue;
+        }
+
+        const pulse = (Math.sin(markerTime * 6.2) + 1) * 0.5;
+        const bob = Math.sin(markerTime * 5.1) * 0.14;
+        const popScale = 1 + pulse * 0.18;
+        const echoScale = 1.34 + pulse * 0.12;
+        const attentionPosition = [
+          marker.position[0],
+          marker.position[1] + bob,
+          marker.position[2]
+        ];
+
+        drawSpriteQuad(
+          marker.texture,
+          [attentionPosition[0], attentionPosition[1] - 0.02, attentionPosition[2]],
+          [marker.size[0] * echoScale, marker.size[1] * echoScale],
+          fullUvRect
+        );
+        drawSpriteQuad(
+          marker.texture,
+          attentionPosition,
+          [marker.size[0] * popScale, marker.size[1] * popScale],
+          fullUvRect
+        );
       }
     },
 

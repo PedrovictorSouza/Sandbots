@@ -48,6 +48,25 @@ function normalizeCollisionResult(result) {
   };
 }
 
+function getFacingToward(fromPosition, toPosition, fallback = "down") {
+  if (!fromPosition || !toPosition) {
+    return fallback;
+  }
+
+  const deltaX = toPosition[0] - fromPosition[0];
+  const deltaZ = toPosition[2] - fromPosition[2];
+
+  if (Math.abs(deltaX) > Math.abs(deltaZ)) {
+    return deltaX > 0 ? "right" : "left";
+  }
+
+  if (Math.abs(deltaZ) > 0.001) {
+    return deltaZ > 0 ? "down" : "up";
+  }
+
+  return fallback;
+}
+
 export function createStaticController() {
   return {
     getIntent() {
@@ -143,6 +162,20 @@ export async function createCharacterFactory({
 
         getPosition() {
           return [...state.position];
+        },
+
+        setPosition(nextPosition) {
+          if (!Array.isArray(nextPosition) || nextPosition.length < 3) {
+            return;
+          }
+
+          state.position = [nextPosition[0], nextPosition[1], nextPosition[2]];
+          state.groundY = nextPosition[1] || baseGroundY;
+          state.verticalVelocity = 0;
+        },
+
+        faceToward(position) {
+          state.facing = getFacingToward(state.position, position, state.facing);
         },
 
         update(deltaTime) {

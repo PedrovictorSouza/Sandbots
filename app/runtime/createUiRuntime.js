@@ -1,9 +1,11 @@
 import { createBagDetailsController } from "../ui/bagDetailsController.js";
 import { createGameplayDialogueController } from "../ui/gameplayDialogueController.js";
 import { createGameplayUiVisibilityController } from "../ui/gameplayUiVisibilityController.js";
+import { createColliderGizmoOverlay } from "../ui/colliderGizmoOverlay.js";
 import { createGroundCellHighlightController } from "../ui/groundCellHighlightController.js";
 import { createHudSuspenseBoundary } from "../ui/hudSuspenseBoundary.js";
 import { createOnboardingHintController } from "../ui/onboardingHintController.js";
+import { createSkillLearnOverlay } from "../ui/skillLearnOverlay.js";
 import { createWorldSpeechController } from "../ui/worldSpeechController.js";
 import { createBagUiRuntime } from "./bagUiRuntime.js";
 import { createLazyModuleHandle } from "./lazyModuleHandle.js";
@@ -28,6 +30,7 @@ export function createUiRuntime({
   getRegionForPosition,
   resourceHarvestPrompt,
   interactPrompt,
+  questSystem = null,
   isBagDetailItemId,
   clearGameFlowInput,
   isBuilderPanelOpen,
@@ -61,6 +64,7 @@ export function createUiRuntime({
     inventoryPanel,
     pokedexAlertButton,
     pokedexOverlay,
+    skillLearnOverlay: skillLearnOverlayRoot,
     mount,
     renderFrame
   } = dom;
@@ -119,6 +123,7 @@ export function createUiRuntime({
       getRegionForPosition,
       resourceHarvestPrompt,
       interactPrompt,
+      questSystem,
       initialStatus: status?.textContent || "Inicializando cena...",
       questTitleElement: questFocusTitle,
       questBodyElement: questFocusBody,
@@ -271,7 +276,14 @@ export function createUiRuntime({
     uiLayer,
     clearGameFlowInput
   });
+  const skillLearnOverlay = createSkillLearnOverlay({
+    root: skillLearnOverlayRoot,
+    clearGameFlowInput
+  });
   const worldSpeech = createWorldSpeechController({
+    mount: overlayMount
+  });
+  const colliderGizmos = createColliderGizmoOverlay({
     mount: overlayMount
   });
   const groundCellHighlight = createGroundCellHighlightController({
@@ -338,6 +350,7 @@ export function createUiRuntime({
     ...hud,
     bagUiRuntime,
     createLazyUiModule,
+    colliderGizmos,
     gameplayDialogue,
     gameplayUiVisibility,
     groundCellHighlight,
@@ -347,6 +360,7 @@ export function createUiRuntime({
     pokedexRuntime,
     pokedexUiState: pokedexRuntime.state,
     setStatusFallback,
+    skillLearnOverlay,
     worldSpeech
   };
 }

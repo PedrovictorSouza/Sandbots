@@ -44,6 +44,11 @@ export function resolveRuntimeFlags({
     searchParams.get("skipStartForIntro") ||
     hashParams.get("introRoom") ||
     hashParams.get("skipStartForIntro");
+  const debugCollidersValue =
+    searchParams.get("debugColliders") ||
+    searchParams.get("colliderGizmos") ||
+    hashParams.get("debugColliders") ||
+    hashParams.get("colliderGizmos");
   const requestedScene =
     normalizeDevScene(searchParams.get("scene")) ||
     normalizeDevScene(hashParams.get("scene"));
@@ -51,6 +56,7 @@ export function resolveRuntimeFlags({
 
   return {
     skipStartScreen: isEnabledFlagValue(skipStartScreenValue),
+    debugColliders: isEnabledFlagValue(debugCollidersValue),
     introRoom,
     scene: requestedScene
   };

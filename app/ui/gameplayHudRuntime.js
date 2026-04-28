@@ -24,6 +24,7 @@ export function createGameplayHudRuntime({
   getRegionForPosition,
   resourceHarvestPrompt,
   interactPrompt,
+  questSystem = null,
   initialStatus
 }) {
   const gameHud = createGameHudController({
@@ -50,6 +51,7 @@ export function createGameplayHudRuntime({
     getRegionForPosition,
     resourceHarvestPrompt,
     interactPrompt,
+    questSystem,
     initialStatus
   });
 

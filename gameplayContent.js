@@ -171,7 +171,11 @@ export const GROUND_GRASS_LAYOUT = [
   { id: "grass-4", position: [15.8, 0, -4.2] },
   { id: "grass-5", position: [18.1, 0, -8.6] },
   { id: "grass-6", position: [4.6, 0, 1.9] },
-  { id: "grass-7", position: [21.3, 0, -1.8] }
+  { id: "grass-7", position: [21.3, 0, -1.8] },
+  { id: "grass-8", position: [23.8, 0, -5.6] },
+  { id: "grass-9", position: [26.1, 0, -9.4] },
+  { id: "grass-10", position: [28.4, 0, -2.6] },
+  { id: "grass-11", position: [30.2, 0, -7.2] }
 ];
 
 export const GROUND_FLOWER_LAYOUT = [

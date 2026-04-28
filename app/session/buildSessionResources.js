@@ -8,11 +8,11 @@ import {
   ACT_TWO_POKEDEX_CACHE_POSITION,
   ACT_TWO_POKEDEX_CACHE_SIZE,
   ACT_TWO_REPAIR_PLANT_POSITION,
-  ACT_TWO_REPAIR_PLANT_SIZE,
-  ACT_TWO_SQUIRTLE_SIZE
+  ACT_TWO_REPAIR_PLANT_SIZE
 } from "../../rendering/worldAssets.js";
 import { createPlayerDustState } from "./playerDustParticles.js";
 import { createNatureRevivalEffectState } from "./natureRevivalEffects.js";
+import { createColliderGizmoTextures } from "./colliderGizmos.js";
 
 function createPlayerDustCanvas() {
   const canvas = document.createElement("canvas");
@@ -78,11 +78,8 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.playerDust = createPlayerDustState();
   session.natureRevivalSparkTexture = worldTextureFactory.fromCanvas(createNatureRevivalSparkCanvas());
   session.natureRevivalEffects = createNatureRevivalEffectState();
-  session.squirtleTexture = worldTextureFactory.createSquirtleTexture();
+  session.colliderGizmoTextures = createColliderGizmoTextures(worldTextureFactory);
   session.bulbasaurTexture = worldTextureFactory.createBulbasaurTexture();
-  session.squirtleRecoveredTexture = worldTextureFactory.createSquirtleTexture({
-    recovered: true
-  });
 
   session.deadGrassTexture = worldTextureFactory.createGroundGrassTexture();
   session.greenGrassTexture = worldTextureFactory.createGroundGrassTexture({
@@ -101,9 +98,14 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   });
 
   session.actTwoSquirtle = {
-    texture: session.squirtleTexture,
     position: [...ACT_TWO_SQUIRTLE_POSITION],
-    size: ACT_TWO_SQUIRTLE_SIZE
+    recovered: false,
+    modelInstance: {
+      offset: [...ACT_TWO_SQUIRTLE_POSITION],
+      scale: 0.5,
+      yaw: 0,
+      active: false
+    }
   };
 
   session.bulbasaurEncounter = {

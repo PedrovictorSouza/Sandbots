@@ -18,9 +18,18 @@ function createFrameSnapshot() {
       text: "",
       worldPosition: null
     },
+    taskPop: {
+      visible: false,
+      text: "",
+      worldPosition: null
+    },
     groundCellHighlight: {
       visible: false,
       groundCell: null
+    },
+    colliderGizmos: {
+      visible: false,
+      colliders: []
     },
     render: {
       viewProjection: null,
@@ -57,8 +66,15 @@ function resetFrameSnapshot(snapshot) {
   snapshot.worldPrompt.text = "";
   snapshot.worldPrompt.worldPosition = null;
 
+  snapshot.taskPop.visible = false;
+  snapshot.taskPop.text = "";
+  snapshot.taskPop.worldPosition = null;
+
   snapshot.groundCellHighlight.visible = false;
   snapshot.groundCellHighlight.groundCell = null;
+
+  snapshot.colliderGizmos.visible = false;
+  snapshot.colliderGizmos.colliders = [];
 
   snapshot.render.viewProjection = null;
   snapshot.render.sceneObjects = null;
@@ -144,6 +160,30 @@ function commitWorldPrompt(worldSpeechController, snapshot, previousSnapshot) {
   worldSpeechController.setPromptWorldPosition?.(snapshot.worldPrompt.worldPosition);
 }
 
+function commitTaskPop(worldSpeechController, snapshot, previousSnapshot) {
+  if (!snapshot.taskPop.visible) {
+    if (previousSnapshot.taskPop.visible) {
+      worldSpeechController.hideTaskPop?.();
+    }
+    return;
+  }
+
+  const needsShow =
+    !previousSnapshot.taskPop.visible ||
+    previousSnapshot.taskPop.text !== snapshot.taskPop.text;
+
+  if (needsShow) {
+    worldSpeechController.showTaskPop?.({
+      text: snapshot.taskPop.text,
+      worldPosition: snapshot.taskPop.worldPosition,
+      anchorHeight: 2.68
+    });
+    return;
+  }
+
+  worldSpeechController.setTaskPopWorldPosition?.(snapshot.taskPop.worldPosition);
+}
+
 function commitGroundCellHighlight(highlightController, snapshot, previousSnapshot) {
   if (!snapshot.groundCellHighlight.visible) {
     if (previousSnapshot.groundCellHighlight.visible) {
@@ -163,6 +203,23 @@ function commitGroundCellHighlight(highlightController, snapshot, previousSnapsh
   }
 
   highlightController.setGroundCell(snapshot.groundCellHighlight.groundCell);
+}
+
+function commitColliderGizmos(colliderGizmoController, snapshot, previousSnapshot) {
+  if (!colliderGizmoController) {
+    return;
+  }
+
+  if (!snapshot.colliderGizmos.visible) {
+    if (previousSnapshot.colliderGizmos.visible) {
+      colliderGizmoController.hide();
+    }
+    return;
+  }
+
+  colliderGizmoController.show({
+    colliders: snapshot.colliderGizmos.colliders
+  });
 }
 
 function commitRender(worldRenderer, snapshot) {
@@ -204,6 +261,7 @@ function commitProjectedOverlays({
   worldSpeechController,
   highlightController,
   actTwoTutorial,
+  colliderGizmos,
   snapshot
 }) {
   if (snapshot.worldSpeech.visible) {
@@ -214,8 +272,16 @@ function commitProjectedOverlays({
     worldSpeechController.updatePrompt?.(camera, mount.clientWidth, mount.clientHeight);
   }
 
+  if (snapshot.taskPop.visible) {
+    worldSpeechController.updateTaskPop?.(camera, mount.clientWidth, mount.clientHeight);
+  }
+
   if (snapshot.groundCellHighlight.visible) {
     highlightController.update(camera, mount.clientWidth, mount.clientHeight);
+  }
+
+  if (snapshot.colliderGizmos.visible) {
+    colliderGizmos?.update(camera, mount.clientWidth, mount.clientHeight);
   }
 
   if (snapshot.tutorial.active) {
@@ -235,6 +301,7 @@ export function createFrameSnapshotController({
   worldRenderer,
   worldSpeech,
   groundCellHighlight,
+  colliderGizmos,
   actTwoTutorial,
   hud
 }) {
@@ -254,13 +321,16 @@ export function createFrameSnapshotController({
       commitHud(hud, frontBuffer);
       commitWorldSpeech(worldSpeech, frontBuffer, previousSnapshot);
       commitWorldPrompt(worldSpeech, frontBuffer, previousSnapshot);
+      commitTaskPop(worldSpeech, frontBuffer, previousSnapshot);
       commitGroundCellHighlight(groundCellHighlight, frontBuffer, previousSnapshot);
+      commitColliderGizmos(colliderGizmos, frontBuffer, previousSnapshot);
       commitRender(worldRenderer, frontBuffer);
       commitProjectedOverlays({
         camera,
         mount,
         worldSpeechController: worldSpeech,
         highlightController: groundCellHighlight,
+        colliderGizmos,
         actTwoTutorial,
         snapshot: frontBuffer
       });

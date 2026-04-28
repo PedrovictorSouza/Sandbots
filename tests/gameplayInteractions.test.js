@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createGameplayInteractions } from "../world/gameplayInteractions.js";
-import {
-  FLOWER_BED_POKEDEX_ENTRY_ID,
-  TALL_GRASS_POKEDEX_ENTRY_ID
-} from "../pokedexEntries.js";
+import { HABITAT_EVENT } from "../app/sandbox/habitatData.js";
 
 function createInteractions(overrides = {}) {
   return createGameplayInteractions({
@@ -202,7 +199,9 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(false);
     expect(findNearbyGroundCell).not.toHaveBeenCalled();
-    expect(pushNotice).toHaveBeenCalledWith("Nenhum recurso na area.");
+    expect(pushNotice).toHaveBeenCalledWith(
+      "No resource in range. Move closer to a tree or drop, then press Enter."
+    );
   });
 
   it("advances the quest when the player finds the stranded pokemon", () => {
@@ -274,7 +273,7 @@ describe("createGameplayInteractions", () => {
       yaw: 0
     };
     const pushNotice = vi.fn();
-    const showPokedexEntry = vi.fn();
+    const habitatSystem = { recordEvent: vi.fn() };
     const onFirstGrassRestored = vi.fn();
     const interactions = createInteractions({
       findNearbyGroundCell: vi.fn(() => ({
@@ -284,7 +283,7 @@ describe("createGameplayInteractions", () => {
       purifyGroundCell: vi.fn(() => true),
       reviveGroundGrass: vi.fn(() => true),
       onFirstGrassRestored,
-      showPokedexEntry,
+      habitatSystem,
       pushNotice
     });
     const storyState = {
@@ -311,7 +310,10 @@ describe("createGameplayInteractions", () => {
     expect(result).toBe(true);
     expect(storyState.flags.firstGrassRestored).toBe(true);
     expect(pushNotice).toHaveBeenCalledWith("You've restored a dead grass!");
-    expect(showPokedexEntry).toHaveBeenCalledWith(FLOWER_BED_POKEDEX_ENTRY_ID);
+    expect(habitatSystem.recordEvent).toHaveBeenCalledWith({
+      type: HABITAT_EVENT.REVIVE_PATCH,
+      targetId: "grass"
+    });
     expect(onFirstGrassRestored).toHaveBeenCalledTimes(1);
   });
 
@@ -323,7 +325,11 @@ describe("createGameplayInteractions", () => {
       tileSpan: 1.425,
       yaw: 0
     };
-    const showPokedexEntry = vi.fn();
+    const habitatSystem = {
+      recordEvent: vi.fn(() => {
+        storyState.flags.tallGrassDiscovered = true;
+      })
+    };
     const interactions = createInteractions({
       findNearbyGroundCell: vi.fn(() => ({
         groundCell,
@@ -331,7 +337,7 @@ describe("createGameplayInteractions", () => {
       })),
       purifyGroundCell: vi.fn(() => true),
       reviveGroundGrass: vi.fn(() => true),
-      showPokedexEntry,
+      habitatSystem,
       pushNotice: vi.fn()
     });
     const storyState = {
@@ -361,7 +367,10 @@ describe("createGameplayInteractions", () => {
     expect(storyState.flags.restoredGrassCount).toBe(4);
     expect(storyState.flags.tallGrassDiscovered).toBe(true);
     expect(storyState.flags.rustlingGrassCellId).toBe(groundCell.id);
-    expect(showPokedexEntry).toHaveBeenCalledWith(TALL_GRASS_POKEDEX_ENTRY_ID);
+    expect(habitatSystem.recordEvent).toHaveBeenCalledWith({
+      type: HABITAT_EVENT.REVIVE_PATCH,
+      targetId: "grass"
+    });
   });
 
   it("triggers Tangrowth's flower recovery comment after enough flowers are revived", () => {

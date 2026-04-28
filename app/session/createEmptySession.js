@@ -10,6 +10,7 @@ export function createEmptySession() {
     actTwoSquirtle: null,
     characterTextures: {},
     chopperNpcActor: null,
+    colliderGizmoTextures: null,
     deadFlowerTexture: null,
     deadGrassTexture: null,
     elevatedTerrainColliders: [],
@@ -36,8 +37,6 @@ export function createEmptySession() {
     resourceNodes: createResourceNodes(),
     sceneObjects: [],
     spawnActTwoPlayer: () => {},
-    squirtleRecoveredTexture: null,
-    squirtleTexture: null,
     woodDrops: [],
     woodTexture: null
   };

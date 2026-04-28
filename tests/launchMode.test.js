@@ -65,8 +65,7 @@ describe("launchMode", () => {
     const session = {
       spawnActTwoPlayer: () => {},
       actTwoRepairPlant: { fixed: false },
-      actTwoSquirtle: { texture: null },
-      squirtleRecoveredTexture: { id: "recovered" }
+      actTwoSquirtle: { recovered: false }
     };
     const startScreen = { dismiss: () => {} };
     const introSequence = { dismiss: () => {} };
@@ -93,6 +92,6 @@ describe("launchMode", () => {
     ]);
     expect(playerMemory.foundPokedex).toBe(true);
     expect(session.actTwoRepairPlant.fixed).toBe(true);
-    expect(session.actTwoSquirtle.texture).toBe(session.squirtleRecoveredTexture);
+    expect(session.actTwoSquirtle.recovered).toBe(true);
   });
 });

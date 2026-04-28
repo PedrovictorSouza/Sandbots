@@ -22,13 +22,22 @@ describe("createFrameSnapshotController", () => {
       show: vi.fn(),
       hide: vi.fn(),
       update: vi.fn(),
-      setWorldPosition: vi.fn()
+      setWorldPosition: vi.fn(),
+      showTaskPop: vi.fn(),
+      hideTaskPop: vi.fn(),
+      updateTaskPop: vi.fn(),
+      setTaskPopWorldPosition: vi.fn()
     };
     const groundCellHighlight = {
       show: vi.fn(),
       hide: vi.fn(),
       update: vi.fn(),
       setGroundCell: vi.fn()
+    };
+    const colliderGizmos = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      update: vi.fn()
     };
     const actTwoTutorial = {
       update: vi.fn()
@@ -45,6 +54,12 @@ describe("createFrameSnapshotController", () => {
     const worldMarkers = { markerTextures: {} };
     const characters = { playerCharacter: { id: "player" } };
     const groundCell = { id: "cell-1" };
+    const collider = {
+      id: "terrain-collider-1",
+      position: [7, 1, -2],
+      size: [2, 2, 2],
+      surfaceY: 2
+    };
     const speechPosition = [12, 0.5, -3];
 
     const controller = createFrameSnapshotController({
@@ -52,6 +67,7 @@ describe("createFrameSnapshotController", () => {
       mount,
       worldRenderer,
       worldSpeech,
+      colliderGizmos,
       groundCellHighlight,
       actTwoTutorial,
       hud
@@ -67,8 +83,13 @@ describe("createFrameSnapshotController", () => {
     firstFrame.worldSpeech.visible = true;
     firstFrame.worldSpeech.text = "Tangrowth esta esperando.";
     firstFrame.worldSpeech.worldPosition = speechPosition;
+    firstFrame.taskPop.visible = true;
+    firstFrame.taskPop.text = "YOU RESTORED THE TALL GRASS!";
+    firstFrame.taskPop.worldPosition = [4, 0, 2];
     firstFrame.groundCellHighlight.visible = true;
     firstFrame.groundCellHighlight.groundCell = groundCell;
+    firstFrame.colliderGizmos.visible = true;
+    firstFrame.colliderGizmos.colliders = [collider];
     firstFrame.render.viewProjection = viewProjection;
     firstFrame.render.sceneObjects = sceneObjects;
     firstFrame.render.grassBillboards.push({ texture: "grass", position: [0, 0, 0], size: [1, 1] });
@@ -98,8 +119,16 @@ describe("createFrameSnapshotController", () => {
       text: "Tangrowth esta esperando.",
       worldPosition: speechPosition
     });
+    expect(worldSpeech.showTaskPop).toHaveBeenCalledWith({
+      text: "YOU RESTORED THE TALL GRASS!",
+      worldPosition: [4, 0, 2],
+      anchorHeight: 2.68
+    });
     expect(groundCellHighlight.show).toHaveBeenCalledWith({
       groundCell
+    });
+    expect(colliderGizmos.show).toHaveBeenCalledWith({
+      colliders: [collider]
     });
     expect(worldRenderer.drawScene).toHaveBeenCalledWith(viewProjection, sceneObjects);
     expect(worldRenderer.drawBillboards).toHaveBeenNthCalledWith(
@@ -123,7 +152,9 @@ describe("createFrameSnapshotController", () => {
     );
     expect(worldRenderer.drawCharacters).toHaveBeenCalledWith(viewProjection, characters);
     expect(worldSpeech.update).toHaveBeenCalledWith(camera, 1280, 720);
+    expect(worldSpeech.updateTaskPop).toHaveBeenCalledWith(camera, 1280, 720);
     expect(groundCellHighlight.update).toHaveBeenCalledWith(camera, 1280, 720);
+    expect(colliderGizmos.update).toHaveBeenCalledWith(camera, 1280, 720);
     expect(actTwoTutorial.update).toHaveBeenCalledWith(camera, 1280, 720, [4, 0, 2], 0.016);
 
     const secondFrame = controller.beginFrame();
@@ -132,6 +163,9 @@ describe("createFrameSnapshotController", () => {
     secondFrame.worldSpeech.visible = true;
     secondFrame.worldSpeech.text = "Tangrowth esta esperando.";
     secondFrame.worldSpeech.worldPosition = [18, 0.5, -6];
+    secondFrame.taskPop.visible = true;
+    secondFrame.taskPop.text = "YOU RESTORED THE TALL GRASS!";
+    secondFrame.taskPop.worldPosition = [8, 0, 5];
     secondFrame.groundCellHighlight.visible = true;
     secondFrame.groundCellHighlight.groundCell = groundCell;
     secondFrame.tutorial.active = true;
@@ -143,6 +177,7 @@ describe("createFrameSnapshotController", () => {
     expect(secondFrame.render.grassBillboards).toHaveLength(0);
     expect(secondFrame.render.genericBillboards).toHaveLength(0);
     expect(worldSpeech.setWorldPosition).toHaveBeenCalledWith([18, 0.5, -6]);
+    expect(worldSpeech.setTaskPopWorldPosition).toHaveBeenCalledWith([8, 0, 5]);
     expect(groundCellHighlight.setGroundCell).toHaveBeenCalledWith(groundCell);
     expect(worldRenderer.drawBillboard).toHaveBeenCalledTimes(1);
 
@@ -153,6 +188,8 @@ describe("createFrameSnapshotController", () => {
     controller.commitFrame();
 
     expect(worldSpeech.hide).toHaveBeenCalledTimes(1);
+    expect(worldSpeech.hideTaskPop).toHaveBeenCalledTimes(1);
     expect(groundCellHighlight.hide).toHaveBeenCalledTimes(1);
+    expect(colliderGizmos.hide).toHaveBeenCalledTimes(1);
   });
 });

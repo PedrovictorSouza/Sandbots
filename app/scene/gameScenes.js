@@ -93,8 +93,8 @@ export function createGameScenes({
         const session = getGameSession();
 
         session?.spawnActTwoPlayer?.();
-        if (session?.actTwoSquirtle && session.squirtleTexture) {
-          session.actTwoSquirtle.texture = session.squirtleTexture;
+        if (session?.actTwoSquirtle) {
+          session.actTwoSquirtle.recovered = false;
         }
 
         actTwoTutorial.start(tutorialConfig);

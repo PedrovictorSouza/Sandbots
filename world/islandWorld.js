@@ -408,17 +408,17 @@ export function buildNearbyPrompt({
   }
 
   if (harvestTarget?.resourceNode) {
-    return `[Espaco] ${harvestTarget.resourceNode.label} • +${harvestTarget.resourceNode.yield} ${getItemLabel(
+    return `[Enter] ${harvestTarget.resourceNode.label} • +${harvestTarget.resourceNode.yield} ${getItemLabel(
       harvestTarget.resourceNode.itemId
     )}`;
   }
 
   if (harvestTarget?.palm) {
-    return "[Espaco] Derrubar palmeira para gerar Wood";
+    return "[Enter] Hit the palm tree to drop Wood";
   }
 
   if (harvestTarget?.groundCell) {
-    return "[Espaco] Purificar chao corrompido";
+    return "[Enter] Restore the dry ground";
   }
 
   return `${quest.title} • ${quest.actionLabel}`;

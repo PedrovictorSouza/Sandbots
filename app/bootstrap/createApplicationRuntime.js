@@ -7,7 +7,6 @@ import {
 } from "../../actTwoSceneConfig.js";
 import {
   BULBASAUR_POKEDEX_ENTRY_ID,
-  FLOWER_BED_POKEDEX_ENTRY_ID,
   SQUIRTLE_POKEDEX_ENTRY_ID
 } from "../../pokedexEntries.js";
 import { GAME_FLOW } from "../../gameFlow.js";
@@ -16,7 +15,6 @@ import {
   ITEM_DEFS,
   NPC_PROFILES,
   PLACEHOLDER_RECIPES,
-  PRETTY_FLOWER_BED_HABITAT_LABEL,
   TANGROWTH_OPENING_LINE,
   WATER_GUN_POWER_ITEM_ID,
   createInitialInventory,
@@ -41,6 +39,12 @@ import {
   TANGROWTH_ONBOARDING_DIALOGUE,
   TANGROWTH_TALL_GRASS_RETURN_DIALOGUE
 } from "../../dialogue/gameplayDialogueContent.js";
+import { createDialogueSystem } from "../dialogue/createDialogueSystem.js";
+import { SMALL_ISLAND_DIALOGUES } from "../dialogue/dialogueData.js";
+import { createQuestSystem } from "../quest/createQuestSystem.js";
+import { QUEST_EVENT, SMALL_ISLAND_QUESTS } from "../quest/questData.js";
+import { createHabitatSystem } from "../sandbox/createHabitatSystem.js";
+import { SMALL_ISLAND_HABITATS } from "../sandbox/habitatData.js";
 import {
   findNearbyGroundCell,
   purifyGroundCell,
@@ -63,6 +67,7 @@ import {
 import { createGameplayInteractions } from "../../world/gameplayInteractions.js";
 import { createGameSession } from "../gameSession.js";
 import { startNatureRevivalEffect } from "../session/natureRevivalEffects.js";
+import { startChopperNpcFlight } from "../session/chopperNpcActor.js";
 import { createEngineRuntime } from "../runtime/createEngineRuntime.js";
 import { createDialogueCameraController } from "../runtime/dialogueCameraController.js";
 import { createGameAppController } from "../runtime/gameAppController.js";
@@ -89,9 +94,10 @@ import {
 import { resolveDomElements } from "./resolveDomElements.js";
 import { createGameShell } from "../ui/createGameShell.js";
 
-const RESOURCE_HARVEST_PROMPT = "Espaco coleta";
-const INTERACT_PROMPT = "E interage";
+const RESOURCE_HARVEST_PROMPT = "Enter action";
+const INTERACT_PROMPT = "E talk";
 const ENABLE_GAMEPLAY_DEV_BOOT = true;
+const ENABLE_QUEST_PERSISTENCE = false;
 const DEFAULT_DEV_SCENE = DEV_SCENE.GAMEPLAY;
 const GAMEPLAY_DEFAULT_UI_SECTIONS = Object.freeze([
   "hud"
@@ -112,9 +118,32 @@ const PLAYER_SKILL_DEFS = {
     glyph: "W",
     color: "#65c7ff",
     ink: "#081f33"
+  },
+  leafage: {
+    id: "leafage",
+    label: "Leafage",
+    shortLabel: "Leaf",
+    glyph: "L",
+    color: "#7ed36d",
+    ink: "#0b2610"
   }
 };
-const PLAYER_SKILL_ORDER = ["transform", "waterGun"];
+const PLAYER_SKILL_ORDER = ["transform", "waterGun", "leafage"];
+const QUEST_COMPLETION_POP_DURATION_MS = 2400;
+const QUEST_COMPLETION_POP_MESSAGES = Object.freeze({
+  "learn-to-move": "YOU TOOK YOUR FIRST STEPS!",
+  "wake-guide": "YOU MET CHOPPER!",
+  "gather-first-supplies": "YOU GATHERED SUPPLIES!",
+  "shape-a-living-patch": "YOU RESTORED A PATCH!",
+  "record-a-memory": "YOU RECORDED A MEMORY!",
+  "open-the-water-route": "YOU LEARNED WATER GUN!",
+  "water-dry-grass": "YOU RESTORED THE TALL GRASS!",
+  "inspect-rustling-grass": "YOU MET A NEW HELPER!",
+  "grow-a-home-patch": "YOU GREW A HOME PATCH!",
+  "chopper-first-habitat-report": "YOU REPORTED BACK!"
+});
+const CHOPPER_SECOND_TALK_APPROACH_DURATION = 1.05;
+const CHOPPER_SECOND_TALK_STOP_DISTANCE = 1.45;
 
 function scheduleIdleTask(windowRef, callback, timeout = 1200) {
   if (typeof windowRef.requestIdleCallback === "function") {
@@ -208,7 +237,8 @@ export function createApplicationRuntime({
   };
   const playerSkills = {
     transform: false,
-    waterGun: false
+    waterGun: false,
+    leafage: false
   };
   let harvestRequested = false;
   let interactRequested = false;
@@ -217,6 +247,134 @@ export function createApplicationRuntime({
   let gameSession = null;
   let uiRuntime = null;
   let sceneFlowRuntime = null;
+  let questCompletionPop = null;
+  let scriptedInteractionActive = false;
+
+  function getRuntimeNow() {
+    return windowRef.performance?.now?.() ?? Date.now();
+  }
+
+  function buildQuestTransitionNotice(completedQuestIds = [], activeQuest = null) {
+    const completedQuest = questSystem.getQuest(completedQuestIds.at(-1));
+    const nextQuest = completedQuest?.nextQuestId ?
+      questSystem.getQuest(completedQuest.nextQuestId) :
+      activeQuest;
+    const completedCopy = completedQuest ? `Task complete: ${completedQuest.title}.` : "Task complete.";
+    const nextCopy = nextQuest ?
+      `Next: ${nextQuest.title}. ${nextQuest.guidance || nextQuest.description}` :
+      "Free roam: keep restoring the island and checking in with helpers.";
+    return `${completedCopy} ${nextCopy}`;
+  }
+
+  function buildQuestCompletionPopText(completedQuestIds = []) {
+    const completedQuestId = completedQuestIds.at(-1);
+    const completedQuest = completedQuestId ? questSystem.getQuest(completedQuestId) : null;
+
+    return QUEST_COMPLETION_POP_MESSAGES[completedQuestId] ||
+      `YOU COMPLETED ${completedQuest?.title?.toUpperCase?.() || "THE TASK"}!`;
+  }
+
+  function showQuestCompletionPop(completedQuestIds = []) {
+    questCompletionPop = {
+      text: buildQuestCompletionPopText(completedQuestIds),
+      expiresAt: getRuntimeNow() + QUEST_COMPLETION_POP_DURATION_MS
+    };
+  }
+
+  function getQuestCompletionPop() {
+    if (!questCompletionPop) {
+      return null;
+    }
+
+    if (questCompletionPop.expiresAt <= getRuntimeNow()) {
+      questCompletionPop = null;
+      return null;
+    }
+
+    return questCompletionPop;
+  }
+
+  function getYawToward(fromPosition, toPosition) {
+    const deltaX = toPosition[0] - fromPosition[0];
+    const deltaZ = toPosition[2] - fromPosition[2];
+    return Math.atan2(deltaX, deltaZ);
+  }
+
+  function getChopperNpcPosition() {
+    return gameSession?.chopperNpcActor?.npcActor?.character?.getPosition?.() || null;
+  }
+
+  function buildChopperApproachTarget(playerPosition, chopperPosition) {
+    const toPlayer = [
+      playerPosition[0] - chopperPosition[0],
+      playerPosition[2] - chopperPosition[2]
+    ];
+    const distance = Math.hypot(toPlayer[0], toPlayer[1]);
+    const direction = distance > 0.001 ?
+      [toPlayer[0] / distance, toPlayer[1] / distance] :
+      [0, 1];
+
+    return [
+      playerPosition[0] - direction[0] * CHOPPER_SECOND_TALK_STOP_DISTANCE,
+      playerPosition[1],
+      playerPosition[2] - direction[1] * CHOPPER_SECOND_TALK_STOP_DISTANCE
+    ];
+  }
+
+  function shouldPlayChopperSecondTalkApproach({ targetId, dialogueId }) {
+    const firstMovementComplete = questSystem.getQuest("learn-to-move")?.status === "completed";
+
+    return targetId === "tangrowth" &&
+      dialogueId === "onboarding" &&
+      firstMovementComplete &&
+      !storyState.flags.chopperSecondTalkApproachSeen &&
+      Boolean(gameSession?.chopperNpcActor) &&
+      Boolean(gameSession?.playerCharacter);
+  }
+
+  const questSystem = createQuestSystem({
+    quests: SMALL_ISLAND_QUESTS,
+    storage: ENABLE_QUEST_PERSISTENCE ? windowRef.localStorage : null,
+    transitionDelayMs: 3000,
+    onChange({ reason, payload, activeQuest }) {
+      uiRuntime?.syncQuestFocus(storyState);
+      uiRuntime?.syncHudInstructions(storyState);
+      uiRuntime?.renderMissionCards(storyState, inventory, uiRuntime.getNoticeMessage());
+
+      if (reason === "quest-progress-completed" && payload?.completedQuestIds?.length) {
+        showQuestCompletionPop(payload.completedQuestIds);
+        uiRuntime?.pushNotice(
+          buildQuestTransitionNotice(payload.completedQuestIds, activeQuest),
+          5.2
+        );
+
+        if (payload.completedQuestIds.includes("inspect-rustling-grass")) {
+          unlockPlayerSkill("leafage", {
+            silent: true
+          });
+          uiRuntime?.pushNotice("You learned Leafage.");
+        }
+      }
+    }
+  });
+  const dialogueSystem = createDialogueSystem({
+    dialogues: SMALL_ISLAND_DIALOGUES,
+    questSystem
+  });
+  const habitatSystem = createHabitatSystem({
+    habitats: SMALL_ISLAND_HABITATS,
+    storyState,
+    onDiscover({ habitat, discoveredHabitats }) {
+      uiRuntime?.setNearbyHabitats(discoveredHabitats.map((entry) => entry.label));
+      uiRuntime?.pushNotice(`Habitat discovered: ${habitat.label}.`);
+      if (habitat.pokedexEntryId) {
+        uiRuntime?.pokedexRuntime.setOpen(true, {
+          markSeen: true,
+          entryId: habitat.pokedexEntryId
+        });
+      }
+    }
+  });
 
   function setStatusFallback(message, isError = false) {
     if (!status) {
@@ -268,13 +426,19 @@ export function createApplicationRuntime({
     return Boolean(ITEM_DEFS[itemId]?.bagDetailsEligible);
   }
 
-  function unlockPlayerSkill(skillId) {
+  function unlockPlayerSkill(skillId, { silent = false } = {}) {
     if (!PLAYER_SKILL_DEFS[skillId] || playerSkills[skillId]) {
       return;
     }
 
     playerSkills[skillId] = true;
     uiRuntime.syncSkillsUi(playerSkills);
+    if (!silent) {
+      questSystem.emit({
+        type: QUEST_EVENT.UNLOCK,
+        targetId: skillId
+      });
+    }
 
     if (skillId === "waterGun") {
       inventory[WATER_GUN_POWER_ITEM_ID] = 1;
@@ -350,6 +514,7 @@ export function createApplicationRuntime({
     getRegionForPosition,
     resourceHarvestPrompt: RESOURCE_HARVEST_PROMPT,
     interactPrompt: INTERACT_PROMPT,
+    questSystem,
     isBagDetailItemId,
     clearGameFlowInput,
     isBuilderPanelOpen: () => builderPanelOpen,
@@ -374,31 +539,84 @@ export function createApplicationRuntime({
       };
 
       if (targetId === "tangrowth" && dialogueId === "onboarding") {
-        return uiRuntime.gameplayDialogue.openConversation({
-          lines: TANGROWTH_ONBOARDING_DIALOGUE,
-          onLineChange(line) {
-            if (line?.id !== "notice-squirtle-sound") {
-              return;
-            }
+        const openOnboardingConversation = () => {
+          return uiRuntime.gameplayDialogue.openConversation({
+            lines: dialogueSystem.getConversation("chopperOnboarding") || TANGROWTH_ONBOARDING_DIALOGUE,
+            onLineChange(line) {
+              if (line?.id !== "notice-squirtle-sound") {
+                return;
+              }
 
-            dialogueCamera?.focusWorldPoint({
-              position: gameSession?.actTwoSquirtle?.position
-            });
-          },
-          onComplete: restoreCameraOnComplete
-        });
+              dialogueCamera?.focusWorldPoint({
+                position: gameSession?.actTwoSquirtle?.position
+              });
+            },
+            onComplete: restoreCameraOnComplete
+          });
+        };
+
+        if (shouldPlayChopperSecondTalkApproach({ targetId, dialogueId })) {
+          const chopperActor = gameSession.chopperNpcActor;
+          const playerPosition = gameSession.playerCharacter.getPosition();
+          const chopperPosition = getChopperNpcPosition() || playerPosition;
+          const targetPosition = buildChopperApproachTarget(playerPosition, chopperPosition);
+
+          storyState.flags.chopperSecondTalkApproachSeen = true;
+          scriptedInteractionActive = true;
+          clearGameFlowInput();
+          dialogueCamera?.focusWorldPoint({
+            position: chopperPosition,
+            height: 1.55
+          });
+
+          const flightStarted = startChopperNpcFlight(chopperActor, {
+            targetPosition,
+            duration: CHOPPER_SECOND_TALK_APPROACH_DURATION,
+            onComplete() {
+              const latestPlayerPosition = gameSession?.playerCharacter?.getPosition?.() || playerPosition;
+              const latestChopperPosition = getChopperNpcPosition() || targetPosition;
+
+              chopperActor.npcActor.character?.faceToward?.(latestPlayerPosition);
+              chopperActor.npcActor.faceYaw = getYawToward(latestChopperPosition, latestPlayerPosition);
+              scriptedInteractionActive = false;
+              dialogueCamera?.focusNpcConversation({
+                targetId,
+                playerPosition: latestPlayerPosition,
+                npcActors: gameSession?.npcActors || [],
+                interactables: gameSession?.interactables || []
+              });
+              openOnboardingConversation();
+            }
+          });
+
+          if (!flightStarted) {
+            scriptedInteractionActive = false;
+            return openOnboardingConversation();
+          }
+
+          return true;
+        }
+
+        return openOnboardingConversation();
       }
 
       if (targetId === "tangrowth" && dialogueId === "tallGrassReturn") {
         return uiRuntime.gameplayDialogue.openConversation({
-          lines: TANGROWTH_TALL_GRASS_RETURN_DIALOGUE,
+          lines: dialogueSystem.getConversation("chopperTallGrassReturn") || TANGROWTH_TALL_GRASS_RETURN_DIALOGUE,
+          onComplete: restoreCameraOnComplete
+        });
+      }
+
+      if (targetId === "tangrowth" && dialogueId === "firstHabitatReport") {
+        return uiRuntime.gameplayDialogue.openConversation({
+          lines: dialogueSystem.getConversation("chopperFirstHabitatReport"),
           onComplete: restoreCameraOnComplete
         });
       }
 
       if (targetId === "squirtle" && dialogueId === "discovery") {
         return uiRuntime.gameplayDialogue.openConversation({
-          lines: SQUIRTLE_DISCOVERY_DIALOGUE,
+          lines: dialogueSystem.getConversation("strandedHelperDiscovery") || SQUIRTLE_DISCOVERY_DIALOGUE,
           onComplete: restoreCameraOnComplete
         });
       }
@@ -407,30 +625,44 @@ export function createApplicationRuntime({
     },
     unlockPlayerAbility: unlockPlayerSkill,
     unlockPokedexReward() {
-      if (gameSession?.actTwoSquirtle && gameSession.squirtleRecoveredTexture) {
-        gameSession.actTwoSquirtle.texture = gameSession.squirtleRecoveredTexture;
+      if (gameSession?.actTwoSquirtle) {
+        gameSession.actTwoSquirtle.recovered = true;
       }
 
       playerMemory.foundPokedex = true;
       uiRuntime.pokedexRuntime.unlock();
-      uiRuntime.pokedexRuntime.setOpen(true, {
-        markSeen: true,
-        entryId: SQUIRTLE_POKEDEX_ENTRY_ID
+      questSystem.emit({
+        type: QUEST_EVENT.PHOTO,
+        targetId: "first-memory"
       });
-    },
-    showPokedexEntry(entryId) {
-      uiRuntime.pokedexRuntime.setOpen(true, {
-        markSeen: true,
-        entryId: entryId || FLOWER_BED_POKEDEX_ENTRY_ID
+
+      void uiRuntime.skillLearnOverlay.play({
+        title: "YOU LEARNED",
+        skillName: "WATER GUN!",
+        note: "Hold X to restore dry ground."
+      }).then(() => {
+        uiRuntime.pokedexRuntime.setOpen(true, {
+          markSeen: true,
+          scripted: true,
+          entryId: SQUIRTLE_POKEDEX_ENTRY_ID
+        });
       });
     },
     onFirstGrassRestored() {
-      uiRuntime.setNearbyHabitats([PRETTY_FLOWER_BED_HABITAT_LABEL]);
+      questSystem.emit({
+        type: QUEST_EVENT.PLACE,
+        targetId: "revived-habitat"
+      });
+      questSystem.emit({
+        type: QUEST_EVENT.BUILD,
+        targetId: "revived-habitat"
+      });
+      uiRuntime.setNearbyHabitats(habitatSystem.getDiscoveredLabels());
       uiRuntime.syncQuestFocus(storyState);
     },
     onFlowersRecovered() {
       uiRuntime.gameplayDialogue.openConversation({
-        lines: TANGROWTH_FLOWER_RECOVERY_DIALOGUE
+        lines: dialogueSystem.getConversation("chopperFlowerRecovery") || TANGROWTH_FLOWER_RECOVERY_DIALOGUE
       });
     },
     onBulbasaurRevealed({ cellId }) {
@@ -460,8 +692,12 @@ export function createApplicationRuntime({
       encounter.landingPosition = landingPosition;
       encounter.position = [...originPosition];
       uiRuntime.gameplayDialogue.openConversation({
-        lines: BULBASAUR_HABITAT_DISCOVERY_DIALOGUE,
+        lines: dialogueSystem.getConversation("leafHelperHabitat") || BULBASAUR_HABITAT_DISCOVERY_DIALOGUE,
         onComplete: () => {
+          questSystem.emit({
+            type: QUEST_EVENT.TALK,
+            targetId: "leaf-helper"
+          });
           uiRuntime.pokedexRuntime.setOpen(true, {
             markSeen: true,
             entryId: BULBASAUR_POKEDEX_ENTRY_ID
@@ -472,6 +708,8 @@ export function createApplicationRuntime({
     onGroundItemCollected({ itemId }) {
       uiRuntime.bagUiRuntime.handleItemCollected(itemId, storyState);
     },
+    questSystem,
+    habitatSystem,
     onNaturePatchRevived({ patch, type }) {
       if (!gameSession?.natureRevivalEffects || !patch) {
         return;
@@ -578,6 +816,7 @@ export function createApplicationRuntime({
       worldCanvas: dom.worldCanvas,
       worldRenderer: engine.worldRenderer,
       worldSpeech: uiRuntime.worldSpeech,
+      colliderGizmos: uiRuntime.colliderGizmos,
       groundCellHighlight: uiRuntime.groundCellHighlight,
       gameplayDialogue: uiRuntime.gameplayDialogue,
       dialogueCamera,
@@ -592,6 +831,8 @@ export function createApplicationRuntime({
         clearCameraLookInput: gameInput.clearCameraLookInput,
         updateGamepads: gameInput.updateGamepads,
         isPaused: () => gamePaused,
+        isSkillLearnActive: () => uiRuntime.skillLearnOverlay.isActive(),
+        isScriptedInteractionActive: () => scriptedInteractionActive,
         isPrimaryActionActive: gameInput.isPrimaryActionActive,
         inventory,
         playerSkills,
@@ -633,6 +874,11 @@ export function createApplicationRuntime({
 
           if (collectedWoodCount > 0) {
             uiRuntime.bagUiRuntime.handleItemCollected("wood", storyState);
+            questSystem.emit({
+              type: QUEST_EVENT.COLLECT,
+              targetId: "wood",
+              amount: collectedWoodCount
+            });
           }
 
           return collectedWoodCount;
@@ -640,9 +886,16 @@ export function createApplicationRuntime({
         findNearbyActionTarget,
         findNearbyInteractable,
         getActiveQuest,
+        getActiveSystemQuest() {
+          return questSystem.getActiveQuest();
+        },
+        getQuestCompletionPop,
         getItemLabel,
         performHarvestAction,
         performInteractAction,
+        recordQuestEvent(event) {
+          return questSystem.emit(event);
+        },
         tangrowthOpeningLine: TANGROWTH_OPENING_LINE,
         updatePalmShake,
         updateResourceNodes
@@ -660,6 +913,7 @@ export function createApplicationRuntime({
       },
       rendering: {
         ...engine.rendering,
+        debugColliders: runtimeFlags.debugColliders,
         isNpcActive,
         isInteractableActive,
         isResourceNodeActive
@@ -673,8 +927,8 @@ export function createApplicationRuntime({
       }
       if (sceneFlowRuntime.sceneDirector.is(GAME_FLOW.TUTORIAL)) {
         session.spawnActTwoPlayer?.();
-        if (session.actTwoSquirtle && session.squirtleTexture) {
-          session.actTwoSquirtle.texture = session.squirtleTexture;
+        if (session.actTwoSquirtle) {
+          session.actTwoSquirtle.recovered = false;
         }
       }
       if (sceneFlowRuntime.sceneDirector.is(GAME_FLOW.GAMEPLAY)) {
@@ -685,6 +939,9 @@ export function createApplicationRuntime({
         uiRuntime.gameplayDialogue.close?.();
         uiRuntime.gameplayUiVisibility.hideAll?.();
         uiRuntime.gameplayUiVisibility.showSections?.(GAMEPLAY_DEFAULT_UI_SECTIONS);
+        if (runtimeFlags.debugColliders) {
+          uiRuntime.pushNotice("Collider gizmos enabled.");
+        }
       }
       applyLaunchModeRuntime(effectiveLaunchMode, {
         session,

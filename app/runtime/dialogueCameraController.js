@@ -55,6 +55,12 @@ function buildDialogueCameraPose({ camera, playerPosition, npcPosition }) {
 export function createDialogueCameraController({ camera, cameraOrbit }) {
   let restorePose = null;
 
+  function captureRestorePose() {
+    if (!restorePose) {
+      restorePose = camera.getPose();
+    }
+  }
+
   function focusNpcConversation({ playerPosition, npcActors = [], interactables = [], targetId }) {
     const npcPosition = getNpcPosition(npcActors, interactables, targetId);
 
@@ -62,7 +68,7 @@ export function createDialogueCameraController({ camera, cameraOrbit }) {
       return;
     }
 
-    restorePose = camera.getPose();
+    captureRestorePose();
     const dialoguePose = buildDialogueCameraPose({
       camera,
       playerPosition,
@@ -80,6 +86,7 @@ export function createDialogueCameraController({ camera, cameraOrbit }) {
       return;
     }
 
+    captureRestorePose();
     const currentPose = camera.getPose();
     const pointPose = {
       target: [position[0], height, position[2]],

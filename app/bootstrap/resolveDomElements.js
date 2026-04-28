@@ -35,6 +35,7 @@ export function resolveDomElements(documentRef = document) {
     inventoryPanel: documentRef.getElementById("inventory-panel"),
     startOverlay: documentRef.getElementById("start-overlay"),
     sceneTransitionVeil: documentRef.getElementById("scene-transition-veil"),
+    skillLearnOverlay: documentRef.getElementById("skill-learn-overlay"),
     introOverlay: documentRef.getElementById("intro-overlay"),
     introRoomDebugRoot: documentRef.getElementById("intro-room-debug-root"),
     pauseOverlay: documentRef.getElementById("pause-overlay"),

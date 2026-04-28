@@ -12,6 +12,7 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
         <canvas id="sprite-layer" class="layer" width="426" height="240"></canvas>
         <div class="ui-layer" id="ui-layer">
           <div class="scene-transition-veil" id="scene-transition-veil" hidden aria-hidden="true"></div>
+          <section class="skill-learn-overlay" id="skill-learn-overlay" hidden aria-label="Skill learned"></section>
           <section class="cinematic-overlay" id="cinematic-overlay" hidden aria-label="Act two cinematic"></section>
           <section class="tutorial-overlay" id="tutorial-overlay" hidden aria-label="Act two tutorial"></section>
           <section class="pokedex-overlay" id="pokedex-overlay" hidden aria-label="Pokedex entry">

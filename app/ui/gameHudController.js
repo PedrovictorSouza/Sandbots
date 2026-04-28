@@ -1,3 +1,5 @@
+import { createQuestLog } from "./createQuestLog.js";
+
 export function createGameHudController({
   statusElement,
   hudInstructionsElement,
@@ -22,6 +24,7 @@ export function createGameHudController({
   getRegionForPosition,
   resourceHarvestPrompt,
   interactPrompt,
+  questSystem = null,
   initialStatus = "Inicializando cena..."
 }) {
   const MAX_VISIBLE_INVENTORY_SLOTS = 5;
@@ -69,6 +72,8 @@ export function createGameHudController({
   };
   const hudBoardElement = hudInstructionsElement?.closest?.(".hud") || hudMetaElement?.closest?.(".hud") || null;
   let hudBoardFlashTimeout = 0;
+  let hudBoardEntranceVariant = false;
+  const questLog = questSystem ? createQuestLog({ questSystem }) : null;
 
   function escapeHtml(value) {
     return String(value)
@@ -95,6 +100,21 @@ export function createGameHudController({
       hudBoardElement.dataset.noticeFlash = "false";
       hudBoardFlashTimeout = 0;
     }, 3000);
+  }
+
+  function replayHudBoardEntrance() {
+    if (!hudBoardElement) {
+      return;
+    }
+
+    if (hudBoardFlashTimeout) {
+      clearTimeout(hudBoardFlashTimeout);
+      hudBoardFlashTimeout = 0;
+    }
+
+    hudBoardElement.dataset.noticeFlash = "false";
+    hudBoardEntranceVariant = !hudBoardEntranceVariant;
+    hudBoardElement.dataset.taskEnter = hudBoardEntranceVariant ? "a" : "b";
   }
 
   function getHudTime() {
@@ -260,6 +280,18 @@ export function createGameHudController({
       return;
     }
 
+    if (questLog) {
+      const nextHtml = questLog.renderLogHtml();
+
+      if (uiCache.missionsHtml === nextHtml) {
+        return;
+      }
+
+      uiCache.missionsHtml = nextHtml;
+      missionsStackElement.innerHTML = nextHtml;
+      return;
+    }
+
     const quest = getActiveQuest(storyState);
     const recipe = quest.recipeId ? placeholderRecipes[quest.recipeId] : null;
     const trackedRecipe = statusState.trackedRecipe;
@@ -378,6 +410,37 @@ export function createGameHudController({
       return;
     }
 
+    if (questLog) {
+      const activeQuest = questSystem.getActiveQuest();
+      const activeQuestId = activeQuest?.id || null;
+      const questChanged = activeQuestId && uiCache.hudFocusQuestId !== activeQuestId;
+      const nextContext = questLog.renderActiveSummaryHtml();
+      const nextChecklist = questLog.renderChecklistHtml();
+
+      if (questChanged) {
+        replayHudBoardEntrance();
+      }
+
+      if (hudContextElement && uiCache.hudContext !== nextContext) {
+        uiCache.hudContext = nextContext;
+        hudContextElement.innerHTML = nextContext;
+        if (!questChanged) {
+          flashHudBoard();
+        }
+      }
+
+      if (hudChecklistElement && uiCache.hudChecklist !== nextChecklist) {
+        uiCache.hudChecklist = nextChecklist;
+        hudChecklistElement.innerHTML = nextChecklist;
+        if (!questChanged) {
+          flashHudBoard();
+        }
+      }
+
+      uiCache.hudFocusQuestId = activeQuestId;
+      return;
+    }
+
     const activeQuest = getActiveQuest(storyState);
     const activeQuestId = activeQuest?.id || null;
     const now = getHudTime();
@@ -454,21 +517,50 @@ export function createGameHudController({
       return;
     }
 
+    if (questSystem?.getActiveQuest) {
+      const activeQuest = questSystem.getActiveQuest();
+      const nextText = activeQuest ?
+        activeQuest.description :
+        "Explore freely, restore habitats, and check in with helpers.";
+      const questChanged = activeQuest?.id && uiCache.hudQuestId !== activeQuest.id;
+      uiCache.hudQuestId = activeQuest?.id || uiCache.hudQuestId;
+
+      if (uiCache.hudInstructions === nextText) {
+        if (questChanged) {
+          replayHudBoardEntrance();
+        }
+        return;
+      }
+
+      uiCache.hudInstructions = nextText;
+      hudInstructionsElement.textContent = nextText;
+      if (questChanged) {
+        replayHudBoardEntrance();
+      } else {
+        flashHudBoard();
+      }
+      return;
+    }
+
     const activeQuest = getActiveQuest(storyState);
     const nextText = HUD_GUIDE_BY_QUEST_ID[activeQuest?.id] || INITIAL_GAMEPLAY_GUIDE;
-    const questChanged = activeQuest?.id && uiCache.hudQuestId && uiCache.hudQuestId !== activeQuest.id;
+    const questChanged = activeQuest?.id && uiCache.hudQuestId !== activeQuest.id;
     uiCache.hudQuestId = activeQuest?.id || uiCache.hudQuestId;
 
     if (uiCache.hudInstructions === nextText) {
       if (questChanged) {
-        flashHudBoard();
+        replayHudBoardEntrance();
       }
       return;
     }
 
     uiCache.hudInstructions = nextText;
     hudInstructionsElement.textContent = nextText;
-    flashHudBoard();
+    if (questChanged) {
+      replayHudBoardEntrance();
+    } else {
+      flashHudBoard();
+    }
   }
 
   return {

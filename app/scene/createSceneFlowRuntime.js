@@ -204,8 +204,8 @@ export function createSceneFlowRuntime({
       onSquirtleHeal: () => {
         const session = getGameSession();
 
-        if (session?.actTwoSquirtle && session.squirtleRecoveredTexture) {
-          session.actTwoSquirtle.texture = session.squirtleRecoveredTexture;
+        if (session?.actTwoSquirtle) {
+          session.actTwoSquirtle.recovered = true;
         }
       },
       onPokedexReveal: () => {
@@ -238,8 +238,8 @@ export function createSceneFlowRuntime({
         if (result.learnedWaterGun) {
           unlockPlayerSkill("transform");
           unlockPlayerSkill("waterGun");
-          if (session?.actTwoSquirtle && session.squirtleRecoveredTexture) {
-            session.actTwoSquirtle.texture = session.squirtleRecoveredTexture;
+          if (session?.actTwoSquirtle) {
+            session.actTwoSquirtle.recovered = true;
           }
         }
         sceneDirector?.transition(GAME_FLOW.GAMEPLAY);

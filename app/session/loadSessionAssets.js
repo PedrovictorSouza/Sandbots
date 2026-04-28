@@ -22,6 +22,7 @@ export async function loadSessionAssets({ gl, setStatus }) {
     chopperModel,
     chopperBodyModel,
     chopperPropellerModel,
+    robot1Model,
     characterFactory,
     woodImage
   ] = await Promise.all([
@@ -80,6 +81,15 @@ export async function loadSessionAssets({ gl, setStatus }) {
       onStatus: setStatus
     }),
 
+    loadTexturedModel({
+      gl,
+      gltfPath: "./Character/Robot-1/robot-1.gltf",
+      binPath: "./Character/Robot-1/robot-1.bin",
+      texturePath: "./Character/Robot-1/robot-1.png",
+      normalizedSize: 1.65,
+      onStatus: setStatus
+    }),
+
     createCharacterFactory({
       spriteSheetUrl: "./Character/player-spritesheet.png",
       idleUrl: "./Character/player-idle.png"
@@ -106,6 +116,7 @@ export async function loadSessionAssets({ gl, setStatus }) {
     // Novos.
     chopperBodyModel,
     chopperPropellerModel,
+    robot1Model,
 
     characterFactory,
     woodImage
