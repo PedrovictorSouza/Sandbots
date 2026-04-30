@@ -25,7 +25,7 @@ describe("stageRuntimeController", () => {
     expect(properties.get("--game-scale")).toBe("1");
     expect(properties.get("--console-display-scale")).toBe("1");
     expect(properties.get("--ui-gap")).toBe("20px");
-    expect(properties.get("--hud-width")).toBe("540px");
+    expect(properties.get("--hud-width")).toBe("420px");
     expect(properties.get("--status-width")).toBe("420px");
     expect(properties.get("--skills-width")).toBe("280px");
     expect(properties.get("--inventory-width")).toBe("460px");

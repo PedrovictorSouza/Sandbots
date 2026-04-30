@@ -270,6 +270,21 @@ export function createQuestSystem({
     activateNextQuestAfterCompletion(quest);
   }
 
+  function applyEventToQuest(quest, event, amount) {
+    let questChanged = false;
+
+    for (const objective of quest.objectives) {
+      if (!objectiveMatchesEvent(objective, event) || objective.current >= objective.required) {
+        continue;
+      }
+
+      objective.current = Math.min(objective.required, objective.current + amount);
+      questChanged = true;
+    }
+
+    return questChanged;
+  }
+
   function emit(event) {
     if (!event?.type) {
       return { changed: false, completedQuestIds: [] };
@@ -282,20 +297,25 @@ export function createQuestSystem({
 
     for (let guard = 0; guard < quests.length; guard += 1) {
       const quest = getActiveQuest();
-      if (!quest || quest.status !== QUEST_STATUS.ACTIVE) {
+      if (!quest) {
         break;
       }
 
-      let questChanged = false;
-      for (const objective of quest.objectives) {
-        if (!objectiveMatchesEvent(objective, event) || objective.current >= objective.required) {
-          continue;
+      if (quest.status !== QUEST_STATUS.ACTIVE) {
+        const nextQuest = quest.status === QUEST_STATUS.COMPLETED && quest.nextQuestId ?
+          getQuest(quest.nextQuestId) :
+          null;
+
+        if (nextQuest && nextQuest.status === QUEST_STATUS.LOCKED) {
+          const nextQuestChanged = applyEventToQuest(nextQuest, event, amount);
+          changed = nextQuestChanged || changed;
         }
 
-        objective.current = Math.min(objective.required, objective.current + amount);
-        questChanged = true;
-        changed = true;
+        break;
       }
+
+      const questChanged = applyEventToQuest(quest, event, amount);
+      changed = questChanged || changed;
 
       if (!questChanged || !isQuestComplete(quest)) {
         break;

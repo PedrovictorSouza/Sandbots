@@ -134,4 +134,14 @@ describe("createBagUiRuntime", () => {
 
     expect(bagDetails.setItem).toHaveBeenLastCalledWith(itemDefs.berry, 1);
   });
+
+  it("reports the selected detail item", () => {
+    const { runtime } = createRuntime();
+
+    expect(runtime.getSelectedItemId()).toBe("wood");
+
+    runtime.selectItem("berry");
+
+    expect(runtime.getSelectedItemId()).toBe("berry");
+  });
 });

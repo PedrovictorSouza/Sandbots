@@ -91,17 +91,69 @@ export const TANGROWTH_TALL_GRASS_RETURN_DIALOGUE = [
   }
 ];
 
+export const TANGROWTH_TALL_GRASS_MEMORY_DIALOGUE = [
+  {
+    speaker: "Tangrowth",
+    text: "Ohh, this brings back memories!"
+  },
+  {
+    speaker: "Tangrowth",
+    text: "Back in the day, there was tall grass like this all over the place around here!"
+  },
+  {
+    speaker: "Tangrowth",
+    text: "Seeing such fresh, green tall grass makes me feel like Pokemon might return at any moment..."
+  }
+];
+
+export const CHOPPER_BULBASAUR_ENCOURAGEMENT_DIALOGUE = [
+  {
+    speaker: "Chopper",
+    text: "Seems like you're doing a great job, if you want something, just ask me"
+  }
+];
+
 export const BULBASAUR_HABITAT_DISCOVERY_DIALOGUE = [
   {
     speaker: "Bulbasaur",
-    text: "Yeehp, nice to meet you!"
+    text: "Yippee! Nice to meet you! This plot of tall grass is kinda small, but I like it!"
   },
   {
     speaker: "Bulbasaur",
-    text: "This plot of tall grass is kinda small, but I like it!"
+    text: "I love leaves and grass and stuff. And living by lotsa green things!"
+  }
+];
+
+export const BULBASAUR_DRY_GRASS_REQUEST_DIALOGUE = [
+  {
+    speaker: "Bulbasaur",
+    text: "The ground here is too dry, and the grass is all wilty, and... And it's nothing like where I lived before!"
   },
   {
     speaker: "Bulbasaur",
-    text: "I love leaves and grass and stuff, and living by lotsa green things!"
+    text: "Can you help? Would you water the dry tall grass? Please?"
+  },
+  {
+    speaker: "Bulbasaur",
+    text: "If you do that, I'll teach you something really neat"
+  }
+];
+
+export const BULBASAUR_LEAFAGE_REWARD_DIALOGUE = [
+  {
+    speaker: "Bulbasaur",
+    text: "You did it! The tall grass feels soft and springy again!"
+  },
+  {
+    speaker: "Bulbasaur",
+    text: "A promise is a promise. Watch closely, okay?"
+  },
+  {
+    speaker: "Bulbasaur",
+    text: "This is Leafage! Use it to grow tall grass one square at a time."
+  },
+  {
+    speaker: "",
+    text: "You learned Leafage."
   }
 ];

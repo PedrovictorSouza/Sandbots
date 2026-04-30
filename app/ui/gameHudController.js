@@ -246,7 +246,7 @@ export function createGameHudController({
     inventoryGridElement.innerHTML = nextHtml;
   }
 
-  function syncSkillsUi(skills) {
+  function syncSkillsUi(skills, activeSkillId = null) {
     if (!skillsGridElement || !skillsPanelElement) {
       return;
     }
@@ -257,9 +257,14 @@ export function createGameHudController({
     const nextHtml = playerSkillOrder.map((skillId) => {
       const skill = playerSkillDefs[skillId];
       const unlocked = Boolean(skills[skillId]);
+      const active = unlocked && skillId === activeSkillId;
 
       return `
-        <div class="skill-slot" data-unlocked="${unlocked ? "true" : "false"}">
+        <div
+          class="skill-slot"
+          data-unlocked="${unlocked ? "true" : "false"}"
+          data-active="${active ? "true" : "false"}"
+        >
           <div
             class="skill-slot__icon"
             style="--slot-color:${skill.color}; --slot-ink:${skill.ink}"
@@ -281,7 +286,7 @@ export function createGameHudController({
     }
 
     if (questLog) {
-      const nextHtml = questLog.renderLogHtml();
+      const nextHtml = questLog.renderLogHtml(storyState);
 
       if (uiCache.missionsHtml === nextHtml) {
         return;
@@ -415,7 +420,7 @@ export function createGameHudController({
       const activeQuestId = activeQuest?.id || null;
       const questChanged = activeQuestId && uiCache.hudFocusQuestId !== activeQuestId;
       const nextContext = questLog.renderActiveSummaryHtml();
-      const nextChecklist = questLog.renderChecklistHtml();
+      const nextChecklist = questLog.renderChecklistHtml(storyState);
 
       if (questChanged) {
         replayHudBoardEntrance();

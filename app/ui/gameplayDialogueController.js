@@ -149,6 +149,7 @@ export function createGameplayDialogueController({
     const key = event.key.toLowerCase();
 
     if (
+      event.code === "KeyX" ||
       event.code === "KeyE" ||
       event.code === "Enter"
     ) {
@@ -182,6 +183,7 @@ export function createGameplayDialogueController({
     const key = event.key.toLowerCase();
     if (
       event.code === "KeyE" ||
+      event.code === "KeyX" ||
       event.code === "Enter" ||
       event.code === "Space" ||
       event.code === "Escape" ||

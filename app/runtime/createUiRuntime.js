@@ -204,8 +204,8 @@ export function createUiRuntime({
         replayIfUnloaded: true
       });
     },
-    syncSkillsUi(skillsState) {
-      return invokeHud("syncSkillsUi", [skillsState], {
+    syncSkillsUi(skillsState, activeSkillId = null) {
+      return invokeHud("syncSkillsUi", [skillsState, activeSkillId], {
         replayIfUnloaded: true
       });
     },

@@ -33,4 +33,491 @@ describe("createQuestLog", () => {
     expect(summaryHtml).toContain("hud-task-subtitle");
     expect(summaryHtml).toContain("Talk to Chopper so he can explain");
   });
+
+  it("renders tracked long-running tasks alongside the active quest", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        trackedTaskIds: ["making-habitats"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Making habitats");
+    expect(checklistHtml).toContain("Arrange tall grass, trees, rocks and furniture");
+    expect(logHtml).toContain('data-task-id="making-habitats"');
+    expect(logHtml).toContain("Pokemon Habitat");
+  });
+
+  it("checks the Making habitats task after a habitat is restored", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        makingHabitatsComplete: true,
+        trackedTaskIds: ["making-habitats"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+
+    expect(checklistHtml).toContain('data-done="true"');
+    expect(checklistHtml).toContain("Making habitats");
+  });
+
+  it("renders Bulbasaur's dry grass task with progress from story state", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        restoredGrassCount: 4,
+        trackedTaskIds: ["water-dry-tall-grass"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Water dry tall grass");
+    expect(checklistHtml).toContain("4/10 restored");
+    expect(logHtml).toContain('data-task-id="water-dry-tall-grass"');
+  });
+
+  it("renders the Leppa Berry task with step-specific guidance", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        leppaTreeRevived: true,
+        trackedTaskIds: ["give-leppa-berry"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Give Leppa Berry to Bulbasaur");
+    expect(checklistHtml).toContain("Headbutt the revived tree");
+    expect(logHtml).toContain('data-task-id="give-leppa-berry"');
+  });
+
+  it("renders Chopper's log chair task with step-specific guidance", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        logChairPlaced: true,
+        trackedTaskIds: ["tangrowth-log-chair"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Tangrowth");
+    expect(checklistHtml).toContain("press A or E to sit");
+    expect(logHtml).toContain('data-task-id="tangrowth-log-chair"');
+  });
+
+  it("renders the Workbench task with recipe progress guidance", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        workbenchDiyRecipesReceived: true,
+        trackedTaskIds: ["workbench-campfire"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Workbench");
+    expect(checklistHtml).toContain("create a Campfire");
+    expect(logHtml).toContain('data-task-id="workbench-campfire"');
+  });
+
+  it("renders the Campfire bag selection task as it progresses", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        campfireCrafted: true,
+        trackedTaskIds: ["spit-out-campfire"]
+      }
+    };
+
+    const initialChecklistHtml = questLog.renderChecklistHtml(storyState);
+
+    expect(initialChecklistHtml).toContain("Professor Tangrowth");
+    expect(initialChecklistHtml).toContain("Press X to open the bag and select the Campfire.");
+
+    storyState.flags.campfireSelectedForTangrowth = true;
+
+    const selectedChecklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(selectedChecklistHtml).toContain("press A or E to spit out the Campfire");
+    expect(logHtml).toContain('data-task-id="spit-out-campfire"');
+  });
+
+  it("renders Charmander's habitat and Campfire task as it progresses", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        leafageTallGrassCount: 2,
+        trackedTaskIds: ["charmander-tall-grass"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("2/4 tall grass grown");
+
+    storyState.flags.charmanderRustlingGrassCellId = "ground-1-1";
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Inspect the rustling grass.");
+
+    storyState.flags.charmanderRevealed = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("D-Pad Up");
+
+    storyState.flags.charmanderFollowing = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Lead Charmander close to the Campfire.");
+    expect(logHtml).toContain('data-task-id="charmander-tall-grass"');
+  });
+
+  it("renders the ruined Pokemon Center task through inspection and PC steps", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        pokemonCenterGuideStarted: true,
+        trackedTaskIds: ["ruined-pokemon-center"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("destroyed Pokemon Center");
+
+    storyState.flags.ruinedPokemonCenterInspected = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Check the PC inside");
+    expect(logHtml).toContain('data-task-id="ruined-pokemon-center"');
+  });
+
+  it("renders the Boulder-Shaded Tall Grass challenge as it progresses", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        boulderChallengeAvailable: true,
+        boulderShadedTallGrassCount: 2,
+        trackedTaskIds: ["boulder-shaded-tall-grass"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("2/4 tall grass grown");
+
+    storyState.flags.boulderShadedTallGrassHabitatCreated = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Inspect the rustling");
+
+    storyState.flags.timburrRevealed = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("receive Life Coins");
+    expect(logHtml).toContain('data-task-id="boulder-shaded-tall-grass"');
+  });
+
+  it("renders Bulbasaur's Straw Bed recipe challenge with both counters", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        bulbasaurStrawBedChallengeAvailable: true,
+        wateredTreeCount: 3,
+        sturdySticksGatheredForChallenge: 7,
+        trackedTaskIds: ["bulbasaur-straw-bed"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("3/5 trees watered, 7/10 sturdy sticks");
+
+    storyState.flags.bulbasaurStrawBedChallengeComplete = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain('choose &quot;Do you need anything?&quot;');
+    expect(logHtml).toContain('data-task-id="bulbasaur-straw-bed"');
+  });
+
+  it("renders the Straw Bed Recipe task from craft to Bulbasaur turn-in", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        strawBedRecipeUnlocked: true,
+        trackedTaskIds: ["straw-bed-recipe"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("You will need 2 Leaves");
+
+    storyState.flags.strawBedCrafted = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("select the Straw Bed");
+
+    storyState.flags.strawBedSelectedForBulbasaur = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("within the boundaries");
+
+    storyState.flags.strawBedPlacedInBulbasaurHabitat = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Talk to Bulbasaur after placing");
+    expect(logHtml).toContain('data-task-id="straw-bed-recipe"');
+  });
+
+  it("renders the New Challenges in PC task", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        newPcChallengesAvailable: true,
+        trackedTaskIds: ["new-challenges-in-pc"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("New Challenges in PC");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("check the new Challenges");
+
+    storyState.flags.newPcChallengesChecked = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("You checked the new Challenges");
+    expect(logHtml).toContain('data-task-id="new-challenges-in-pc"');
+  });
+
+  it("renders the Leaf Den Kit task from Tangrowth talk to PC purchase", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        tangrowthHouseTalkAvailable: true,
+        trackedTaskIds: ["leaf-den-kit"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Professor Tangrowth");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("building houses");
+
+    storyState.flags.tangrowthHouseTalkComplete = true;
+    storyState.flags.leafDenKitPurchaseAvailable = true;
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("purchase a Leaf Den Kit");
+
+    storyState.flags.leafDenKitPurchased = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("You purchased a Leaf Den Kit");
+    expect(logHtml).toContain('data-task-id="leaf-den-kit"');
+  });
+
+  it("renders the Building the Leaf Den task through placement and construction", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        leafDenBuildAvailable: true,
+        trackedTaskIds: ["build-leaf-den"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("select the Leaf Den Kit");
+
+    storyState.flags.leafDenKitSelected = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Place the Leaf Den Kit");
+
+    storyState.flags.leafDenKitPlaced = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Gather 3 Sturdy Sticks and 3 Leaves");
+
+    storyState.flags.leafDenConstructionStarted = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("few real-world hours");
+
+    storyState.flags.leafDenBuilt = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("The Leaf Den is complete");
+    expect(logHtml).toContain('data-task-id="build-leaf-den"');
+  });
+
+  it("renders the Leaf Den furniture task through interior placement and Timburr turn-in", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        leafDenFurnitureRequestAvailable: true,
+        trackedTaskIds: ["leaf-den-furniture"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Enter the Leaf Den");
+
+    storyState.flags.leafDenInteriorEntered = true;
+    storyState.flags.leafDenFurniturePlacedCount = 2;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("2/3 placed");
+
+    storyState.flags.leafDenFurniturePlacedCount = 3;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Timburr");
+
+    storyState.flags.leafDenFurnitureRequestComplete = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Timburr approved");
+    expect(logHtml).toContain('data-task-id="leaf-den-furniture"');
+  });
+
+  it("renders Charmander's celebration task through the Ditto Flag reward", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        charmanderCelebrationRequestAvailable: true,
+        trackedTaskIds: ["charmander-celebration"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Charmander");
+
+    storyState.flags.charmanderCelebrationSuggested = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Bring Charmander to Professor Tangrowth");
+
+    storyState.flags.dittoFlagReceived = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("You received a Ditto Flag");
+    expect(logHtml).toContain('data-task-id="charmander-celebration"');
+  });
+
+  it("renders the Ditto Flag house task from bag selection to placement", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        dittoFlagReceived: true,
+        trackedTaskIds: ["ditto-flag-house"]
+      }
+    };
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("select the Ditto Flag");
+
+    storyState.flags.dittoFlagSelectedForHouse = true;
+    expect(questLog.renderChecklistHtml(storyState)).toContain("place the Ditto Flag");
+
+    storyState.flags.dittoFlagPlacedOnHouse = true;
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("marked as your house");
+    expect(logHtml).toContain('data-task-id="ditto-flag-house"');
+  });
 });

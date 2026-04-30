@@ -9,13 +9,12 @@ async function bootHandbook(page) {
 test("boots into a ready state and renders core HUD elements", async ({ page }) => {
   await bootHandbook(page);
 
-  await expect(page.locator("#status")).toBeVisible();
   await expect(page.locator("#status")).not.toHaveAttribute("data-error", "true");
   await expect(page.locator(".hud")).toBeVisible();
   await expect(page.locator("#hud-instructions")).toBeVisible();
   await expect(page.locator("#hud-instructions")).not.toHaveText("");
-  await expect(page.locator("#missions-stack")).toBeVisible();
-  await expect(page.locator("#inventory-grid")).toBeVisible();
+  await expect(page.locator(".hud-checklist")).toBeVisible();
+  await expect(page.locator(".hud-checklist")).not.toHaveText("");
 });
 
 test("opens the handbook and reaches the article shelf", async ({ page }) => {

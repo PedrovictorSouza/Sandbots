@@ -1,3 +1,5 @@
+import { SMALL_ISLAND_FIELD_TASKS } from "../story/storyBeatData.js";
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -73,6 +75,94 @@ function renderObjectiveHintHtml(objective) {
   `;
 }
 
+function getTrackedTasks(storyState = {}) {
+  const taskIds = storyState.flags?.trackedTaskIds;
+
+  if (!Array.isArray(taskIds)) {
+    return [];
+  }
+
+  return taskIds
+    .map((taskId) => SMALL_ISLAND_FIELD_TASKS[taskId])
+    .filter(Boolean);
+}
+
+function isTrackedTaskDone(storyState = {}, task) {
+  return Boolean(task?.completeFlag && storyState.flags?.[task.completeFlag]);
+}
+
+function getTrackedTaskDescription(storyState = {}, task) {
+  if (typeof task?.description === "function") {
+    return task.description(storyState);
+  }
+
+  return task?.description || "";
+}
+
+function renderTrackedTaskChecklistHtml(storyState = {}) {
+  return getTrackedTasks(storyState).map((task) => {
+    const done = isTrackedTaskDone(storyState, task);
+    const description = getTrackedTaskDescription(storyState, task);
+
+    return `
+      <div
+        class="hud-checklist__item hud-checklist__item--tracked"
+        data-done="${done ? "true" : "false"}"
+        data-objective-type="TRACKED_TASK"
+      >
+        <span class="hud-checklist__box" aria-hidden="true"></span>
+        <span class="hud-checklist__content">
+          <strong class="hud-checklist__task-title">${escapeHtml(task.title)}</strong>
+          <span class="hud-checklist__task-copy">${escapeHtml(description)}</span>
+        </span>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderMissionCardHtml({ eyebrow, title, copy, metaHtml = "", done = false, taskId = "" }) {
+  return `
+    <article
+      class="mission-card"
+      data-task-done="${done ? "true" : "false"}"
+      ${taskId ? `data-task-id="${escapeHtml(taskId)}"` : ""}
+    >
+      <div class="mission-card__eyebrow">${escapeHtml(eyebrow)}</div>
+      <div class="mission-card__header">
+        <span class="mission-card__check" aria-hidden="true"></span>
+        <div class="mission-card__title">${escapeHtml(title)}</div>
+      </div>
+      <div class="mission-card__copy">${escapeHtml(copy)}</div>
+      ${metaHtml ? `<div class="mission-card__meta">${metaHtml}</div>` : ""}
+    </article>
+  `;
+}
+
+function renderQuestMissionCardHtml(quest) {
+  const done = quest.status === "completed";
+
+  return renderMissionCardHtml({
+    eyebrow: quest.status,
+    title: quest.title,
+    copy: formatQuestSummary(quest),
+    done,
+    taskId: quest.id,
+    metaHtml: quest.objectives.map((objective) => `
+      <span>${escapeHtml(formatObjectiveLabel(objective))} ${escapeHtml(formatQuestObjective(objective))}</span>
+    `).join("")
+  });
+}
+
+function renderTrackedTaskCardHtml(storyState = {}, task) {
+  return renderMissionCardHtml({
+    eyebrow: "tracked",
+    title: task.title,
+    copy: getTrackedTaskDescription(storyState, task),
+    done: isTrackedTaskDone(storyState, task),
+    taskId: task.id
+  });
+}
+
 export function createQuestLog({
   questSystem
 } = {}) {
@@ -93,13 +183,9 @@ export function createQuestLog({
     return renderQuestSummaryHtml(getActiveQuest());
   }
 
-  function renderChecklistHtml() {
+  function renderChecklistHtml(storyState = {}) {
     const quest = getActiveQuest();
-    if (!quest) {
-      return "";
-    }
-
-    return quest.objectives.map((objective) => {
+    const activeQuestHtml = quest ? quest.objectives.map((objective) => {
       const done = (objective.current || 0) >= objective.required;
       return `
         <div
@@ -114,30 +200,28 @@ export function createQuestLog({
           </span>
         </div>
       `;
-    }).join("");
+    }).join("") : "";
+
+    return `${activeQuestHtml}${renderTrackedTaskChecklistHtml(storyState)}`;
   }
 
-  function renderLogHtml() {
+  function renderLogHtml(storyState = {}) {
     if (!questSystem?.getQuestLog) {
       return "";
     }
 
-    return questSystem.getQuestLog().map((quest) => `
-      <article
-        class="mission-card"
-        data-quest-status="${escapeHtml(quest.status)}"
-        data-quest-id="${escapeHtml(quest.id)}"
-      >
-        <div class="mission-card__eyebrow">${escapeHtml(quest.status)}</div>
-        <div class="mission-card__title">${escapeHtml(quest.title)}</div>
-        <div class="mission-card__copy">${escapeHtml(formatQuestSummary(quest))}</div>
-        <div class="mission-card__meta">
-          ${quest.objectives.map((objective) => `
-            <span>${escapeHtml(formatObjectiveLabel(objective))} ${escapeHtml(formatQuestObjective(objective))}</span>
-          `).join("")}
-        </div>
-      </article>
-    `).join("");
+    const questLog = questSystem.getQuestLog();
+    const activeQuest = getActiveQuest();
+    const activeQuestCardsHtml = activeQuest ? renderQuestMissionCardHtml(activeQuest) : "";
+    const remainingQuestCardsHtml = questLog
+      .filter((quest) => quest.id !== activeQuest?.id)
+      .map(renderQuestMissionCardHtml)
+      .join("");
+    const trackedCardsHtml = getTrackedTasks(storyState)
+      .map((task) => renderTrackedTaskCardHtml(storyState, task))
+      .join("");
+
+    return `${activeQuestCardsHtml}${trackedCardsHtml}${remainingQuestCardsHtml}`;
   }
 
   return {

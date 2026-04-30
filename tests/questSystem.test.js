@@ -167,6 +167,33 @@ describe("createQuestSystem", () => {
     vi.useRealTimers();
   });
 
+  it("counts restoration progress that happens during the next-task transition", () => {
+    vi.useFakeTimers();
+    const questSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: createMemoryStorage(),
+      transitionDelayMs: 3000
+    });
+
+    questSystem.activateQuest("open-the-water-route");
+    questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
+
+    expect(questSystem.getActiveQuest().id).toBe("open-the-water-route");
+    expect(questSystem.getActiveQuest().status).toBe("completed");
+
+    questSystem.emit({ type: QUEST_EVENT.BUILD, targetId: "revived-grass" });
+
+    expect(questSystem.getQuest("water-dry-grass").status).toBe("locked");
+    expect(questSystem.getQuest("water-dry-grass").objectives[0].current).toBe(1);
+
+    vi.advanceTimersByTime(3000);
+
+    expect(questSystem.getActiveQuest().id).toBe("water-dry-grass");
+    expect(questSystem.getActiveQuest().objectives[0].current).toBe(1);
+
+    vi.useRealTimers();
+  });
+
   it("advances the vertical slice through gameplay events", () => {
     const questSystem = createQuestSystem({
       quests: SMALL_ISLAND_QUESTS,

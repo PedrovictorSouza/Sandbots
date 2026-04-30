@@ -138,6 +138,7 @@ export function createBagUiRuntime({
   return {
     handleItemCollected,
     hideDetails,
+    getSelectedItemId: () => resolveSelectedItemId(),
     inspect,
     isDetailsOpen: () => bagDetailsOpen,
     selectItem,

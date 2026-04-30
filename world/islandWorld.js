@@ -1,8 +1,21 @@
-import { RESOURCE_NODE_DEFS, WORLD_LIMIT } from "../gameplayContent.js";
+import {
+  LEPPA_BERRY_ITEM_ID,
+  LEPPA_TREE_DROP_OFFSET,
+  RESOURCE_NODE_DEFS,
+  WORLD_LIMIT
+} from "../gameplayContent.js";
 
 const WOOD_DROP_HEIGHT = 0.78;
 const WOOD_PICKUP_RADIUS = 0.64;
+const LEPPA_DROP_HEIGHT = 0.72;
+const LEPPA_PICKUP_RADIUS = 0.68;
+const LEPPA_TREE_INTERACT_DISTANCE = 2.35;
+const LOG_CHAIR_INTERACT_DISTANCE = 1.45;
+const LEAF_DEN_INTERACT_DISTANCE = 2.2;
 const PALM_SHAKE_DURATION = 0.42;
+const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
+const BULBASAUR_STRAW_BED_TREE_TARGET_COUNT = 5;
+const BULBASAUR_STRAW_BED_STICK_TARGET_COUNT = 10;
 
 export function createFacingStaticController(facing) {
   return {
@@ -90,6 +103,10 @@ export function buildPalmInstances(houseModel, treeModel, candidates) {
 }
 
 export function findNearbyPalm(playerPosition, treeModel, palmInstances) {
+  if (!treeModel || !Array.isArray(palmInstances)) {
+    return null;
+  }
+
   let nearestPalm = null;
   let nearestDistance = Infinity;
 
@@ -110,6 +127,77 @@ export function findNearbyPalm(playerPosition, treeModel, palmInstances) {
   }
 
   return nearestPalm;
+}
+
+export function updateBulbasaurStrawBedChallengeCompletion(storyState) {
+  const flags = storyState?.flags;
+
+  if (
+    !flags?.bulbasaurStrawBedChallengeAvailable ||
+    flags.strawBedRecipeUnlocked
+  ) {
+    return false;
+  }
+
+  const complete =
+    (flags.wateredTreeCount || 0) >= BULBASAUR_STRAW_BED_TREE_TARGET_COUNT &&
+    (flags.sturdySticksGatheredForChallenge || 0) >= BULBASAUR_STRAW_BED_STICK_TARGET_COUNT;
+
+  if (!complete || flags.bulbasaurStrawBedChallengeComplete) {
+    return false;
+  }
+
+  flags.bulbasaurStrawBedChallengeComplete = true;
+  return true;
+}
+
+export function waterNearbyPalm(playerPosition, treeModel, palmInstances, storyState) {
+  if (
+    !storyState?.flags?.bulbasaurStrawBedChallengeAvailable ||
+    storyState.flags.strawBedRecipeUnlocked
+  ) {
+    return {
+      hit: false,
+      counted: false,
+      challengeComplete: false,
+      palm: null
+    };
+  }
+
+  const nearestPalm = findNearbyPalm(playerPosition, treeModel, palmInstances);
+
+  if (!nearestPalm) {
+    return {
+      hit: false,
+      counted: false,
+      challengeComplete: false,
+      palm: null
+    };
+  }
+
+  nearestPalm.shakeTimer = nearestPalm.shakeDuration || PALM_SHAKE_DURATION;
+
+  if (nearestPalm.wateredForBulbasaurChallenge) {
+    return {
+      hit: true,
+      counted: false,
+      challengeComplete: false,
+      palm: nearestPalm
+    };
+  }
+
+  nearestPalm.wateredForBulbasaurChallenge = true;
+  storyState.flags.wateredTreeCount = Math.min(
+    BULBASAUR_STRAW_BED_TREE_TARGET_COUNT,
+    (storyState.flags.wateredTreeCount || 0) + 1
+  );
+
+  return {
+    hit: true,
+    counted: true,
+    challengeComplete: updateBulbasaurStrawBedChallengeCompletion(storyState),
+    palm: nearestPalm
+  };
 }
 
 function buildWoodDrops(treeModel, palmInstance, nextWoodDropId) {
@@ -232,6 +320,234 @@ export function collectWoodDrops(playerPosition, woodDrops, inventory) {
   return collectedThisFrame;
 }
 
+function isLeppaTreeRequestActive(storyState) {
+  return Boolean(
+    storyState?.flags?.squirtleLeppaRequestAvailable &&
+    !storyState?.flags?.leppaBerryGiftComplete
+  );
+}
+
+export function syncLeppaTreeState(leppaTree, storyState) {
+  if (!leppaTree) {
+    return null;
+  }
+
+  const requestActive = isLeppaTreeRequestActive(storyState);
+  const revived = Boolean(storyState?.flags?.leppaTreeRevived || leppaTree.revived);
+  leppaTree.revived = revived;
+
+  if (leppaTree.deadInstance) {
+    leppaTree.deadInstance.active = requestActive && !revived;
+  }
+
+  if (leppaTree.aliveInstance) {
+    leppaTree.aliveInstance.active = revived;
+  }
+
+  return leppaTree;
+}
+
+export function findNearbyLeppaTree(playerPosition, leppaTree, storyState) {
+  if (!isLeppaTreeRequestActive(storyState) || !leppaTree?.position) {
+    return null;
+  }
+
+  const distance = Math.hypot(
+    playerPosition[0] - leppaTree.position[0],
+    playerPosition[2] - leppaTree.position[2]
+  );
+
+  if (distance > LEPPA_TREE_INTERACT_DISTANCE) {
+    return null;
+  }
+
+  const revived = Boolean(storyState?.flags?.leppaTreeRevived || leppaTree.revived);
+  const berryDropped = Boolean(storyState?.flags?.leppaBerryDropped || leppaTree.berryDropped);
+
+  if (!revived) {
+    return {
+      leppaTree,
+      action: "water",
+      distance
+    };
+  }
+
+  if (!berryDropped) {
+    return {
+      leppaTree,
+      action: "headbutt",
+      distance
+    };
+  }
+
+  return null;
+}
+
+export function reviveLeppaTree(leppaTree, storyState) {
+  if (!leppaTree || !isLeppaTreeRequestActive(storyState)) {
+    return false;
+  }
+
+  leppaTree.revived = true;
+  storyState.flags.leppaTreeRevived = true;
+  syncLeppaTreeState(leppaTree, storyState);
+  return true;
+}
+
+export function dropLeppaBerryFromTree(leppaTree, leppaBerryDrops = [], storyState = null) {
+  if (!leppaTree?.position || leppaTree.berryDropped) {
+    return null;
+  }
+
+  const drop = {
+    id: "leppa-berry-0",
+    itemId: LEPPA_BERRY_ITEM_ID,
+    position: [
+      leppaTree.position[0] + LEPPA_TREE_DROP_OFFSET[0],
+      leppaTree.position[1] + LEPPA_TREE_DROP_OFFSET[1],
+      leppaTree.position[2] + LEPPA_TREE_DROP_OFFSET[2]
+    ],
+    size: [LEPPA_DROP_HEIGHT, LEPPA_DROP_HEIGHT],
+    uvRect: [0, 0, 1, 1],
+    pickupRadius: LEPPA_PICKUP_RADIUS,
+    collected: false
+  };
+
+  leppaTree.berryDropped = true;
+  leppaBerryDrops.push(drop);
+
+  if (storyState?.flags) {
+    storyState.flags.leppaBerryDropped = true;
+  }
+
+  return drop;
+}
+
+export function collectLeppaBerryDrops(playerPosition, leppaBerryDrops, inventory, storyState = null) {
+  let collectedThisFrame = 0;
+
+  for (const leppaBerryDrop of leppaBerryDrops) {
+    if (leppaBerryDrop.collected) {
+      continue;
+    }
+
+    const dx = playerPosition[0] - leppaBerryDrop.position[0];
+    const dz = playerPosition[2] - leppaBerryDrop.position[2];
+    if (Math.hypot(dx, dz) > leppaBerryDrop.pickupRadius) {
+      continue;
+    }
+
+    leppaBerryDrop.collected = true;
+    inventory[LEPPA_BERRY_ITEM_ID] = (inventory[LEPPA_BERRY_ITEM_ID] || 0) + 1;
+    collectedThisFrame += 1;
+  }
+
+  if (collectedThisFrame > 0 && storyState?.flags) {
+    storyState.flags.leppaBerryCollected = true;
+  }
+
+  return collectedThisFrame;
+}
+
+export function buildLogChairPlacement(playerPosition) {
+  return {
+    id: "log-chair-0",
+    position: [
+      playerPosition[0] + 0.92,
+      0.02,
+      playerPosition[2] + 0.42
+    ],
+    size: [1.34, 1.08],
+    uvRect: [0, 0, 1, 1]
+  };
+}
+
+export function buildStrawBedPlacement(anchorPosition) {
+  return {
+    id: "straw-bed-0",
+    position: [
+      anchorPosition[0],
+      0.02,
+      anchorPosition[2]
+    ],
+    size: [1.55, 1.02],
+    uvRect: [0, 0, 1, 1]
+  };
+}
+
+export function buildCampfirePlacement(anchorPosition = [12.4, 0.02, -8.4]) {
+  return {
+    id: "campfire-0",
+    position: [
+      anchorPosition[0] + 0.92,
+      0.02,
+      anchorPosition[2] + 0.42
+    ],
+    size: [1.34, 1.18],
+    uvRect: [0, 0, 1, 1]
+  };
+}
+
+export function buildLeafDenKitPlacement(playerPosition) {
+  return {
+    id: "leaf-den-0",
+    position: [
+      playerPosition[0] + 1.15,
+      0.02,
+      playerPosition[2] + 0.35
+    ],
+    size: [1.95, 1.45],
+    uvRect: [0, 0, 1, 1]
+  };
+}
+
+export function findNearbyLogChair(playerPosition, logChair, storyState) {
+  if (
+    !storyState?.flags?.logChairPlaced ||
+    storyState?.flags?.logChairSat ||
+    !logChair?.position
+  ) {
+    return null;
+  }
+
+  const distance = Math.hypot(
+    playerPosition[0] - logChair.position[0],
+    playerPosition[2] - logChair.position[2]
+  );
+
+  if (distance > LOG_CHAIR_INTERACT_DISTANCE) {
+    return null;
+  }
+
+  return {
+    logChair,
+    distance
+  };
+}
+
+export function findNearbyLeafDen(playerPosition, leafDen, storyState) {
+  if (
+    !storyState?.flags?.leafDenKitPlaced ||
+    !leafDen?.position
+  ) {
+    return null;
+  }
+
+  const distance = Math.hypot(
+    playerPosition[0] - leafDen.position[0],
+    playerPosition[2] - leafDen.position[2]
+  );
+
+  if (distance > LEAF_DEN_INTERACT_DISTANCE) {
+    return null;
+  }
+
+  return {
+    leafDen,
+    distance
+  };
+}
+
 export function isNpcActive(npcActor, storyState) {
   return npcActor.activeWhen(storyState);
 }
@@ -282,7 +598,11 @@ export function findNearbyInteractable(
   npcActors,
   interactables,
   storyState,
-  groundGrassPatches = []
+  groundGrassPatches = [],
+  logChair = null,
+  leafDen = null,
+  timburrEncounter = null,
+  charmanderEncounter = null
 ) {
   let nearest = null;
   let nearestDistance = Infinity;
@@ -327,7 +647,6 @@ export function findNearbyInteractable(
 
   const rustlingGrassCellId = storyState?.flags?.rustlingGrassCellId;
   const rustlingGrassActive =
-    storyState?.flags?.tangrowthTallGrassCommentSeen &&
     !storyState?.flags?.bulbasaurRevealed &&
     Boolean(rustlingGrassCellId);
 
@@ -354,6 +673,277 @@ export function findNearbyInteractable(
         };
         nearestDistance = distance;
       }
+    }
+  }
+
+  const charmanderRustlingGrassCellId = storyState?.flags?.charmanderRustlingGrassCellId;
+  const charmanderRustlingGrassActive =
+    !storyState?.flags?.charmanderRevealed &&
+    Boolean(charmanderRustlingGrassCellId);
+
+  if (charmanderRustlingGrassActive) {
+    const rustlingGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
+      return (
+        groundGrassPatch.cellId === charmanderRustlingGrassCellId &&
+        groundGrassPatch.state === "alive"
+      );
+    });
+
+    if (rustlingGrassPatch) {
+      const distance = Math.hypot(
+        playerPosition[0] - rustlingGrassPatch.position[0],
+        playerPosition[2] - rustlingGrassPatch.position[2]
+      );
+
+      if (distance <= 1.85 && distance < nearestDistance) {
+        nearest = {
+          kind: "charmanderGrassEncounter",
+          id: "charmanderRustlingGrass",
+          label: "Inspect the rustling grass",
+          cellId: rustlingGrassPatch.cellId
+        };
+        nearestDistance = distance;
+      }
+    }
+  }
+
+  const timburrRustlingGrassCellId = storyState?.flags?.timburrRustlingGrassCellId;
+  const timburrRustlingGrassActive =
+    !storyState?.flags?.timburrRevealed &&
+    Boolean(timburrRustlingGrassCellId);
+
+  if (timburrRustlingGrassActive) {
+    const rustlingGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
+      return (
+        groundGrassPatch.cellId === timburrRustlingGrassCellId &&
+        groundGrassPatch.state === "alive"
+      );
+    });
+
+    if (rustlingGrassPatch) {
+      const distance = Math.hypot(
+        playerPosition[0] - rustlingGrassPatch.position[0],
+        playerPosition[2] - rustlingGrassPatch.position[2]
+      );
+
+      if (distance <= 1.85 && distance < nearestDistance) {
+        nearest = {
+          kind: "timburrGrassEncounter",
+          id: "timburrRustlingGrass",
+          label: "Inspect the Boulder-Shaded Tall Grass",
+          cellId: rustlingGrassPatch.cellId
+        };
+        nearestDistance = distance;
+      }
+    }
+  }
+
+  const bulbasaurMissionActive =
+    storyState?.flags?.bulbasaurRevealed &&
+    !storyState?.flags?.bulbasaurDryGrassMissionAccepted &&
+    (storyState?.flags?.restoredGrassCount || 0) < BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT &&
+    Boolean(rustlingGrassCellId);
+  const bulbasaurRequestReady =
+    storyState?.flags?.bulbasaurRevealed &&
+    storyState?.flags?.bulbasaurDryGrassMissionAccepted &&
+    !storyState?.flags?.bulbasaurDryGrassRequestTurnedIn &&
+    (
+      storyState?.flags?.bulbasaurDryGrassMissionComplete ||
+      (storyState?.flags?.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
+    ) &&
+    Boolean(rustlingGrassCellId);
+
+  if (bulbasaurMissionActive || bulbasaurRequestReady) {
+    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
+      return (
+        groundGrassPatch.cellId === rustlingGrassCellId &&
+        groundGrassPatch.state === "alive"
+      );
+    });
+
+    if (bulbasaurGrassPatch) {
+      const distance = Math.hypot(
+        playerPosition[0] - bulbasaurGrassPatch.position[0],
+        playerPosition[2] - bulbasaurGrassPatch.position[2]
+      );
+
+      if (distance <= 1.85 && distance < nearestDistance) {
+        nearest = {
+          kind: bulbasaurRequestReady ? "bulbasaurRequestComplete" : "bulbasaurMission",
+          id: bulbasaurRequestReady ? "bulbasaurLeafageReward" : "bulbasaurDryGrassMission",
+          label: "Talk to Bulbasaur",
+          cellId: bulbasaurGrassPatch.cellId
+        };
+        nearestDistance = distance;
+      }
+    }
+  }
+
+  const leppaGiftReady =
+    storyState?.flags?.squirtleLeppaRequestAvailable &&
+    storyState?.flags?.leppaBerryCollected &&
+    !storyState?.flags?.leppaBerryGiftComplete &&
+    storyState?.flags?.bulbasaurRevealed &&
+    Boolean(rustlingGrassCellId);
+
+  if (leppaGiftReady) {
+    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
+      return (
+        groundGrassPatch.cellId === rustlingGrassCellId &&
+        groundGrassPatch.state === "alive"
+      );
+    });
+
+    if (bulbasaurGrassPatch) {
+      const distance = Math.hypot(
+        playerPosition[0] - bulbasaurGrassPatch.position[0],
+        playerPosition[2] - bulbasaurGrassPatch.position[2]
+      );
+
+      if (distance <= 1.85 && distance < nearestDistance) {
+        nearest = {
+          kind: "leppaBerryGift",
+          id: "bulbasaur",
+          label: "Look at this!",
+          cellId: bulbasaurGrassPatch.cellId
+        };
+        nearestDistance = distance;
+      }
+    }
+  }
+
+  const bulbasaurStrawBedRecipeReady =
+    storyState?.flags?.bulbasaurRevealed &&
+    storyState?.flags?.bulbasaurStrawBedChallengeComplete &&
+    !storyState?.flags?.strawBedRecipeUnlocked &&
+    Boolean(rustlingGrassCellId);
+
+  if (bulbasaurStrawBedRecipeReady) {
+    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
+      return (
+        groundGrassPatch.cellId === rustlingGrassCellId &&
+        groundGrassPatch.state === "alive"
+      );
+    });
+
+    if (bulbasaurGrassPatch) {
+      const distance = Math.hypot(
+        playerPosition[0] - bulbasaurGrassPatch.position[0],
+        playerPosition[2] - bulbasaurGrassPatch.position[2]
+      );
+
+      if (distance <= 1.85 && distance < nearestDistance) {
+        nearest = {
+          kind: "bulbasaurStrawBedRecipe",
+          id: "bulbasaurStrawBedRecipe",
+          label: "Do you need anything?",
+          cellId: bulbasaurGrassPatch.cellId
+        };
+        nearestDistance = distance;
+      }
+    }
+  }
+
+  const bulbasaurStrawBedCompleteReady =
+    storyState?.flags?.bulbasaurRevealed &&
+    storyState?.flags?.strawBedPlacedInBulbasaurHabitat &&
+    !storyState?.flags?.bulbasaurStrawBedRequestComplete &&
+    Boolean(rustlingGrassCellId);
+
+  if (bulbasaurStrawBedCompleteReady) {
+    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
+      return (
+        groundGrassPatch.cellId === rustlingGrassCellId &&
+        groundGrassPatch.state === "alive"
+      );
+    });
+
+    if (bulbasaurGrassPatch) {
+      const distance = Math.hypot(
+        playerPosition[0] - bulbasaurGrassPatch.position[0],
+        playerPosition[2] - bulbasaurGrassPatch.position[2]
+      );
+
+      if (distance <= 1.85 && distance < nearestDistance) {
+        nearest = {
+          kind: "bulbasaurStrawBedComplete",
+          id: "bulbasaurStrawBedComplete",
+          label: "Talk to Bulbasaur",
+          cellId: bulbasaurGrassPatch.cellId
+        };
+        nearestDistance = distance;
+      }
+    }
+  }
+
+  const nearbyLogChair = findNearbyLogChair(playerPosition, logChair, storyState);
+  if (nearbyLogChair && nearbyLogChair.distance < nearestDistance) {
+    nearest = {
+      kind: "logChairSeat",
+      id: "logChair",
+      label: "Sit on Log Chair"
+    };
+    nearestDistance = nearbyLogChair.distance;
+  }
+
+  const nearbyLeafDen = findNearbyLeafDen(playerPosition, leafDen, storyState);
+  if (nearbyLeafDen && nearbyLeafDen.distance < nearestDistance) {
+    nearest = {
+      kind: storyState?.flags?.leafDenBuilt ?
+        "leafDenEntrance" :
+        "leafDenConstruction",
+      id: "leafDen",
+      label: storyState?.flags?.leafDenBuilt || storyState?.flags?.leafDenConstructionStarted ?
+        "Leaf Den" :
+        "Leaf Den Kit"
+    };
+    nearestDistance = nearbyLeafDen.distance;
+  }
+
+  const timburrFurnitureReady =
+    storyState?.flags?.leafDenFurnitureRequestAvailable &&
+    !storyState?.flags?.leafDenFurnitureRequestComplete &&
+    Number(storyState?.flags?.leafDenFurniturePlacedCount || 0) >= 3 &&
+    storyState?.flags?.timburrRevealed &&
+    timburrEncounter?.visible &&
+    Array.isArray(timburrEncounter.position);
+
+  if (timburrFurnitureReady) {
+    const distance = Math.hypot(
+      playerPosition[0] - timburrEncounter.position[0],
+      playerPosition[2] - timburrEncounter.position[2]
+    );
+
+    if (distance <= 1.85 && distance < nearestDistance) {
+      nearest = {
+        kind: "timburrLeafDenFurnitureComplete",
+        id: "timburr",
+        label: "Talk to Timburr"
+      };
+      nearestDistance = distance;
+    }
+  }
+
+  const charmanderCelebrationReady =
+    storyState?.flags?.charmanderCelebrationRequestAvailable &&
+    !storyState?.flags?.charmanderCelebrationSuggested &&
+    storyState?.flags?.charmanderRevealed &&
+    charmanderEncounter?.visible &&
+    Array.isArray(charmanderEncounter.position);
+
+  if (charmanderCelebrationReady) {
+    const distance = Math.hypot(
+      playerPosition[0] - charmanderEncounter.position[0],
+      playerPosition[2] - charmanderEncounter.position[2]
+    );
+
+    if (distance <= 1.85 && distance < nearestDistance) {
+      nearest = {
+        kind: "charmanderCelebrationRequest",
+        id: "charmander",
+        label: "Talk to Charmander"
+      };
+      nearestDistance = distance;
     }
   }
 
@@ -397,14 +987,78 @@ export function buildNearbyPrompt({
   interactTarget,
   quest,
   transientMessage,
-  getItemLabel
+  getItemLabel,
+  storyState = null
 }) {
   if (transientMessage) {
     return transientMessage;
   }
 
+  if (harvestTarget?.logChairPlacement) {
+    return "[Enter] Place the Log Chair nearby";
+  }
+
+  if (harvestTarget?.strawBedPlacement) {
+    return harvestTarget.strawBedPlacement.canPlace ?
+      "[Enter] Place the Straw Bed in Bulbasaur's habitat" :
+      "[Enter] Move inside Bulbasaur's habitat to place the Straw Bed";
+  }
+
+  if (harvestTarget?.leafDenKitPlacement) {
+    return "[Enter] Place the Leaf Den Kit";
+  }
+
+  if (harvestTarget?.leafDenFurniturePlacement) {
+    return "[Enter] Place furniture inside the Leaf Den";
+  }
+
+  if (harvestTarget?.dittoFlagPlacement) {
+    return "[Enter] Place the Ditto Flag on the Leaf Den";
+  }
+
+  if (
+    interactTarget?.target?.id === "tangrowth" &&
+    quest?.id === "spit-out-campfire"
+  ) {
+    return `[A / E] ${interactTarget.target.label} • Spit out Campfire`;
+  }
+
+  if (interactTarget?.target?.id === "ruinedPokemonCenter") {
+    return `[A / E] ${interactTarget.target.label} • Inspect`;
+  }
+
+  if (interactTarget?.target?.id === "pokemonCenterPc") {
+    return `[A / E] ${interactTarget.target.label} • Check PC`;
+  }
+
+  if (interactTarget?.target?.kind === "leafDenConstruction") {
+    return storyState?.flags?.leafDenConstructionStarted ?
+      `[A / E] ${interactTarget.target.label} • Check construction` :
+      `[A / E] ${interactTarget.target.label} • Start construction`;
+  }
+
+  if (interactTarget?.target?.kind === "leafDenEntrance") {
+    return `[A / E] ${interactTarget.target.label} • Enter`;
+  }
+
+  if (interactTarget?.target?.kind === "timburrLeafDenFurnitureComplete") {
+    return `[A / E] ${interactTarget.target.label} • Complete request`;
+  }
+
+  if (interactTarget?.target?.kind === "charmanderCelebrationRequest") {
+    return `[A / E] ${interactTarget.target.label} • Celebration`;
+  }
+
+  if (interactTarget?.target?.kind === "logChairSeat") {
+    return `[A / E] ${interactTarget.target.label} • ${quest.title}`;
+  }
+
+  if (interactTarget?.target?.kind === "station") {
+    return `[A / E] ${interactTarget.target.label} • ${quest.title}`;
+  }
+
   if (interactTarget?.target) {
-    return `[E] ${interactTarget.target.label} • ${quest.title}`;
+    return `[A / E] ${interactTarget.target.label} • ${quest.title}`;
   }
 
   if (harvestTarget?.resourceNode) {
@@ -414,7 +1068,27 @@ export function buildNearbyPrompt({
   }
 
   if (harvestTarget?.palm) {
+    if (
+      storyState?.flags?.bulbasaurStrawBedChallengeAvailable &&
+      !storyState.flags.bulbasaurStrawBedChallengeComplete &&
+      !storyState.flags.strawBedRecipeUnlocked
+    ) {
+      return "[Enter] Use Water Gun on the tree";
+    }
+
     return "[Enter] Hit the palm tree to drop Wood";
+  }
+
+  if (harvestTarget?.leppaTree?.action === "water") {
+    return "[Enter] Use Water Gun on the dead tree";
+  }
+
+  if (harvestTarget?.leppaTree?.action === "headbutt") {
+    return "[Enter] Headbutt the tree to drop a Leppa Berry";
+  }
+
+  if (harvestTarget?.leafageGroundCell) {
+    return "[Enter] Use Leafage to grow tall grass";
   }
 
   if (harvestTarget?.groundCell) {

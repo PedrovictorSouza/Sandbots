@@ -47,7 +47,7 @@ function buildGroundPatches({
     }
 
     usedGroundCellIds.add(nearestGroundCell.id);
-    patches.push({
+    const patch = {
       id: entry.id || `${idPrefix}-${patches.length}`,
       cellId: nearestGroundCell.id,
       position: [
@@ -57,7 +57,13 @@ function buildGroundPatches({
       ],
       size: Array.isArray(entry.size) ? [...entry.size] : [...defaultSize],
       state: DEAD_PATCH_STATE
-    });
+    };
+
+    if (entry.habitatGroupId) {
+      patch.habitatGroupId = entry.habitatGroupId;
+    }
+
+    patches.push(patch);
   }
 
   return patches;

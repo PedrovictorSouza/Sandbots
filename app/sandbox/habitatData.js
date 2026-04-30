@@ -4,6 +4,7 @@ import {
 } from "../../pokedexEntries.js";
 
 export const HABITAT_EVENT = Object.freeze({
+  RESTORE_HABITAT: "RESTORE_HABITAT",
   REVIVE_PATCH: "REVIVE_PATCH"
 });
 
@@ -24,7 +25,7 @@ export const SMALL_ISLAND_HABITATS = Object.freeze([
       { objectId: "tall-grass", count: 4 }
     ],
     requirements: [
-      { type: HABITAT_EVENT.REVIVE_PATCH, targetId: "grass", required: 4 }
+      { type: HABITAT_EVENT.RESTORE_HABITAT, targetId: "tall-grass", required: 1 }
     ],
     pokedexEntryId: TALL_GRASS_POKEDEX_ENTRY_ID,
     helperArchetypes: ["leaf-helper", "ember-helper", "water-helper", "stone-helper"],
@@ -54,11 +55,17 @@ export const SMALL_ISLAND_HABITATS = Object.freeze([
     label: "Boulder-shaded Tall Grass",
     category: "grass",
     biomeId: "ash-wilds",
-    status: HABITAT_STATUS.PLANNED,
+    status: HABITAT_STATUS.ACTIVE,
     requiredObjects: [
       { objectId: "tall-grass", count: 4 },
       { objectId: "large-boulder", count: 1 }
     ],
+    requirements: [
+      { type: HABITAT_EVENT.RESTORE_HABITAT, targetId: "boulder-shaded-tall-grass", required: 1 }
+    ],
+    reveals: {
+      flag: "boulderShadedTallGrassDiscovered"
+    },
     helperArchetypes: ["builder-helper", "stone-helper"],
     notes: "Early bridge toward rock, building, and strength mechanics."
   },
@@ -129,7 +136,7 @@ export const SMALL_ISLAND_HABITATS = Object.freeze([
       { objectId: "wildflowers", count: 4 }
     ],
     requirements: [
-      { type: HABITAT_EVENT.REVIVE_PATCH, targetId: "grass", required: 1 }
+      { type: HABITAT_EVENT.RESTORE_HABITAT, targetId: "pretty-flower-bed", required: 1 }
     ],
     pokedexEntryId: FLOWER_BED_POKEDEX_ENTRY_ID,
     helperArchetypes: ["wing-helper", "honey-helper", "ember-helper"],

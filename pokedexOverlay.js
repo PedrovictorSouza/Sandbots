@@ -1,6 +1,7 @@
 import { getPokedexEntry, SQUIRTLE_POKEDEX_ENTRY_ID } from "./pokedexEntries.js";
+import { getPokedexRequest } from "./pokedexRequests.js";
 
-const POKEDEX_PAGE_ORDER = ["details", "where-to-find", "specialties"];
+const POKEDEX_PAGE_ORDER = ["details", "where-to-find", "specialties", "requests"];
 
 function isValidPage(page) {
   return POKEDEX_PAGE_ORDER.includes(page);
@@ -14,7 +15,8 @@ export function createPokedexOverlay({ root, onClose = () => {} } = {}) {
   const state = {
     open: !root.hidden,
     page: "details",
-    entryId: SQUIRTLE_POKEDEX_ENTRY_ID
+    entryId: SQUIRTLE_POKEDEX_ENTRY_ID,
+    requestId: null
   };
 
   const entryElement = root.querySelector(".pokedex-entry");
@@ -121,10 +123,25 @@ export function createPokedexOverlay({ root, onClose = () => {} } = {}) {
     }
   }
 
+  function syncRequest() {
+    const request = getPokedexRequest(state.requestId);
+
+    setText("request-status", request?.status || "No Active Request");
+    setText("request-giver", request?.giver || "Pokedex");
+    setText("request-title", request?.title || "No requests yet");
+    setText(
+      "request-description",
+      request?.description || "Keep restoring habitats and checking in with Pokemon."
+    );
+    setText("request-objective", request?.objective || "No objective tracked.");
+    setText("request-reward", request?.reward || "No reward listed.");
+  }
+
   function sync() {
     root.hidden = !state.open;
     root.dataset.page = state.page;
     syncEntry();
+    syncRequest();
 
     for (const button of getPageButtons()) {
       button.dataset.active = button.dataset.pokedexPageTarget === state.page ? "true" : "false";
@@ -197,13 +214,16 @@ export function createPokedexOverlay({ root, onClose = () => {} } = {}) {
     prevPage() {
       cyclePage(-1);
     },
-    setOpen(open, { page = "details", preservePage = false, entryId = null } = {}) {
+    setOpen(open, { page = "details", preservePage = false, entryId = null, requestId = null } = {}) {
       state.open = open;
       if (open && !preservePage) {
         state.page = isValidPage(page) ? page : "details";
       }
       if (open && entryId) {
         state.entryId = getPokedexEntry(entryId).id;
+      }
+      if (open && requestId) {
+        state.requestId = requestId;
       }
       sync();
     },
@@ -224,7 +244,13 @@ export function createPokedexOverlay({ root, onClose = () => {} } = {}) {
         return true;
       }
 
-      if (event.code === "Escape" || event.code === "KeyB" || event.code === "Enter") {
+      if (
+        event.code === "Escape" ||
+        event.code === "KeyB" ||
+        event.code === "KeyX" ||
+        event.code === "Enter" ||
+        event.code === "Space"
+      ) {
         onClose();
         event.preventDefault();
         return true;

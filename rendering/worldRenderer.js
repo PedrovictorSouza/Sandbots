@@ -10,19 +10,31 @@ export function createWorldRenderer({
   spriteAttribs,
   spriteQuadBuffer,
   spriteQuadIndices,
+  skyProgram,
+  skyUniforms,
+  skyAttribs,
+  skyQuadBuffer,
+  skyQuadIndices,
   jitterState
 }) {
   const pixelSnap = new Float32Array(2);
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
 
   function syncPixelSnap() {
     pixelSnap[0] = worldCanvas.width * 0.5;
     pixelSnap[1] = worldCanvas.height * 0.5;
   }
 
-  function configureScenePass(viewProjection) {
+  function clearScenePass() {
     gl.viewport(0, 0, worldCanvas.width, worldCanvas.height);
     gl.clearColor(0.5294, 0.8078, 0.9216, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  }
+
+  function configureScenePass(viewProjection) {
     gl.enable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
     gl.enable(gl.BLEND);
@@ -34,6 +46,55 @@ export function createWorldRenderer({
     gl.uniform2fv(uniforms.pixelSnap, pixelSnap);
     gl.uniform1f(uniforms.time, performance.now() * 0.001);
     gl.uniform1i(uniforms.texture, 0);
+  }
+
+  function getSkyOrientation() {
+    const pose = camera.getPose?.();
+    const direction = pose?.direction || [1, 0, 0];
+    const lookDirection = [
+      -(direction[0] || 0),
+      -(direction[1] || 0),
+      -(direction[2] || 0)
+    ];
+    const lookLength = Math.hypot(
+      lookDirection[0],
+      lookDirection[1],
+      lookDirection[2]
+    ) || 1;
+    const normalizedLook = [
+      lookDirection[0] / lookLength,
+      lookDirection[1] / lookLength,
+      lookDirection[2] / lookLength
+    ];
+
+    return {
+      yaw: Math.atan2(normalizedLook[0], normalizedLook[2]),
+      pitch: Math.asin(clamp(normalizedLook[1], -1, 1))
+    };
+  }
+
+  function drawSky(skyTexture) {
+    if (!skyTexture || !skyProgram || !skyQuadBuffer || !skyQuadIndices) {
+      return;
+    }
+
+    const { yaw, pitch } = getSkyOrientation();
+
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.BLEND);
+    gl.useProgram(skyProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+    gl.uniform1i(skyUniforms.texture, 0);
+    gl.uniform1f(skyUniforms.yaw, yaw);
+    gl.uniform1f(skyUniforms.pitch, pitch);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyQuadBuffer);
+    gl.enableVertexAttribArray(skyAttribs.position);
+    gl.vertexAttribPointer(skyAttribs.position, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, skyQuadIndices);
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
   }
 
   function bindScenePrimitive(primitive) {
@@ -83,6 +144,8 @@ export function createWorldRenderer({
     const { right: quadRight, up: quadUp } = camera.getBillboardAxes();
 
     gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(spriteProgram);
     gl.uniformMatrix4fv(spriteUniforms.viewProjection, false, viewProjection);
     syncPixelSnap();
@@ -131,11 +194,13 @@ export function createWorldRenderer({
   }
 
   return {
-    drawScene(viewProjection, sceneObjects) {
+    drawScene(viewProjection, sceneObjects, skyTexture = null) {
+      clearScenePass();
+      drawSky(skyTexture);
+
       if (!sceneObjects.length) {
         return;
       }
-
       configureScenePass(viewProjection);
 
       for (const sceneObject of sceneObjects) {
@@ -184,10 +249,15 @@ export function createWorldRenderer({
           continue;
         }
 
+        const texture = markerTextures[npcActor.markerKey];
+        if (!texture) {
+          continue;
+        }
+
         const position = npcActor.character.getPosition();
         markers.push({
           id: npcActor.id,
-          texture: markerTextures[npcActor.markerKey],
+          texture,
           position: [position[0], position[1] + npcMarkerOffset, position[2]],
           size: npcMarkerSize,
           attention: attentionTargets.has(npcActor.id)
@@ -199,9 +269,14 @@ export function createWorldRenderer({
           continue;
         }
 
+        const texture = markerTextures[interactable.markerKey];
+        if (!texture) {
+          continue;
+        }
+
         markers.push({
           id: interactable.id,
-          texture: markerTextures[interactable.markerKey],
+          texture,
           position: [
             interactable.position[0],
             interactable.position[1] + worldMarkerHeight,
@@ -217,9 +292,14 @@ export function createWorldRenderer({
           continue;
         }
 
+        const texture = markerTextures[resourceNode.markerKey];
+        if (!texture) {
+          continue;
+        }
+
         markers.push({
           id: resourceNode.id,
-          texture: markerTextures[resourceNode.markerKey],
+          texture,
           position: [
             resourceNode.position[0],
             resourceNode.position[1] + worldMarkerHeight,

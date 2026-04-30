@@ -51,7 +51,14 @@ export function createPokedexRuntime({
 
   function setOpen(
     open,
-    { force = false, markSeen = true, scripted = false, entryId = null } = {}
+    {
+      force = false,
+      markSeen = true,
+      scripted = false,
+      entryId = null,
+      page = "details",
+      requestId = null
+    } = {}
   ) {
     if (open && !state.unlocked && !force) {
       return;
@@ -69,11 +76,14 @@ export function createPokedexRuntime({
     }
 
     clearGameFlowInput();
+    const openOptions = { page, entryId };
+    if (requestId) {
+      openOptions.requestId = requestId;
+    }
+
     entry.setOpen(
       open,
-      open ?
-        { page: "details", entryId } :
-        { preservePage: true }
+      open ? openOptions : { preservePage: true }
     );
     syncUi();
   }

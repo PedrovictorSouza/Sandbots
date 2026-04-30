@@ -45,6 +45,10 @@ export function createGameInputController({
   requestHarvest,
   requestInteract,
   requestPauseToggle,
+  requestPokedexOpen = () => {},
+  requestFollowerCall = () => {},
+  requestMoveCycle = () => {},
+  shouldBagButtonInteract = () => false,
   inspectBag = () => {},
   windowRef = null
 }) {
@@ -61,6 +65,11 @@ export function createGameInputController({
   let gamepadJumpButtonPressed = false;
   let gamepadCameraZoomButtonPressed = false;
   let gamepadPauseButtonPressed = false;
+  let gamepadPokedexButtonPressed = false;
+  let gamepadBagButtonPressed = false;
+  let gamepadFollowerCallButtonPressed = false;
+  let gamepadPreviousMoveButtonPressed = false;
+  let gamepadNextMoveButtonPressed = false;
   let primaryActionPressed = false;
   let cameraZoomCycleRequests = 0;
   let jumpRequests = 0;
@@ -69,6 +78,16 @@ export function createGameInputController({
     return {
       code: GAME_INPUT_BINDINGS.primaryAction.keyboardCode,
       key: "Enter",
+      repeat: false,
+      target: null,
+      preventDefault() {}
+    };
+  }
+
+  function createBagButtonEvent() {
+    return {
+      code: GAME_INPUT_BINDINGS.bag.keyboardCode,
+      key: "x",
       repeat: false,
       target: null,
       preventDefault() {}
@@ -94,6 +113,26 @@ export function createGameInputController({
 
   function isPauseKey(event) {
     return event.code === GAME_INPUT_BINDINGS.pause.keyboardCode;
+  }
+
+  function isPokedexKey(event) {
+    return event.code === GAME_INPUT_BINDINGS.pokedex.keyboardCode;
+  }
+
+  function isBagKey(event) {
+    return event.code === GAME_INPUT_BINDINGS.bag.keyboardCode;
+  }
+
+  function isFollowerCallKey(event) {
+    return event.code === GAME_INPUT_BINDINGS.followerCall.keyboardCode;
+  }
+
+  function isPreviousMoveKey(event) {
+    return event.code === GAME_INPUT_BINDINGS.previousMove.keyboardCode;
+  }
+
+  function isNextMoveKey(event) {
+    return event.code === GAME_INPUT_BINDINGS.nextMove.keyboardCode;
   }
 
   function isJumpKey(event) {
@@ -133,14 +172,32 @@ export function createGameInputController({
       return;
     }
 
-    if (!typingTarget && !builderPanelOpen && (event.code === "ArrowLeft" || event.code === "ArrowRight")) {
-      cameraTurnKeys.add(event.code);
+    if (!typingTarget && !builderPanelOpen && (isPreviousMoveKey(event) || isNextMoveKey(event))) {
+      if (!event.repeat) {
+        requestMoveCycle(isPreviousMoveKey(event) ? -1 : 1);
+      }
       event.preventDefault();
       return;
     }
 
     if (event.code === "Escape" && builderPanelOpen) {
       setBuilderPanelOpen(false);
+      event.preventDefault();
+      return;
+    }
+
+    if (isPokedexKey(event) && !typingTarget) {
+      if (!event.repeat) {
+        requestPokedexOpen();
+      }
+      event.preventDefault();
+      return;
+    }
+
+    if (isFollowerCallKey(event) && !typingTarget && !builderPanelOpen) {
+      if (!event.repeat) {
+        requestFollowerCall();
+      }
       event.preventDefault();
       return;
     }
@@ -153,9 +210,13 @@ export function createGameInputController({
       return;
     }
 
-    if (event.code === "KeyX" && !typingTarget) {
+    if (isBagKey(event) && !typingTarget) {
       if (!event.repeat) {
-        inspectBag();
+        if (shouldBagButtonInteract()) {
+          requestInteract();
+        } else {
+          inspectBag();
+        }
       }
       event.preventDefault();
       return;
@@ -164,6 +225,8 @@ export function createGameInputController({
     if (builderPanelOpen) {
       if (!typingTarget && (
         event.code === GAME_INPUT_BINDINGS.primaryAction.keyboardCode ||
+        isBagKey(event) ||
+        isFollowerCallKey(event) ||
         isJumpKey(event) ||
         event.code === "KeyE" ||
         isMovementKey(key) ||
@@ -268,7 +331,17 @@ export function createGameInputController({
       return;
     }
 
-    if (event.code === "KeyX") {
+    if (isBagKey(event)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (isFollowerCallKey(event)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (isPokedexKey(event)) {
       event.preventDefault();
       return;
     }
@@ -311,6 +384,11 @@ export function createGameInputController({
     let jumpButtonPressed = false;
     let zoomButtonPressed = false;
     let pauseButtonPressed = false;
+    let pokedexButtonPressed = false;
+    let bagButtonPressed = false;
+    let followerCallButtonPressed = false;
+    let previousMoveButtonPressed = false;
+    let nextMoveButtonPressed = false;
 
     const navigatorRef = windowRef?.navigator;
     const gamepads = navigatorRef?.getGamepads?.();
@@ -321,6 +399,11 @@ export function createGameInputController({
       gamepadJumpButtonPressed = false;
       gamepadCameraZoomButtonPressed = false;
       gamepadPauseButtonPressed = false;
+      gamepadPokedexButtonPressed = false;
+      gamepadBagButtonPressed = false;
+      gamepadFollowerCallButtonPressed = false;
+      gamepadPreviousMoveButtonPressed = false;
+      gamepadNextMoveButtonPressed = false;
       return;
     }
 
@@ -340,6 +423,16 @@ export function createGameInputController({
         Number(gamepad.buttons?.[GAME_INPUT_BINDINGS.cameraZoomCycle.gamepadButton]?.value || 0) > 0.55;
       pauseButtonPressed = pauseButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.pause.gamepadButton]?.pressed);
+      pokedexButtonPressed = pokedexButtonPressed ||
+        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.pokedex.gamepadButton]?.pressed);
+      bagButtonPressed = bagButtonPressed ||
+        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.bag.gamepadButton]?.pressed);
+      followerCallButtonPressed = followerCallButtonPressed ||
+        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.followerCall.gamepadButton]?.pressed);
+      previousMoveButtonPressed = previousMoveButtonPressed ||
+        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.previousMove.gamepadButton]?.pressed);
+      nextMoveButtonPressed = nextMoveButtonPressed ||
+        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.nextMove.gamepadButton]?.pressed);
 
       const moveX = applyDeadzone(Number(gamepad.axes?.[0] || 0));
       const moveY = applyDeadzone(Number(gamepad.axes?.[1] || 0));
@@ -359,6 +452,40 @@ export function createGameInputController({
       if (moveX !== 0 || moveY !== 0 || lookX !== 0 || lookY !== 0) {
         continue;
       }
+    }
+
+    if (
+      previousMoveButtonPressed &&
+      !gamepadPreviousMoveButtonPressed &&
+      !isPokedexOpen() &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      requestMoveCycle(-1);
+    }
+
+    gamepadPreviousMoveButtonPressed = previousMoveButtonPressed;
+
+    if (
+      nextMoveButtonPressed &&
+      !gamepadNextMoveButtonPressed &&
+      !isPokedexOpen() &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      requestMoveCycle(1);
+    }
+
+    gamepadNextMoveButtonPressed = nextMoveButtonPressed;
+
+    if (
+      runButtonPressed &&
+      !gamepadRunButtonPressed &&
+      !isPokedexOpen() &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      requestInteract();
     }
 
     gamepadRunButtonPressed = runButtonPressed;
@@ -381,6 +508,54 @@ export function createGameInputController({
     }
 
     gamepadPauseButtonPressed = pauseButtonPressed;
+
+    if (
+      pokedexButtonPressed &&
+      !gamepadPokedexButtonPressed &&
+      !isPokedexOpen() &&
+      !sceneDirector.blocksGameplayInput()
+    ) {
+      requestPokedexOpen();
+    }
+
+    gamepadPokedexButtonPressed = pokedexButtonPressed;
+
+    if (
+      bagButtonPressed &&
+      !gamepadBagButtonPressed &&
+      isPokedexOpen()
+    ) {
+      clearGameFlowInput();
+      pokedexEntry.handleKeydown(createBagButtonEvent());
+    } else if (
+      bagButtonPressed &&
+      !gamepadBagButtonPressed &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      const bagEvent = createBagButtonEvent();
+      if (sceneDirector.handleKeydown(bagEvent)) {
+        // The active gameplay scene consumed X, usually to advance dialogue.
+      } else if (shouldBagButtonInteract()) {
+        requestInteract();
+      } else {
+        inspectBag();
+      }
+    }
+
+    gamepadBagButtonPressed = bagButtonPressed;
+
+    if (
+      followerCallButtonPressed &&
+      !gamepadFollowerCallButtonPressed &&
+      !isPokedexOpen() &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      requestFollowerCall();
+    }
+
+    gamepadFollowerCallButtonPressed = followerCallButtonPressed;
 
     if (actionButtonPressed && !gamepadActionButtonPressed) {
       const primaryEvent = createPrimaryButtonEvent();

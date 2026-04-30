@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPokedexOverlay } from "../pokedexOverlay.js";
 import {
   BULBASAUR_POKEDEX_ENTRY_ID,
   FLOWER_BED_POKEDEX_ENTRY_ID,
-  TALL_GRASS_POKEDEX_ENTRY_ID
+  TALL_GRASS_POKEDEX_ENTRY_ID,
+  TIMBURR_POKEDEX_ENTRY_ID
 } from "../pokedexEntries.js";
+import {
+  BOULDER_SHADED_TALL_GRASS_CHALLENGE_ID,
+  NEW_HABITAT_CHALLENGES_ID,
+  SQUIRTLE_LEPPA_BERRY_REQUEST_ID
+} from "../pokedexRequests.js";
 
 function createOverlayRoot() {
   const root = document.createElement("section");
@@ -46,16 +52,25 @@ function createOverlayRoot() {
       <div data-pokedex-field="drawer-icon"></div>
       <div data-pokedex-field="drawer-label"></div>
       <div data-pokedex-field="drawer-count"></div>
+      <div data-pokedex-field="request-status"></div>
+      <div data-pokedex-field="request-giver"></div>
+      <div data-pokedex-field="request-title"></div>
+      <div data-pokedex-field="request-description"></div>
+      <div data-pokedex-field="request-objective"></div>
+      <div data-pokedex-field="request-reward"></div>
       <button data-pokedex-page-target="details"></button>
       <button data-pokedex-page-target="where-to-find"></button>
       <button data-pokedex-page-target="specialties"></button>
+      <button data-pokedex-page-target="requests"></button>
       <section data-pokedex-page-panel="details"></section>
       <section data-pokedex-page-panel="where-to-find"></section>
       <section data-pokedex-page-panel="specialties"></section>
+      <section data-pokedex-page-panel="requests"></section>
       <div data-pokedex-art-scene="squirtle"></div>
       <div data-pokedex-art-scene="bulbasaur" hidden></div>
       <div data-pokedex-art-scene="flower-bed" hidden></div>
       <div data-pokedex-art-scene="tall-grass" hidden></div>
+      <div data-pokedex-art-scene="timburr" hidden></div>
     </article>
   `;
   return root;
@@ -121,5 +136,76 @@ describe("createPokedexOverlay", () => {
     expect(root.querySelector(".pokedex-entry")?.dataset.pokedexTheme).toBe("forest");
     expect(root.querySelector('[data-pokedex-art-scene="bulbasaur"]')?.hidden).toBe(false);
     expect(root.querySelector('[data-pokedex-art-scene="squirtle"]')?.hidden).toBe(true);
+  });
+
+  it("opens the request menu with a Squirtle request", () => {
+    const root = createOverlayRoot();
+    const overlay = createPokedexOverlay({ root });
+
+    overlay.setOpen(true, {
+      page: "requests",
+      requestId: SQUIRTLE_LEPPA_BERRY_REQUEST_ID
+    });
+
+    expect(overlay.getPage()).toBe("requests");
+    expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("New Request");
+    expect(root.querySelector('[data-pokedex-field="request-giver"]')?.textContent).toBe("Squirtle");
+    expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("A Leppa Berry for Bulbasaur");
+    expect(root.querySelector('[data-pokedex-field="request-objective"]')?.textContent).toContain("Use Water Gun on the dead tree");
+    expect(root.querySelector('[data-pokedex-page-panel="requests"]')?.hidden).toBe(false);
+  });
+
+  it("treats X as a close shortcut while the Pokedesk is open", () => {
+    const root = createOverlayRoot();
+    const onClose = vi.fn();
+    const overlay = createPokedexOverlay({ root, onClose });
+    const event = {
+      code: "KeyX",
+      key: "x",
+      preventDefault: vi.fn()
+    };
+
+    overlay.setOpen(true);
+
+    expect(overlay.handleKeydown(event)).toBe(true);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders Timburr and the Boulder-Shaded Tall Grass challenge request", () => {
+    const root = createOverlayRoot();
+    const overlay = createPokedexOverlay({ root });
+
+    overlay.setOpen(true, {
+      entryId: TIMBURR_POKEDEX_ENTRY_ID
+    });
+
+    expect(root.querySelector('[data-pokedex-field="name"]')?.textContent).toBe("Timburr");
+    expect(root.querySelector('[data-pokedex-field="habitat-copy"]')?.textContent).toBe("Boulder shade");
+    expect(root.querySelector('[data-pokedex-art-scene="timburr"]')?.hidden).toBe(false);
+
+    overlay.setOpen(true, {
+      page: "requests",
+      requestId: BOULDER_SHADED_TALL_GRASS_CHALLENGE_ID
+    });
+
+    expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("Challenge");
+    expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("Boulder-Shaded Tall Grass");
+    expect(root.querySelector('[data-pokedex-field="request-reward"]')?.textContent).toBe("Life Coins.");
+  });
+
+  it("renders the new Habitat Challenges request from the PC", () => {
+    const root = createOverlayRoot();
+    const overlay = createPokedexOverlay({ root });
+
+    overlay.setOpen(true, {
+      page: "requests",
+      requestId: NEW_HABITAT_CHALLENGES_ID
+    });
+
+    expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("New Challenges");
+    expect(root.querySelector('[data-pokedex-field="request-giver"]')?.textContent).toBe("Pokemon Center PC");
+    expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("New Habitat Challenges");
+    expect(root.querySelector('[data-pokedex-field="request-objective"]')?.textContent).toContain("Review the new Challenges");
   });
 });

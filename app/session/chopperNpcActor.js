@@ -4,6 +4,16 @@ const CHOPPER_NPC_YAW = 0.65;
 const CHOPPER_NPC_PROPELLER_SPEED = 26;
 const CHOPPER_NPC_PROPELLER_PIVOT = [0.125, 2, 0];
 const CHOPPER_NPC_FLIGHT_LIFT = 0.78;
+const CHOPPER_PATROL_SPEED = 1.85;
+const CHOPPER_PATROL_PAUSE_DURATION = 1.35;
+const CHOPPER_PATROL_ARRIVE_DISTANCE = 0.22;
+const CHOPPER_PATROL_POINTS = Object.freeze([
+  [10.4, 0.02, -7.2],
+  [13.4, 0.02, -5.9],
+  [16.8, 0.02, -8.1],
+  [14.2, 0.02, -10.4],
+  [9.4, 0.02, -9.1]
+]);
 
 function getNpcPosition(npcActor) {
   return npcActor?.character?.getPosition?.() || npcActor?.position || [0, 0, 0];
@@ -28,6 +38,25 @@ function getYawToward(fromPosition, toPosition) {
   const deltaX = toPosition[0] - fromPosition[0];
   const deltaZ = toPosition[2] - fromPosition[2];
   return Math.atan2(deltaX, deltaZ);
+}
+
+function getNearestPatrolPointIndex(position) {
+  let nearestIndex = 0;
+  let nearestDistance = Infinity;
+
+  CHOPPER_PATROL_POINTS.forEach((patrolPoint, index) => {
+    const distance = Math.hypot(
+      position[0] - patrolPoint[0],
+      position[2] - patrolPoint[2]
+    );
+
+    if (distance < nearestDistance) {
+      nearestIndex = index;
+      nearestDistance = distance;
+    }
+  });
+
+  return nearestIndex;
 }
 
 function syncChopperNpcInstances(actor, {
@@ -75,6 +104,7 @@ export function createChopperNpcActor({ npcActor }) {
     elapsed: 0,
     flightLift: 0,
     scriptedFlight: null,
+    patrol: null,
     propellerAngle: 0,
     bodyInstance: {
       offset: [...getNpcPosition(npcActor)],
@@ -98,6 +128,57 @@ export function createChopperNpcActor({ npcActor }) {
 
   syncChopperNpcInstances(actor);
   return actor;
+}
+
+function updatePatrol(actor, deltaTime, storyState) {
+  if (
+    !storyState?.flags?.chopperPatrolEnabled ||
+    (
+      storyState?.flags?.pokemonCenterGuideStarted &&
+      !storyState?.flags?.challengesUnlocked
+    ) ||
+    actor.scriptedFlight ||
+    !actor.active
+  ) {
+    return;
+  }
+
+  const currentPosition = getNpcPosition(actor.npcActor);
+  if (!actor.patrol) {
+    actor.patrol = {
+      waypointIndex: getNearestPatrolPointIndex(currentPosition),
+      pauseTimer: 0
+    };
+  }
+
+  if (actor.patrol.pauseTimer > 0) {
+    actor.patrol.pauseTimer = Math.max(0, actor.patrol.pauseTimer - deltaTime);
+    return;
+  }
+
+  const targetPosition = CHOPPER_PATROL_POINTS[actor.patrol.waypointIndex];
+  const deltaX = targetPosition[0] - currentPosition[0];
+  const deltaZ = targetPosition[2] - currentPosition[2];
+  const distance = Math.hypot(deltaX, deltaZ);
+
+  if (distance <= CHOPPER_PATROL_ARRIVE_DISTANCE) {
+    actor.patrol.waypointIndex =
+      (actor.patrol.waypointIndex + 1) % CHOPPER_PATROL_POINTS.length;
+    actor.patrol.pauseTimer = CHOPPER_PATROL_PAUSE_DURATION;
+    return;
+  }
+
+  const step = Math.min(distance, CHOPPER_PATROL_SPEED * deltaTime);
+  const directionX = deltaX / distance;
+  const directionZ = deltaZ / distance;
+  const nextPosition = [
+    currentPosition[0] + directionX * step,
+    targetPosition[1],
+    currentPosition[2] + directionZ * step
+  ];
+
+  actor.npcActor.faceYaw = getYawToward(currentPosition, targetPosition);
+  setNpcPosition(actor.npcActor, nextPosition);
 }
 
 export function startChopperNpcFlight(actor, {
@@ -171,6 +252,7 @@ export function updateChopperNpcActor(actor, {
   actor.active = typeof isNpcActive === "function" ?
     isNpcActive(actor.npcActor, storyState) :
     true;
+  updatePatrol(actor, deltaTime, storyState);
 
   const time = actor.elapsed;
   syncChopperNpcInstances(actor, {

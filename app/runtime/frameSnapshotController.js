@@ -34,6 +34,7 @@ function createFrameSnapshot() {
     render: {
       viewProjection: null,
       sceneObjects: null,
+      skyTexture: null,
       grassBillboards: [],
       flowerBillboards: [],
       worldMarkers: null,
@@ -78,6 +79,7 @@ function resetFrameSnapshot(snapshot) {
 
   snapshot.render.viewProjection = null;
   snapshot.render.sceneObjects = null;
+  snapshot.render.skyTexture = null;
   snapshot.render.grassBillboards.length = 0;
   snapshot.render.flowerBillboards.length = 0;
   snapshot.render.worldMarkers = null;
@@ -230,7 +232,11 @@ function commitRender(worldRenderer, snapshot) {
     return;
   }
 
-  worldRenderer.drawScene(viewProjection, render.sceneObjects || []);
+  if (render.skyTexture) {
+    worldRenderer.drawScene(viewProjection, render.sceneObjects || [], render.skyTexture);
+  } else {
+    worldRenderer.drawScene(viewProjection, render.sceneObjects || []);
+  }
   worldRenderer.drawBillboards(viewProjection, render.grassBillboards);
   worldRenderer.drawBillboards(viewProjection, render.flowerBillboards);
 

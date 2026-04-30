@@ -109,7 +109,7 @@ describe("buildGroundGridInstances", () => {
 
     const revived = reviveGroundGrass(groundInstances[0], grassPatches);
 
-    expect(revived).toBe(true);
+    expect(revived).toBe(grassPatches[0]);
     expect(grassPatches[0].state).toBe(GREEN_GRASS_STATE);
     expect(reviveGroundGrass(groundInstances[0], grassPatches)).toBe(false);
   });
@@ -137,7 +137,7 @@ describe("buildGroundGridInstances", () => {
 
     const revived = reviveGroundFlower(groundInstances[1], flowerPatches);
 
-    expect(revived).toBe(true);
+    expect(revived).toBe(flowerPatches[0]);
     expect(flowerPatches[0].state).toBe(ALIVE_PATCH_STATE);
     expect(reviveGroundFlower(groundInstances[1], flowerPatches)).toBe(false);
   });

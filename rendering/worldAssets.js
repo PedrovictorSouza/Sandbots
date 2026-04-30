@@ -7,6 +7,7 @@ export const ACT_TWO_MONSTER_SIZE = [2.6, 2.42];
 export const ACT_TWO_SQUIRTLE_POSITION = [17.8, 0.02, -10.4];
 export const ACT_TWO_SQUIRTLE_SIZE = [2.24, 2.12];
 export const ACT_TWO_BULBASAUR_SIZE = [2.26, 2.14];
+export const ACT_TWO_CHARMANDER_SIZE = [2.18, 2.08];
 export const ACT_TWO_POKEDEX_CACHE_POSITION = [9.65, 0.02, -8.65];
 export const ACT_TWO_POKEDEX_CACHE_SIZE = [3.1, 2.42];
 export const ACT_TWO_REPAIR_PLANT_POSITION = [28.4, 0.02, -4.4];
@@ -153,6 +154,38 @@ const SPRITE_FRAGMENT_SOURCE = `
   }
 `;
 
+const SKY_VERTEX_SOURCE = `
+  attribute vec2 aPosition;
+
+  varying vec2 vScreenUv;
+
+  void main() {
+    vScreenUv = aPosition * 0.5 + 0.5;
+    gl_Position = vec4(aPosition, 0.0, 1.0);
+  }
+`;
+
+const SKY_FRAGMENT_SOURCE = `
+  precision mediump float;
+
+  uniform sampler2D uSkyTexture;
+  uniform float uSkyYaw;
+  uniform float uSkyPitch;
+
+  varying vec2 vScreenUv;
+
+  const float PI = 3.14159265359;
+
+  void main() {
+    float horizontalSpan = 0.40;
+    float u = fract((uSkyYaw / (PI * 2.0)) + (vScreenUv.x - 0.5) * horizontalSpan);
+    float pitchOffset = clamp(uSkyPitch, -0.9, 0.9) * 0.18;
+    float v = clamp(0.86 - vScreenUv.y * 0.78 + pitchOffset, 0.001, 0.999);
+
+    gl_FragColor = texture2D(uSkyTexture, vec2(u, v));
+  }
+`;
+
 export function createNoopWebGlContext() {
   let handleId = 0;
   const createHandle = (kind) => ({ kind, id: ++handleId });
@@ -170,6 +203,7 @@ export function createNoopWebGlContext() {
     ELEMENT_ARRAY_BUFFER: 0x8893,
     FLOAT: 0x1406,
     FRAGMENT_SHADER: 0x8B30,
+    LINEAR: 0x2601,
     LINK_STATUS: 0x8B82,
     NEAREST: 0x2600,
     ONE_MINUS_SRC_ALPHA: 0x0303,
@@ -328,6 +362,36 @@ export function createWorldRenderingResources(gl) {
     gl.STATIC_DRAW
   );
 
+  const skyProgram = createProgram(gl, SKY_VERTEX_SOURCE, SKY_FRAGMENT_SOURCE);
+  const skyAttribs = {
+    position: gl.getAttribLocation(skyProgram, "aPosition")
+  };
+  const skyUniforms = {
+    texture: gl.getUniformLocation(skyProgram, "uSkyTexture"),
+    yaw: gl.getUniformLocation(skyProgram, "uSkyYaw"),
+    pitch: gl.getUniformLocation(skyProgram, "uSkyPitch")
+  };
+  const skyQuadBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, skyQuadBuffer);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([
+      -1, -1,
+      1, -1,
+      -1, 1,
+      1, 1
+    ]),
+    gl.STATIC_DRAW
+  );
+
+  const skyQuadIndices = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, skyQuadIndices);
+  gl.bufferData(
+    gl.ELEMENT_ARRAY_BUFFER,
+    new Uint16Array([0, 1, 2, 2, 1, 3]),
+    gl.STATIC_DRAW
+  );
+
   return {
     program,
     attribs,
@@ -336,7 +400,12 @@ export function createWorldRenderingResources(gl) {
     spriteAttribs,
     spriteUniforms,
     spriteQuadBuffer,
-    spriteQuadIndices
+    spriteQuadIndices,
+    skyProgram,
+    skyAttribs,
+    skyUniforms,
+    skyQuadBuffer,
+    skyQuadIndices
   };
 }
 
@@ -454,12 +523,13 @@ function createTextureFromImage(gl, image) {
   return texture;
 }
 
-function createTextureFromSource(gl, source) {
+function createTextureFromSource(gl, source, { filter = gl.NEAREST } = {}) {
   const texture = gl.createTexture();
+  const textureFilter = filter || gl.NEAREST;
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, textureFilter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, textureFilter);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return texture;
@@ -703,6 +773,84 @@ function createBulbasaurPlaceholderCanvas() {
   context.beginPath();
   context.ellipse(56, 54, 10, 5, -0.48, 0, Math.PI * 2);
   context.fill();
+
+  return canvas;
+}
+
+function createCharmanderPlaceholderCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(244, 119, 54, 0.22)";
+  context.beginPath();
+  context.ellipse(64, 104, 28, 10, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.strokeStyle = "#d76635";
+  context.lineWidth = 11;
+  context.lineCap = "round";
+  context.beginPath();
+  context.moveTo(82, 82);
+  context.bezierCurveTo(108, 72, 98, 42, 112, 34);
+  context.stroke();
+
+  context.fillStyle = "#ef6a32";
+  context.beginPath();
+  context.ellipse(112, 31, 11, 16, 0.2, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "#ffd95a";
+  context.beginPath();
+  context.ellipse(112, 34, 6, 9, 0.2, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#ef8a45";
+  context.beginPath();
+  context.ellipse(64, 76, 24, 30, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#ffd79b";
+  context.beginPath();
+  context.ellipse(64, 82, 13, 18, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#f59a50";
+  context.beginPath();
+  context.ellipse(64, 56, 24, 21, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "rgba(255, 237, 193, 0.5)";
+  context.beginPath();
+  context.ellipse(55, 48, 8, 5, -0.4, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#2b2521";
+  context.beginPath();
+  context.arc(56, 56, 2.6, 0, Math.PI * 2);
+  context.arc(72, 56, 2.6, 0, Math.PI * 2);
+  context.fill();
+
+  context.strokeStyle = "#8b3b23";
+  context.lineWidth = 4;
+  context.lineCap = "round";
+  context.beginPath();
+  context.moveTo(56, 69);
+  context.quadraticCurveTo(64, 75, 72, 69);
+  context.stroke();
+
+  context.strokeStyle = "#dc6d35";
+  context.lineWidth = 8;
+  context.beginPath();
+  context.moveTo(48, 92);
+  context.lineTo(42, 104);
+  context.moveTo(80, 92);
+  context.lineTo(88, 104);
+  context.stroke();
 
   return canvas;
 }
@@ -1021,12 +1169,14 @@ function createGroundFlowerCanvas({ revived = false } = {}) {
 
 export function createWorldTextureFactory(gl) {
   return {
+    LINEAR: gl.LINEAR,
+
     fromCanvas(canvas) {
       return createTextureFromSource(gl, canvas);
     },
 
-    fromImage(image) {
-      return createTextureFromSource(gl, image);
+    fromImage(image, options) {
+      return createTextureFromSource(gl, image, options);
     },
 
     buildMarkerTextureMap(itemDefs, worldMarkerStyles) {
@@ -1059,6 +1209,10 @@ export function createWorldTextureFactory(gl) {
 
     createBulbasaurTexture() {
       return createTextureFromSource(gl, createBulbasaurPlaceholderCanvas());
+    },
+
+    createCharmanderTexture() {
+      return createTextureFromSource(gl, createCharmanderPlaceholderCanvas());
     },
 
     createPokedexCacheTexture() {
@@ -1098,6 +1252,18 @@ function computeModelBounds(primitives) {
   return { min, max };
 }
 
+function resolveModelAssetPath(basePath, uri) {
+  if (!uri) {
+    return "";
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(uri) || uri.startsWith("/")) {
+    return uri;
+  }
+
+  return `${basePath}${uri}`;
+}
+
 export async function loadPicoModel({
   gl,
   gltfPath,
@@ -1124,12 +1290,23 @@ export async function loadPicoModel({
   const basePath = gltfPath.includes("/") ?
     gltfPath.slice(0, gltfPath.lastIndexOf("/") + 1) :
     "./";
-  const binBuffer = await fetch(`${basePath}${gltf.buffers[0].uri}`).then((response) => {
-    if (!response.ok) {
-      throw new Error(`Nao foi possivel carregar ${gltf.buffers[0].uri}`);
-    }
-    return response.arrayBuffer();
-  });
+  const resolvedTexturePath = gltf.images?.[gltf.textures?.[0]?.source || 0]?.uri ?
+    resolveModelAssetPath(
+      basePath,
+      gltf.images[gltf.textures?.[0]?.source || 0].uri
+    ) :
+    null;
+  const [binBuffer, textureImage] = await Promise.all([
+    fetch(`${basePath}${gltf.buffers[0].uri}`).then((response) => {
+      if (!response.ok) {
+        throw new Error(`Nao foi possivel carregar ${gltf.buffers[0].uri}`);
+      }
+      return response.arrayBuffer();
+    }),
+    resolvedTexturePath ?
+      loadImageAsset(resolvedTexturePath).catch(() => null) :
+      Promise.resolve(null)
+  ]);
 
   const primitives = [];
   for (const mesh of gltf.meshes) {
@@ -1160,7 +1337,9 @@ export async function loadPicoModel({
 
   return {
     primitives,
-    texture: createTextureFromPicoData(gl, picoData.texture),
+    texture: textureImage ?
+      createTextureFromImage(gl, textureImage) :
+      createTextureFromPicoData(gl, picoData.texture),
     offset: [
       -center[0] * scale,
       -bounds.min[1] * scale,
@@ -1195,9 +1374,13 @@ export async function loadTexturedModel({
   const basePath = gltfPath.includes("/") ?
     gltfPath.slice(0, gltfPath.lastIndexOf("/") + 1) :
     "./";
-  const resolvedBinPath = binPath || `${basePath}${gltf.buffers[0].uri}`;
+  const resolvedBinPath = binPath ||
+    resolveModelAssetPath(basePath, gltf.buffers[0].uri);
   const resolvedTexturePath = texturePath ||
-    `${basePath}${gltf.images?.[gltf.textures?.[0]?.source || 0]?.uri || ""}`;
+    resolveModelAssetPath(
+      basePath,
+      gltf.images?.[gltf.textures?.[0]?.source || 0]?.uri
+    );
 
   const [binBuffer, textureImage] = await Promise.all([
     fetch(resolvedBinPath).then((response) => {

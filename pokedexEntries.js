@@ -1,5 +1,7 @@
 export const SQUIRTLE_POKEDEX_ENTRY_ID = "squirtle";
 export const BULBASAUR_POKEDEX_ENTRY_ID = "bulbasaur";
+export const CHARMANDER_POKEDEX_ENTRY_ID = "charmander";
+export const TIMBURR_POKEDEX_ENTRY_ID = "timburr";
 export const FLOWER_BED_POKEDEX_ENTRY_ID = "prettyFlowerBed";
 export const TALL_GRASS_POKEDEX_ENTRY_ID = "tallGrass";
 
@@ -148,6 +150,110 @@ export const POKEDEX_ENTRIES = {
     },
     drawer: null
   },
+  [CHARMANDER_POKEDEX_ENTRY_ID]: {
+    id: CHARMANDER_POKEDEX_ENTRY_ID,
+    number: "No. 004",
+    name: "Charmander",
+    theme: "ember",
+    artVariant: "charmander",
+    details: {
+      eyebrow: "Details",
+      species: "Lizard Pokemon",
+      descriptionHtml:
+        "The flame on its tail shows the strength of its life-force. It helps bring warmth back to restored habitats.",
+      stats: [
+        { label: "Height", value: "2'0\"" },
+        { label: "Weight", value: "18.7 lbs." },
+        { label: "Type", badgeIcon: "\u{1F525}", badgeLabel: "Fire" }
+      ]
+    },
+    whereToFind: {
+      eyebrow: "Where to Find",
+      pin: "Tall grass",
+      island: "",
+      islandHtml: createTallGrassWherePreview(),
+      count: "1/2",
+      stats: [
+        { label: "Time", value: "Day / Sunset" },
+        { label: "Weather", value: "Clear" }
+      ]
+    },
+    specialties: {
+      eyebrow: "Specialties & Likes",
+      specialtyTitle: "Specialties",
+      specialtyIcon: "\u{1F525}",
+      specialtyLabel: "Fire",
+      favoritesTitle: "Favorites",
+      favorites: [
+        "Campfires",
+        "Warm places",
+        "Fresh tall grass",
+        "Dry wood",
+        "Brave helpers",
+        "Cozy habitats"
+      ],
+      habitatTitle: "Ideal Habitat",
+      habitatCopy: "Warm"
+    },
+    artCard: {
+      title: "Details",
+      time: "Sunset",
+      rarity: "Common"
+    },
+    drawer: null
+  },
+  [TIMBURR_POKEDEX_ENTRY_ID]: {
+    id: TIMBURR_POKEDEX_ENTRY_ID,
+    number: "No. 532",
+    name: "Timburr",
+    theme: "stone",
+    artVariant: "timburr",
+    details: {
+      eyebrow: "Details",
+      species: "Muscular Pokemon",
+      descriptionHtml:
+        "It loves sturdy places and trains by carrying heavy timber. Boulder shade and tall grass make it feel ready to help.",
+      stats: [
+        { label: "Height", value: "2'0\"" },
+        { label: "Weight", value: "27.6 lbs." },
+        { label: "Type", badgeIcon: "\u25C6", badgeLabel: "Fighting" }
+      ]
+    },
+    whereToFind: {
+      eyebrow: "Where to Find",
+      pin: "Boulder shade",
+      island: "",
+      islandHtml: createTallGrassWherePreview(),
+      count: "1/2",
+      stats: [
+        { label: "Time", value: "Day" },
+        { label: "Weather", value: "Clear / Cloudy" }
+      ]
+    },
+    specialties: {
+      eyebrow: "Specialties & Likes",
+      specialtyTitle: "Specialties",
+      specialtyIcon: "\u25C6",
+      specialtyLabel: "Build",
+      favoritesTitle: "Favorites",
+      favorites: [
+        "Boulders",
+        "Tall grass",
+        "Training spots",
+        "Timber",
+        "Sturdy furniture",
+        "Helping with work"
+      ],
+      habitatTitle: "Ideal Habitat",
+      habitatCopy: "Boulder shade"
+    },
+    artCard: {
+      title: "Details",
+      time: "Day",
+      rarity: "Challenge"
+    },
+    drawer: null
+  },
   [FLOWER_BED_POKEDEX_ENTRY_ID]: {
     id: FLOWER_BED_POKEDEX_ENTRY_ID,
     number: "No. 008",
@@ -160,7 +266,7 @@ export const POKEDEX_ENTRIES = {
       descriptionHtml:
         'A beautiful bed of <span class="pokedex-entry__description-accent">wildflowers</span>.<br />A faint, sweet aroma wafts about it.',
       stats: [
-        { label: "Patch Size", value: "1 tile" },
+        { label: "Patch Size", value: "4 flowers" },
         { label: "Rarity", value: "Common" },
         { label: "Type", badgeIcon: "\u273F", badgeLabel: "Grass" }
       ]

@@ -27,6 +27,7 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
                   <button class="pokedex-entry__tab" data-pokedex-page-target="details" data-active="true" type="button" aria-label="Details">&#9675;</button>
                   <button class="pokedex-entry__tab" data-pokedex-page-target="where-to-find" data-active="false" type="button" aria-label="Where to Find">&#9632;</button>
                   <button class="pokedex-entry__tab" data-pokedex-page-target="specialties" data-active="false" type="button" aria-label="Specialties and Likes">&hearts;</button>
+                  <button class="pokedex-entry__tab" data-pokedex-page-target="requests" data-active="false" type="button" aria-label="Requests">!</button>
                   <button class="pokedex-entry__nav" data-pokedex-action="next" type="button" aria-label="Next page">R</button>
                 </div>
                 <section class="pokedex-entry__page" data-pokedex-page-panel="details">
@@ -104,6 +105,23 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
                     </section>
                   </div>
                 </section>
+                <section class="pokedex-entry__page pokedex-entry__page--requests" data-pokedex-page-panel="requests" hidden>
+                  <div class="pokedex-entry__eyebrow">Requests</div>
+                  <article class="pokedex-entry__request-card">
+                    <div class="pokedex-entry__request-status" data-pokedex-field="request-status">No Active Request</div>
+                    <div class="pokedex-entry__request-giver" data-pokedex-field="request-giver">Pokedex</div>
+                    <h3 data-pokedex-field="request-title">No requests yet</h3>
+                    <p data-pokedex-field="request-description">Keep restoring habitats and checking in with Pokemon.</p>
+                    <div class="pokedex-entry__request-row">
+                      <span>Objective</span>
+                      <strong data-pokedex-field="request-objective">No objective tracked.</strong>
+                    </div>
+                    <div class="pokedex-entry__request-row">
+                      <span>Reward</span>
+                      <strong data-pokedex-field="request-reward">No reward listed.</strong>
+                    </div>
+                  </article>
+                </section>
               </div>
               <div class="pokedex-entry__art" aria-hidden="true">
                 <div class="pokedex-entry__glow"></div>
@@ -175,6 +193,32 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
                     <div class="pokedex-entry__bulbasaur-leg pokedex-entry__bulbasaur-leg--back-right"></div>
                     <div class="pokedex-entry__bulbasaur-leg pokedex-entry__bulbasaur-leg--front-left"></div>
                     <div class="pokedex-entry__bulbasaur-leg pokedex-entry__bulbasaur-leg--front-right"></div>
+                  </div>
+                </div>
+                <div class="pokedex-entry__charmander-scene" data-pokedex-art-scene="charmander" hidden>
+                  <div class="pokedex-entry__charmander-platform"></div>
+                  <div class="pokedex-entry__charmander">
+                    <div class="pokedex-entry__charmander-tail"></div>
+                    <div class="pokedex-entry__charmander-body"></div>
+                    <div class="pokedex-entry__charmander-head">
+                      <div class="pokedex-entry__charmander-smile"></div>
+                    </div>
+                    <div class="pokedex-entry__charmander-leg pokedex-entry__charmander-leg--left"></div>
+                    <div class="pokedex-entry__charmander-leg pokedex-entry__charmander-leg--right"></div>
+                  </div>
+                </div>
+                <div class="pokedex-entry__timburr-scene" data-pokedex-art-scene="timburr" hidden>
+                  <div class="pokedex-entry__timburr-platform"></div>
+                  <div class="pokedex-entry__timburr-log"></div>
+                  <div class="pokedex-entry__timburr">
+                    <div class="pokedex-entry__timburr-body"></div>
+                    <div class="pokedex-entry__timburr-head">
+                      <div class="pokedex-entry__timburr-smile"></div>
+                    </div>
+                    <div class="pokedex-entry__timburr-arm pokedex-entry__timburr-arm--left"></div>
+                    <div class="pokedex-entry__timburr-arm pokedex-entry__timburr-arm--right"></div>
+                    <div class="pokedex-entry__timburr-leg pokedex-entry__timburr-leg--left"></div>
+                    <div class="pokedex-entry__timburr-leg pokedex-entry__timburr-leg--right"></div>
                   </div>
                 </div>
               </div>

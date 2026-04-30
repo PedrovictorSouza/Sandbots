@@ -11,6 +11,8 @@ import {
   NPC_DEFS,
   OUTPOST_INSTANCE_LAYOUT,
   PALM_INSTANCE_LAYOUT,
+  LEPPA_TREE_POSITION,
+  RUINED_POKEMON_CENTER_LAYOUT,
   RESOURCE_NODE_DEFS,
   GROUND_FLOWER_LAYOUT,
   GROUND_GRASS_LAYOUT,
@@ -42,6 +44,7 @@ function buildElevatedTerrainSafeZones() {
     toSafeZoneFromPosition(ACT_TWO_PLAYER_SPAWN, 24),
     toSafeZoneFromPosition(ACT_TWO_MONSTER_POSITION, 24),
     toSafeZoneFromPosition(ACT_TWO_SQUIRTLE_POSITION, 24),
+    toSafeZoneFromPosition(LEPPA_TREE_POSITION, 8),
     { position: [0, 0], radius: 12 },
     ...NPC_DEFS.map((npc) => toSafeZoneFromPosition(npc.position, 8)),
     ...INTERACTABLE_DEFS.map((interactable) => {
@@ -56,6 +59,10 @@ function buildElevatedTerrainSafeZones() {
       position: [outpost.offset[0], outpost.offset[2]],
       radius: 9
     })),
+    ...RUINED_POKEMON_CENTER_LAYOUT.map((ruin) => ({
+      position: [ruin.offset[0], ruin.offset[2]],
+      radius: 9
+    })),
     ...DYNAMIC_BARRIERS.map((barrier) => ({
       position: [barrier.position[0], barrier.position[2]],
       radius: barrier.radius + 3
@@ -64,17 +71,40 @@ function buildElevatedTerrainSafeZones() {
 }
 
 export function buildWorldLayout(session, assets) {
-  const { groundDeadModel, houseModel, palmModel } = assets;
+  const { groundDeadModel, houseModel, palmModel, tallGrassModel } = assets;
   const groundTileFootprint = Math.max(groundDeadModel.size[0], groundDeadModel.size[2]);
   const groundTileScale = GROUND_TILE_INSTANCE_SCALE;
   const groundTileSpan = groundTileFootprint * groundTileScale;
 
   session.palmModel = palmModel;
+  session.tallGrassModel = tallGrassModel;
   session.palmInstances = buildPalmInstances(
     houseModel,
     palmModel,
     PALM_INSTANCE_LAYOUT
   );
+  session.leppaTree = {
+    id: "leppa-tree",
+    position: [...LEPPA_TREE_POSITION],
+    revived: false,
+    berryDropped: false,
+    deadInstance: {
+      id: "leppa-tree-dead",
+      offset: [...LEPPA_TREE_POSITION],
+      scale: 0.78,
+      yaw: -0.22,
+      active: false,
+      swayStrength: 0
+    },
+    aliveInstance: {
+      id: "leppa-tree-alive",
+      offset: [...LEPPA_TREE_POSITION],
+      scale: 0.88,
+      yaw: -0.22,
+      active: false,
+      swayStrength: 0.04
+    }
+  };
 
   session.groundDeadInstances = buildGroundGridInstances({
     worldLimit: WORLD_LIMIT,

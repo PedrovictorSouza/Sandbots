@@ -13,6 +13,54 @@ import { getColliderGizmoBillboards } from "../session/colliderGizmos.js";
 import { updateIntroRoomFrame } from "../scenes/introRoom/introRoomSequence.js";
 import { updateChopperNpcActor } from "../session/chopperNpcActor.js";
 
+const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
+const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
+const BULBASAUR_WORKBENCH_GUIDE_TARGET = [10.72, 0.02, 3.38];
+const BULBASAUR_WORKBENCH_GUIDE_SPEED = 2.4;
+const CHARMANDER_FOLLOW_SPEED = 2.65;
+const CHARMANDER_FOLLOW_DISTANCE = 1.28;
+const CHARMANDER_CAMPFIRE_LIGHT_DISTANCE = 1.9;
+const TIMBURR_FOLLOW_SPEED = 2.45;
+const TIMBURR_FOLLOW_DISTANCE = 1.62;
+const TALL_GRASS_MIN_FOOTPRINT = 1.28;
+
+function getTallGrassInstanceScale(tallGrassModel, groundGrassPatch, revivalScale) {
+  const modelFootprint = Math.max(
+    tallGrassModel?.size?.[0] || 0,
+    tallGrassModel?.size?.[2] || 0
+  );
+
+  if (!(modelFootprint > 0)) {
+    return revivalScale;
+  }
+
+  const targetFootprint = Math.max(
+    groundGrassPatch?.size?.[0] || 0,
+    TALL_GRASS_MIN_FOOTPRINT
+  );
+  return (targetFootprint / modelFootprint) * revivalScale;
+}
+
+function getTallGrassYaw(groundGrassPatch) {
+  const seed = `${groundGrassPatch?.cellId || ""}:${groundGrassPatch?.id || ""}`;
+  let hash = 0;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  const quarterTurn = (hash % 4) * Math.PI * 0.5;
+  const smallTurn = ((hash % 13) - 6) * 0.035;
+  return quarterTurn + smallTurn;
+}
+
+function getTallGrassSway(groundGrassPatch, shouldRustle, now) {
+  const position = groundGrassPatch?.position || [0, 0, 0];
+  const ambient = Math.sin(now * 0.0018 + position[0] * 0.63 + position[2] * 0.41) * 0.018;
+  const rustle = shouldRustle ? Math.sin(now * 0.024) * 0.09 : 0;
+  return ambient + rustle;
+}
+
 export function startGameLoop({
   camera,
   mount,
@@ -95,7 +143,7 @@ export function startGameLoop({
     return targetId;
   }
 
-  function getQuestAttentionTargetIds({ systemQuest, storyQuest }) {
+  function getQuestAttentionTargetIds({ systemQuest, storyQuest, storyState }) {
     const targetIds = new Set();
 
     for (const objective of systemQuest?.objectives || []) {
@@ -108,6 +156,38 @@ export function startGameLoop({
       targetIds.add(normalizeMarkerTargetId(storyQuest.targetId));
     }
 
+    if (storyState?.flags?.pokemonCenterGuideStarted && !storyState.flags.ruinedPokemonCenterInspected) {
+      targetIds.add("ruinedPokemonCenter");
+    }
+
+    if (storyState?.flags?.ruinedPokemonCenterInspected && !storyState.flags.challengesUnlocked) {
+      targetIds.add("pokemonCenterPc");
+    }
+
+    if (storyState?.flags?.boulderChallengeRewardReady && !storyState.flags.boulderChallengeRewardClaimed) {
+      targetIds.add("pokemonCenterPc");
+    }
+
+    if (storyState?.flags?.newPcChallengesAvailable && !storyState.flags.newPcChallengesChecked) {
+      targetIds.add("pokemonCenterPc");
+    }
+
+    if (storyState?.flags?.tangrowthHouseTalkAvailable && !storyState.flags.tangrowthHouseTalkComplete) {
+      targetIds.add("tangrowth");
+    }
+
+    if (storyState?.flags?.leafDenKitPurchaseAvailable && !storyState.flags.leafDenKitPurchased) {
+      targetIds.add("pokemonCenterPc");
+    }
+
+    if (storyState?.flags?.charmanderCelebrationSuggested && !storyState.flags.charmanderCelebrationComplete) {
+      targetIds.add("tangrowth");
+    }
+
+    if (storyState?.flags?.strawBedRecipeUnlocked && !storyState.flags.strawBedCrafted) {
+      targetIds.add("workbench");
+    }
+
     targetIds.delete(undefined);
     targetIds.delete(null);
     targetIds.delete("");
@@ -116,6 +196,34 @@ export function startGameLoop({
 
   function updateBulbasaurEncounter(deltaTime) {
     const encounter = session.bulbasaurEncounter;
+
+    if (
+      controls.storyState?.flags?.bulbasaurWorkbenchGuideAvailable &&
+      !controls.storyState?.flags?.workbenchDiyRecipesReceived &&
+      encounter
+    ) {
+      const currentPosition =
+        encounter.position ||
+        encounter.landingPosition ||
+        BULBASAUR_WORKBENCH_GUIDE_START;
+      const deltaX = BULBASAUR_WORKBENCH_GUIDE_TARGET[0] - currentPosition[0];
+      const deltaZ = BULBASAUR_WORKBENCH_GUIDE_TARGET[2] - currentPosition[2];
+      const distance = Math.hypot(deltaX, deltaZ);
+      const step = BULBASAUR_WORKBENCH_GUIDE_SPEED * deltaTime;
+
+      encounter.visible = true;
+      encounter.jumpTimer = 0;
+      encounter.originPosition = null;
+      encounter.landingPosition = null;
+      encounter.position = distance <= step || distance <= 0.001 ?
+        [...BULBASAUR_WORKBENCH_GUIDE_TARGET] :
+        [
+          currentPosition[0] + (deltaX / distance) * step,
+          BULBASAUR_WORKBENCH_GUIDE_TARGET[1],
+          currentPosition[2] + (deltaZ / distance) * step
+        ];
+      return;
+    }
 
     if (!encounter?.visible || !encounter.position) {
       return;
@@ -141,6 +249,154 @@ export function startGameLoop({
       encounter.originPosition[2] +
         (encounter.landingPosition[2] - encounter.originPosition[2]) * easedProgress
     ];
+  }
+
+  function updateCharmanderEncounter(deltaTime) {
+    const encounter = session.charmanderEncounter;
+
+    if (!encounter || !controls.storyState?.flags?.charmanderRevealed) {
+      return;
+    }
+
+    encounter.visible = true;
+
+    if (!encounter.position) {
+      encounter.position = session.playerCharacter?.getPosition?.() || [0, 0.02, 0];
+    }
+
+    if (
+      controls.storyState.flags.charmanderFollowing &&
+      session.playerCharacter &&
+      (
+        !controls.storyState.flags.charmanderCampfireLit ||
+        (
+          controls.storyState.flags.leafDenKitPlaced &&
+          !controls.storyState.flags.leafDenConstructionStarted
+        ) ||
+        (
+          controls.storyState.flags.charmanderCelebrationSuggested &&
+          !controls.storyState.flags.charmanderCelebrationComplete
+        )
+      )
+    ) {
+      const playerPosition = session.playerCharacter.getPosition();
+      const deltaX = playerPosition[0] - encounter.position[0];
+      const deltaZ = playerPosition[2] - encounter.position[2];
+      const distance = Math.hypot(deltaX, deltaZ);
+      const step = CHARMANDER_FOLLOW_SPEED * deltaTime;
+
+      if (distance > CHARMANDER_FOLLOW_DISTANCE && distance > 0.001) {
+        const travel = Math.min(step, distance - CHARMANDER_FOLLOW_DISTANCE);
+        encounter.position = [
+          encounter.position[0] + (deltaX / distance) * travel,
+          0.04,
+          encounter.position[2] + (deltaZ / distance) * travel
+        ];
+      }
+    }
+
+    if (
+      session.campfire?.position &&
+      controls.storyState.flags.charmanderFollowing &&
+      !controls.storyState.flags.charmanderCampfireLit
+    ) {
+      const campfireDistance = Math.hypot(
+        encounter.position[0] - session.campfire.position[0],
+        encounter.position[2] - session.campfire.position[2]
+      );
+
+      if (campfireDistance <= CHARMANDER_CAMPFIRE_LIGHT_DISTANCE) {
+        encounter.litCampfire = true;
+        controls.storyState.flags.charmanderCampfireLit = true;
+        controls.storyState.flags.charmanderFollowing = false;
+        controls.onCharmanderCampfireLit?.();
+      }
+    }
+  }
+
+  function updateTimburrEncounter(deltaTime) {
+    const encounter = session.timburrEncounter;
+
+    if (!encounter || !controls.storyState?.flags?.timburrRevealed) {
+      return;
+    }
+
+    encounter.visible = true;
+
+    if (!encounter.position) {
+      encounter.position = session.playerCharacter?.getPosition?.() || [0, 0.02, 0];
+    }
+
+    if (
+      controls.storyState.flags.timburrFollowing &&
+      session.playerCharacter &&
+      !controls.storyState.flags.leafDenConstructionStarted
+    ) {
+      const playerPosition = session.playerCharacter.getPosition();
+      const deltaX = playerPosition[0] - encounter.position[0];
+      const deltaZ = playerPosition[2] - encounter.position[2];
+      const distance = Math.hypot(deltaX, deltaZ);
+      const step = TIMBURR_FOLLOW_SPEED * deltaTime;
+
+      if (distance > TIMBURR_FOLLOW_DISTANCE && distance > 0.001) {
+        const travel = Math.min(step, distance - TIMBURR_FOLLOW_DISTANCE);
+        encounter.position = [
+          encounter.position[0] + (deltaX / distance) * travel,
+          0.04,
+          encounter.position[2] + (deltaZ / distance) * travel
+        ];
+      }
+    }
+  }
+
+  function updateRustlingGrassEvent(deltaTime, canAdvance) {
+    const flags = controls.storyState?.flags;
+
+    if (
+      !canAdvance ||
+      !flags?.pendingRustlingGrassCellId ||
+      flags.rustlingGrassCellId ||
+      flags.bulbasaurRevealed
+    ) {
+      return;
+    }
+
+    const nextDelay = Math.max(0, Number(flags.rustlingGrassDelay || 0) - deltaTime);
+    flags.rustlingGrassDelay = nextDelay;
+
+    if (nextDelay > 0) {
+      return;
+    }
+
+    flags.rustlingGrassCellId = flags.pendingRustlingGrassCellId;
+    delete flags.pendingRustlingGrassCellId;
+    delete flags.rustlingGrassDelay;
+  }
+
+  function getRustlingGrassParticleBillboards(groundGrassPatch, texture, now, uvRect) {
+    if (!texture) {
+      return [];
+    }
+
+    const time = now * 0.001;
+
+    return [0, 1, 2, 3, 4].map((index) => {
+      const cycle = (time * 0.58 + index * 0.19) % 1;
+      const angle = time * 1.7 + index * 1.38;
+      const radius = 0.18 + (index % 3) * 0.08;
+      const size = (0.13 + (index % 2) * 0.025) * (1 - cycle * 0.28);
+
+      return {
+        texture,
+        position: [
+          groundGrassPatch.position[0] + Math.cos(angle) * radius,
+          groundGrassPatch.position[1] + 0.38 + cycle * 0.58,
+          groundGrassPatch.position[2] + Math.sin(angle) * radius
+        ],
+        size: [size, size],
+        uvRect
+      };
+    });
   }
 
   function frame(now) {
@@ -201,6 +457,15 @@ export function startGameLoop({
     ) {
       controls.clearMovementInput();
     }
+
+    updateRustlingGrassEvent(deltaTime, !(
+      cinematicActive ||
+      tutorialActive ||
+      pokedexModalOpen ||
+      dialogueActive ||
+      skillLearnActive ||
+      scriptedInteractionActive
+    ));
 
     const canRotateCamera =
       session.playerCharacter &&
@@ -295,20 +560,35 @@ export function startGameLoop({
     });
     updateNatureRevivalEffects(session.natureRevivalEffects, deltaTime);
 
-    function performHarvestAction(playerPosition) {
+    const activeMoveId = controls.getActiveMoveId?.() || null;
+    const waterGunEquipped = Boolean(
+      controls.playerSkills?.waterGun &&
+      activeMoveId === "waterGun"
+    );
+    const leafageEquipped = Boolean(
+      controls.playerSkills?.leafage &&
+      activeMoveId === "leafage"
+    );
+
+    function performHarvestAction(playerPosition, options = {}) {
       gameplay.performHarvestAction({
         playerPosition,
         palmModel: session.palmModel,
         palmInstances: session.palmInstances,
         resourceNodes: session.resourceNodes,
+        leppaTree: session.leppaTree,
         inventory: controls.inventory,
-        canPurifyGround: Boolean(controls.playerSkills?.waterGun),
+        canPurifyGround: waterGunEquipped,
         groundDeadInstances: session.groundDeadInstances,
         groundFlowerPatches: session.groundFlowerPatches,
         groundGrassPatches: session.groundGrassPatches,
         groundPurifiedInstances: session.groundPurifiedInstances,
         storyState: controls.storyState,
-        woodDrops: session.woodDrops
+        leafDen: session.leafDen,
+        woodDrops: session.woodDrops,
+        leppaBerryDrops: session.leppaBerryDrops,
+        canUseLeafage: leafageEquipped,
+        useWaterGun: Boolean(options.useWaterGun)
       });
     }
 
@@ -323,18 +603,48 @@ export function startGameLoop({
       !scriptedInteractionActive
     ) {
       const playerPosition = session.playerCharacter.getPosition();
+      const primaryActionTarget = gameplay.findNearbyActionTarget({
+        playerPosition,
+        palmModel: session.palmModel,
+        palmInstances: session.palmInstances,
+        resourceNodes: session.resourceNodes,
+        leppaTree: session.leppaTree,
+        leafDen: session.leafDen,
+        storyState: controls.storyState,
+        inventory: controls.inventory,
+        groundDeadInstances: session.groundDeadInstances,
+        groundPurifiedInstances: session.groundPurifiedInstances,
+        groundGrassPatches: session.groundGrassPatches,
+        groundFlowerPatches: session.groundFlowerPatches,
+        canPurifyGround: waterGunEquipped,
+        canUseLeafage: leafageEquipped
+      });
+      const primaryActionIsPlacement = Boolean(
+        primaryActionTarget?.logChairPlacement ||
+        primaryActionTarget?.strawBedPlacement ||
+        primaryActionTarget?.leafDenKitPlacement ||
+        primaryActionTarget?.leafDenFurniturePlacement ||
+        primaryActionTarget?.dittoFlagPlacement
+      );
       const primaryInteractTarget =
-        !dialogueActive ?
+        !dialogueActive &&
+        !primaryActionIsPlacement ?
           gameplay.findNearbyInteractable(
             playerPosition,
             session.npcActors,
             session.interactables,
             controls.storyState,
-            session.groundGrassPatches
+            session.groundGrassPatches,
+            session.logChair,
+            session.leafDen,
+            session.timburrEncounter,
+            session.charmanderEncounter
           ) :
           null;
 
-      if (primaryInteractTarget?.target) {
+      if (primaryActionIsPlacement) {
+        performHarvestAction(playerPosition);
+      } else if (primaryInteractTarget?.target) {
         gameplay.performInteractAction({
           playerPosition,
           npcActors: session.npcActors,
@@ -342,6 +652,10 @@ export function startGameLoop({
           storyState: controls.storyState,
           inventory: controls.inventory,
           groundGrassPatches: session.groundGrassPatches,
+          logChair: session.logChair,
+          leafDen: session.leafDen,
+          timburrEncounter: session.timburrEncounter,
+          charmanderEncounter: session.charmanderEncounter,
           onNpcInteractionStart({ targetId, playerPosition, npcActors, interactables }) {
             faceInteractionTargetTowardPlayer({
               targetId,
@@ -365,7 +679,7 @@ export function startGameLoop({
       }
     } else if (
       controls.isPrimaryActionActive?.() &&
-      controls.playerSkills?.waterGun &&
+      waterGunEquipped &&
       session.playerCharacter &&
       !cinematicActive &&
       !tutorialActive &&
@@ -380,13 +694,31 @@ export function startGameLoop({
         palmModel: session.palmModel,
         palmInstances: session.palmInstances,
         resourceNodes: session.resourceNodes,
+        leppaTree: session.leppaTree,
         storyState: controls.storyState,
+        inventory: controls.inventory,
+        leafDen: session.leafDen,
         groundDeadInstances: session.groundDeadInstances,
-        canPurifyGround: true
+        groundPurifiedInstances: session.groundPurifiedInstances,
+        groundGrassPatches: session.groundGrassPatches,
+        groundFlowerPatches: session.groundFlowerPatches,
+        canPurifyGround: true,
+        canUseLeafage: false
       });
 
-      if (waterGunTarget?.groundCell) {
-        performHarvestAction(playerPosition);
+      if (
+        waterGunTarget?.groundCell ||
+        waterGunTarget?.leppaTree?.action === "water" ||
+        (
+          waterGunTarget?.palm &&
+          controls.storyState.flags.bulbasaurStrawBedChallengeAvailable &&
+          !controls.storyState.flags.bulbasaurStrawBedChallengeComplete &&
+          !controls.storyState.flags.strawBedRecipeUnlocked
+        )
+      ) {
+        performHarvestAction(playerPosition, {
+          useWaterGun: true
+        });
       }
     }
 
@@ -406,6 +738,10 @@ export function startGameLoop({
         storyState: controls.storyState,
         inventory: controls.inventory,
         groundGrassPatches: session.groundGrassPatches,
+        logChair: session.logChair,
+        leafDen: session.leafDen,
+        timburrEncounter: session.timburrEncounter,
+        charmanderEncounter: session.charmanderEncounter,
         onNpcInteractionStart({ targetId, playerPosition, npcActors, interactables }) {
           faceInteractionTargetTowardPlayer({
             targetId,
@@ -426,15 +762,53 @@ export function startGameLoop({
       });
     }
 
+    if (controls.consumeFollowerCallRequest?.()) {
+      const leafDenHelpCall =
+        controls.storyState.flags.leafDenKitPlaced &&
+        !controls.storyState.flags.leafDenConstructionStarted;
+
+      if (leafDenHelpCall) {
+        const called = [];
+        if (controls.storyState.flags.timburrRevealed) {
+          controls.storyState.flags.timburrFollowing = true;
+          called.push("Timburr");
+        }
+        if (controls.storyState.flags.charmanderRevealed) {
+          controls.storyState.flags.charmanderFollowing = true;
+          called.push("Charmander");
+        }
+        hud.pushNotice(called.length ?
+          `${called.join(" and ")} are following you.` :
+          "No Pokemon are ready to help with construction yet.");
+      } else if (
+        controls.storyState.flags.charmanderRevealed &&
+        !controls.storyState.flags.charmanderCampfireLit &&
+        session.campfire
+      ) {
+        controls.storyState.flags.charmanderFollowing = true;
+        hud.pushNotice("Charmander is following you.");
+      } else if (
+        controls.storyState.flags.charmanderCelebrationSuggested &&
+        !controls.storyState.flags.charmanderCelebrationComplete &&
+        controls.storyState.flags.charmanderRevealed
+      ) {
+        controls.storyState.flags.charmanderFollowing = true;
+        hud.pushNotice("Charmander is following you.");
+      }
+    }
+
     hud.updateTransientNotice(deltaTime);
     gameplay.updatePalmShake(deltaTime, session.palmInstances);
     gameplay.updateResourceNodes(deltaTime, session.resourceNodes);
+    gameplay.syncLeppaTreeState?.(session.leppaTree, controls.storyState);
     updateChopperNpcActor(session.chopperNpcActor, {
       deltaTime,
       storyState: controls.storyState,
       isNpcActive: rendering.isNpcActive
     });
     updateBulbasaurEncounter(deltaTime);
+    updateCharmanderEncounter(deltaTime);
+    updateTimburrEncounter(deltaTime);
 
     if (cinematicActive) {
       actTwoSequence.update(deltaTime);
@@ -453,6 +827,22 @@ export function startGameLoop({
         if (collectedWoodCount > 0) {
           hud.syncInventoryUi(controls.inventory);
           hud.pushNotice(`+${collectedWoodCount} Wood`);
+
+          if (controls.storyState.flags.bulbasaurStrawBedChallengeCompletionNoticePending) {
+            controls.storyState.flags.bulbasaurStrawBedChallengeCompletionNoticePending = false;
+            hud.pushNotice("First set of challenges complete. Talk to Bulbasaur.");
+          }
+        }
+
+        const collectedLeppaBerryCount = gameplay.collectLeppaBerryDrops?.(
+          session.playerCharacter.getPosition(),
+          session.leppaBerryDrops,
+          controls.inventory
+        ) || 0;
+
+        if (collectedLeppaBerryCount > 0) {
+          hud.syncInventoryUi(controls.inventory);
+          hud.pushNotice(`+${collectedLeppaBerryCount} Leppa Berry`);
         }
       }
 
@@ -475,9 +865,16 @@ export function startGameLoop({
           palmModel: session.palmModel,
           palmInstances: session.palmInstances,
           resourceNodes: session.resourceNodes,
+          leppaTree: session.leppaTree,
+          leafDen: session.leafDen,
           storyState: controls.storyState,
+          inventory: controls.inventory,
           groundDeadInstances: session.groundDeadInstances,
-          canPurifyGround: Boolean(controls.playerSkills?.waterGun)
+          groundPurifiedInstances: session.groundPurifiedInstances,
+          groundGrassPatches: session.groundGrassPatches,
+          groundFlowerPatches: session.groundFlowerPatches,
+          canPurifyGround: waterGunEquipped,
+          canUseLeafage: leafageEquipped
         }) :
         null;
     const nearbyInteractable =
@@ -487,7 +884,11 @@ export function startGameLoop({
           session.npcActors,
           session.interactables,
           controls.storyState,
-          session.groundGrassPatches
+          session.groundGrassPatches,
+          session.logChair,
+          session.leafDen,
+          session.timburrEncounter,
+          session.charmanderEncounter
         ) :
         null;
     const activeQuest = gameplay.getActiveQuest(controls.storyState);
@@ -499,7 +900,8 @@ export function startGameLoop({
         interactTarget: nearbyInteractable,
         quest: activeQuest,
         transientMessage: hud.getNoticeMessage(),
-        getItemLabel: gameplay.getItemLabel
+        getItemLabel: gameplay.getItemLabel,
+        storyState: controls.storyState
       });
     const shouldShowGroundCellHighlight =
       !cinematicActive &&
@@ -508,7 +910,7 @@ export function startGameLoop({
       !skillLearnActive &&
       !scriptedInteractionActive &&
       !gameplayDialogue.isActive() &&
-      Boolean(nearbyHarvestTarget?.groundCell);
+      Boolean(nearbyHarvestTarget?.groundCell || nearbyHarvestTarget?.leafageGroundCell);
 
     if (!cinematicActive && !tutorialActive && !pokedexModalOpen && !skillLearnActive) {
       nextFrame.hud.active = true;
@@ -525,6 +927,7 @@ export function startGameLoop({
     );
     nextFrame.render.viewProjection = followedViewProjection;
     nextFrame.render.sceneObjects = session.sceneObjects;
+    nextFrame.render.skyTexture = session.skyTexture;
 
     const tangrowthActor = session.npcActors.find((npcActor) => npcActor.id === "tangrowth");
     const tangrowthPosition =
@@ -538,11 +941,299 @@ export function startGameLoop({
       !gameplayDialogue.isActive() &&
       activeQuest?.id === "meetTangrowth" &&
       tangrowthPosition;
+    const shouldShowTangrowthLogChairSpeech =
+      !shouldShowTangrowthSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      controls.storyState.flags.tangrowthLogChairRequestAvailable &&
+      !controls.storyState.flags.logChairReceived &&
+      tangrowthPosition;
+    const shouldShowTangrowthCampfireSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      controls.storyState.flags.campfireCrafted &&
+      !controls.storyState.flags.campfireSpatOut &&
+      tangrowthPosition;
+    const shouldShowTangrowthPokemonCenterSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      controls.storyState.flags.pokemonCenterGuideStarted &&
+      !controls.storyState.flags.ruinedPokemonCenterInspected &&
+      tangrowthPosition;
+    const shouldShowTangrowthHouseSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      controls.storyState.flags.tangrowthHouseTalkAvailable &&
+      !controls.storyState.flags.tangrowthHouseTalkComplete &&
+      tangrowthPosition;
+    const shouldShowTangrowthCelebrationSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      controls.storyState.flags.charmanderCelebrationSuggested &&
+      !controls.storyState.flags.charmanderCelebrationComplete &&
+      tangrowthPosition;
+    const shouldShowBulbasaurMissionSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      Boolean(session.bulbasaurEncounter?.visible) &&
+      Boolean(session.bulbasaurEncounter?.position) &&
+      controls.storyState.flags.bulbasaurRevealed &&
+      !controls.storyState.flags.bulbasaurDryGrassMissionAccepted &&
+      (controls.storyState.flags.restoredGrassCount || 0) < BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT;
+    const shouldShowBulbasaurWorkbenchGuideSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowBulbasaurMissionSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      Boolean(session.bulbasaurEncounter?.visible) &&
+      Boolean(session.bulbasaurEncounter?.position) &&
+      controls.storyState.flags.bulbasaurWorkbenchGuideAvailable &&
+      !controls.storyState.flags.workbenchDiyRecipesReceived;
+    const shouldShowBulbasaurRequestReadySpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowBulbasaurMissionSpeech &&
+      !shouldShowBulbasaurWorkbenchGuideSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      Boolean(session.bulbasaurEncounter?.visible) &&
+      Boolean(session.bulbasaurEncounter?.position) &&
+      controls.storyState.flags.bulbasaurRevealed &&
+      controls.storyState.flags.bulbasaurDryGrassMissionAccepted &&
+      !controls.storyState.flags.bulbasaurDryGrassRequestTurnedIn &&
+      (
+        controls.storyState.flags.bulbasaurDryGrassMissionComplete ||
+        (controls.storyState.flags.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
+      );
+    const shouldShowCharmanderFollowSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowBulbasaurMissionSpeech &&
+      !shouldShowBulbasaurWorkbenchGuideSpeech &&
+      !shouldShowBulbasaurRequestReadySpeech &&
+      !(
+        Boolean(session.bulbasaurEncounter?.visible) &&
+        Boolean(session.bulbasaurEncounter?.position) &&
+        (
+          (
+            controls.storyState.flags.bulbasaurStrawBedChallengeComplete &&
+            !controls.storyState.flags.strawBedRecipeUnlocked
+          ) ||
+          (
+            controls.storyState.flags.strawBedPlacedInBulbasaurHabitat &&
+            !controls.storyState.flags.bulbasaurStrawBedRequestComplete
+          )
+        )
+      ) &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      Boolean(session.charmanderEncounter?.visible) &&
+      Boolean(session.charmanderEncounter?.position) &&
+      controls.storyState.flags.charmanderRevealed &&
+      !controls.storyState.flags.charmanderCampfireLit;
+    const shouldShowBulbasaurStrawBedSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowBulbasaurMissionSpeech &&
+      !shouldShowBulbasaurWorkbenchGuideSpeech &&
+      !shouldShowBulbasaurRequestReadySpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      Boolean(session.bulbasaurEncounter?.visible) &&
+      Boolean(session.bulbasaurEncounter?.position) &&
+      controls.storyState.flags.bulbasaurStrawBedChallengeComplete &&
+      !controls.storyState.flags.strawBedRecipeUnlocked;
+    const shouldShowBulbasaurStrawBedCompleteSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowBulbasaurMissionSpeech &&
+      !shouldShowBulbasaurWorkbenchGuideSpeech &&
+      !shouldShowBulbasaurRequestReadySpeech &&
+      !shouldShowBulbasaurStrawBedSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      Boolean(session.bulbasaurEncounter?.visible) &&
+      Boolean(session.bulbasaurEncounter?.position) &&
+      controls.storyState.flags.strawBedPlacedInBulbasaurHabitat &&
+      !controls.storyState.flags.bulbasaurStrawBedRequestComplete;
+    const shouldShowCharmanderCelebrationSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowBulbasaurMissionSpeech &&
+      !shouldShowBulbasaurWorkbenchGuideSpeech &&
+      !shouldShowBulbasaurRequestReadySpeech &&
+      !shouldShowCharmanderFollowSpeech &&
+      !shouldShowBulbasaurStrawBedSpeech &&
+      !shouldShowBulbasaurStrawBedCompleteSpeech &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !gameplayDialogue.isActive() &&
+      Boolean(session.charmanderEncounter?.visible) &&
+      Boolean(session.charmanderEncounter?.position) &&
+      controls.storyState.flags.charmanderCelebrationRequestAvailable &&
+      !controls.storyState.flags.charmanderCelebrationSuggested &&
+      !controls.storyState.flags.charmanderCelebrationComplete;
 
     if (shouldShowTangrowthSpeech) {
       nextFrame.worldSpeech.visible = true;
       nextFrame.worldSpeech.text = gameplay.tangrowthOpeningLine;
       nextFrame.worldSpeech.worldPosition = tangrowthPosition;
+    }
+
+    if (shouldShowTangrowthLogChairSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "I made something for you.";
+      nextFrame.worldSpeech.worldPosition = tangrowthPosition;
+    }
+
+    if (shouldShowTangrowthCampfireSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = controls.storyState.flags.campfireSelectedForTangrowth ?
+        "Bring it here and spit it out." :
+        "Open your bag and choose the Campfire.";
+      nextFrame.worldSpeech.worldPosition = tangrowthPosition;
+    }
+
+    if (shouldShowTangrowthPokemonCenterSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "This way. The old Pokemon Center is ahead.";
+      nextFrame.worldSpeech.worldPosition = tangrowthPosition;
+    }
+
+    if (shouldShowTangrowthHouseSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "Let's talk about houses.";
+      nextFrame.worldSpeech.worldPosition = tangrowthPosition;
+    }
+
+    if (shouldShowTangrowthCelebrationSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "Bring Charmander here.";
+      nextFrame.worldSpeech.worldPosition = tangrowthPosition;
+    }
+
+    if (shouldShowBulbasaurMissionSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "This is no good...";
+      nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
+    }
+
+    if (shouldShowBulbasaurWorkbenchGuideSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "This way! The Workbench is over here!";
+      nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
+    }
+
+    if (shouldShowBulbasaurRequestReadySpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "You did it!";
+      nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
+    }
+
+    if (shouldShowBulbasaurStrawBedSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "I thought of something!";
+      nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
+    }
+
+    if (shouldShowBulbasaurStrawBedCompleteSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "That looks so cozy!";
+      nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
+    }
+
+    if (shouldShowCharmanderFollowSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = controls.storyState.flags.charmanderFollowing ?
+        "I'll follow you to the fire!" :
+        "Call me when you're ready.";
+      nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
+    }
+
+    if (shouldShowCharmanderCelebrationSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = "Let's celebrate!";
+      nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
     }
 
     if (
@@ -557,7 +1248,8 @@ export function startGameLoop({
 
     if (shouldShowGroundCellHighlight) {
       nextFrame.groundCellHighlight.visible = true;
-      nextFrame.groundCellHighlight.groundCell = nearbyHarvestTarget.groundCell;
+      nextFrame.groundCellHighlight.groundCell =
+        nearbyHarvestTarget.groundCell || nearbyHarvestTarget.leafageGroundCell;
     }
 
     const questCompletionPop = gameplay.getQuestCompletionPop?.();
@@ -573,27 +1265,77 @@ export function startGameLoop({
       nextFrame.taskPop.worldPosition = session.playerCharacter.getPosition();
     }
 
+    if (Array.isArray(session.tallGrassInstances)) {
+      session.tallGrassInstances.length = 0;
+    }
+
     for (const groundGrassPatch of session.groundGrassPatches) {
       const shouldRustle =
-        groundGrassPatch.cellId === controls.storyState.flags.rustlingGrassCellId &&
-        controls.storyState.flags.tangrowthTallGrassCommentSeen &&
-        !controls.storyState.flags.bulbasaurRevealed &&
-        groundGrassPatch.state === "alive";
+        groundGrassPatch.state === "alive" &&
+        (
+          (
+            groundGrassPatch.cellId === controls.storyState.flags.rustlingGrassCellId &&
+            !controls.storyState.flags.bulbasaurRevealed
+          ) ||
+          (
+            groundGrassPatch.cellId === controls.storyState.flags.charmanderRustlingGrassCellId &&
+            !controls.storyState.flags.charmanderRevealed
+          ) ||
+          (
+            groundGrassPatch.cellId === controls.storyState.flags.timburrRustlingGrassCellId &&
+            !controls.storyState.flags.timburrRevealed
+          )
+        );
       const rustleOffset = shouldRustle ? Math.sin(now * 0.024) * 0.11 : 0;
+      const grassRevivalScale = getNatureRevivalScale(
+        session.natureRevivalEffects,
+        groundGrassPatch.id
+      );
 
-      nextFrame.render.grassBillboards.push({
-        texture: groundGrassPatch.state === "alive" ?
-          session.greenGrassTexture :
-          session.deadGrassTexture,
-        position: [
-          groundGrassPatch.position[0] + rustleOffset,
-          groundGrassPatch.position[1],
-          groundGrassPatch.position[2]
-        ],
-        size: groundGrassPatch.size.map((value) => {
-          return value * getNatureRevivalScale(session.natureRevivalEffects, groundGrassPatch.id);
-        })
-      });
+      if (
+        groundGrassPatch.state === "alive" &&
+        session.tallGrassModel &&
+        Array.isArray(session.tallGrassInstances)
+      ) {
+        session.tallGrassInstances.push({
+          id: `tall-grass-${groundGrassPatch.id}`,
+          offset: [
+            groundGrassPatch.position[0] + rustleOffset,
+            groundGrassPatch.position[1],
+            groundGrassPatch.position[2]
+          ],
+          scale: getTallGrassInstanceScale(
+            session.tallGrassModel,
+            groundGrassPatch,
+            grassRevivalScale
+          ),
+          yaw: getTallGrassYaw(groundGrassPatch),
+          swayStrength: getTallGrassSway(groundGrassPatch, shouldRustle, now)
+        });
+      } else {
+        nextFrame.render.grassBillboards.push({
+          texture: groundGrassPatch.state === "alive" ?
+            session.greenGrassTexture :
+            session.deadGrassTexture,
+          position: [
+            groundGrassPatch.position[0] + rustleOffset,
+            groundGrassPatch.position[1],
+            groundGrassPatch.position[2]
+          ],
+          size: groundGrassPatch.size.map((value) => value * grassRevivalScale)
+        });
+      }
+
+      if (shouldRustle) {
+        nextFrame.render.genericBillboards.push(
+          ...getRustlingGrassParticleBillboards(
+            groundGrassPatch,
+            session.natureRevivalSparkTexture,
+            now,
+            rendering.fullUvRect
+          )
+        );
+      }
     }
 
     for (const groundFlowerPatch of session.groundFlowerPatches) {
@@ -624,7 +1366,8 @@ export function startGameLoop({
         fullUvRect: rendering.fullUvRect,
         attentionTargetIds: getQuestAttentionTargetIds({
           systemQuest: activeSystemQuest,
-          storyQuest: activeQuest
+          storyQuest: activeQuest,
+          storyState: controls.storyState
         }),
         isNpcActive: rendering.isNpcActive,
         isInteractableActive: rendering.isInteractableActive,
@@ -634,6 +1377,93 @@ export function startGameLoop({
 
     nextFrame.render.woodTexture = session.woodTexture;
     nextFrame.render.woodDrops = session.woodDrops;
+    nextFrame.render.genericBillboards.push(
+      ...(session.leppaBerryDrops || [])
+        .filter((leppaBerryDrop) => !leppaBerryDrop.collected)
+        .map((leppaBerryDrop) => ({
+          texture: session.leppaBerryTexture,
+          position: leppaBerryDrop.position,
+          size: leppaBerryDrop.size,
+          uvRect: rendering.fullUvRect
+        }))
+    );
+    if (session.logChair && controls.storyState.flags.logChairPlaced) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.logChairTexture,
+        position: session.logChair.position,
+        size: session.logChair.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
+    if (session.strawBed && controls.storyState.flags.strawBedPlacedInBulbasaurHabitat) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.strawBedTexture,
+        position: session.strawBed.position,
+        size: session.strawBed.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
+    if (session.campfire && controls.storyState.flags.campfireSpatOut) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.campfireTexture,
+        position: session.campfire.position,
+        size: session.campfire.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
+    if (session.leafDen && controls.storyState.flags.leafDenKitPlaced) {
+      nextFrame.render.genericBillboards.push({
+        texture: controls.storyState.flags.leafDenBuilt ?
+          session.leafDenTexture :
+          session.leafDenKitTexture,
+        position: session.leafDen.position,
+        size: controls.storyState.flags.leafDenBuilt ?
+          [2.55, 1.85] :
+          session.leafDen.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
+    if (session.dittoFlag && controls.storyState.flags.dittoFlagPlacedOnHouse) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.dittoFlagTexture,
+        position: session.dittoFlag.position,
+        size: session.dittoFlag.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
+    if (controls.storyState.flags.leafDenInteriorEntered) {
+      nextFrame.render.genericBillboards.push(
+        ...(session.leafDenFurniture || []).map((furniture) => ({
+          texture: furniture.kind === "strawBed" ?
+            session.strawBedTexture :
+            furniture.kind === "campfire" ?
+              session.campfireTexture :
+              session.logChairTexture,
+          position: furniture.position,
+          size: furniture.size,
+          uvRect: rendering.fullUvRect
+        }))
+      );
+    }
+    if (
+      session.pokemonCenterPc &&
+      controls.storyState.flags.ruinedPokemonCenterInspected
+    ) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.pokemonCenterPc.texture,
+        position: session.pokemonCenterPc.position,
+        size: session.pokemonCenterPc.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
+    if (session.challengeBoulder && controls.storyState.flags.boulderChallengeAvailable) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.challengeBoulder.texture,
+        position: session.challengeBoulder.position,
+        size: session.challengeBoulder.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
     nextFrame.render.genericBillboards.push({
       texture: session.actTwoPokedexCache?.texture || null,
       position: session.actTwoPokedexCache?.position || null,
@@ -665,6 +1495,18 @@ export function startGameLoop({
       texture: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.texture : null,
       position: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.position : null,
       size: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.size : null,
+      uvRect: rendering.fullUvRect
+    });
+    nextFrame.render.genericBillboards.push({
+      texture: session.charmanderEncounter?.visible ? session.charmanderEncounter.texture : null,
+      position: session.charmanderEncounter?.visible ? session.charmanderEncounter.position : null,
+      size: session.charmanderEncounter?.visible ? session.charmanderEncounter.size : null,
+      uvRect: rendering.fullUvRect
+    });
+    nextFrame.render.genericBillboards.push({
+      texture: session.timburrEncounter?.visible ? session.timburrEncounter.texture : null,
+      position: session.timburrEncounter?.visible ? session.timburrEncounter.position : null,
+      size: session.timburrEncounter?.visible ? session.timburrEncounter.size : null,
       uvRect: rendering.fullUvRect
     });
     nextFrame.render.genericBillboards.push(

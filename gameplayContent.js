@@ -2,6 +2,21 @@ import { ACT_TWO_MONSTER_POSITION } from "./actTwoSceneConfig.js";
 import { ACT_TWO_SQUIRTLE_POSITION } from "./rendering/worldAssets.js";
 
 export const WATER_GUN_POWER_ITEM_ID = "waterGunTotem";
+export const LEPPA_BERRY_ITEM_ID = "leppaBerry";
+export const LOG_CHAIR_ITEM_ID = "logChair";
+export const SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID = "simpleWoodenDiyRecipes";
+export const CAMPFIRE_ITEM_ID = "campfire";
+export const LIFE_COINS_ITEM_ID = "lifeCoins";
+export const LEAVES_ITEM_ID = "leaves";
+export const STRAW_BED_RECIPE_ITEM_ID = "strawBedRecipe";
+export const STRAW_BED_ITEM_ID = "strawBed";
+export const LEAF_DEN_KIT_ITEM_ID = "leafDenKit";
+export const DITTO_FLAG_ITEM_ID = "dittoFlag";
+export const LEAF_DEN_BUILD_REQUIREMENTS = Object.freeze({
+  wood: 3,
+  [LEAVES_ITEM_ID]: 3
+});
+export const LEAF_DEN_BUILD_DURATION_MS = 2 * 60 * 60 * 1000;
 export const PRETTY_FLOWER_BED_HABITAT_LABEL = "Pretty flower bed";
 
 export const ITEM_DEFS = {
@@ -25,6 +40,115 @@ export const ITEM_DEFS = {
     color: "#8c5a34",
     ink: "#fff1e8",
     description: "A branch that fell off a tree somewhere. Perfect for making various toys and everyday items."
+  },
+  [LEPPA_BERRY_ITEM_ID]: {
+    id: LEPPA_BERRY_ITEM_ID,
+    label: "Leppa Berry",
+    bagLabel: "Leppa Berry",
+    bagDetailsEligible: true,
+    shortLabel: "Leppa",
+    glyph: "L",
+    color: "#e85e50",
+    ink: "#fff7de",
+    description: "A vivid red berry with a warm, restorative scent. Bulbasaur keeps glancing at it."
+  },
+  [LOG_CHAIR_ITEM_ID]: {
+    id: LOG_CHAIR_ITEM_ID,
+    label: "Log Chair",
+    bagLabel: "Log chair",
+    bagDetailsEligible: true,
+    shortLabel: "Chair",
+    glyph: "C",
+    color: "#9a6842",
+    ink: "#fff2d6",
+    description: "A sturdy little chair carved from a log. Chopper says every habitat needs a place to rest."
+  },
+  [SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID]: {
+    id: SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID,
+    label: "Simple Wooden DIY Recipes",
+    bagLabel: "Wooden DIY recipes",
+    bagDetailsEligible: true,
+    shortLabel: "DIY",
+    glyph: "D",
+    color: "#d2a36a",
+    ink: "#2a1809",
+    description: "A starter bundle of wooden DIY plans. The Campfire recipe is circled in the corner."
+  },
+  [CAMPFIRE_ITEM_ID]: {
+    id: CAMPFIRE_ITEM_ID,
+    label: "Campfire",
+    bagLabel: "Campfire",
+    bagDetailsEligible: true,
+    shortLabel: "Fire",
+    glyph: "F",
+    color: "#f07d38",
+    ink: "#2a1205",
+    description: "A simple campfire made at the Workbench. Warmth makes the habitat feel more welcoming."
+  },
+  [LIFE_COINS_ITEM_ID]: {
+    id: LIFE_COINS_ITEM_ID,
+    label: "Life Coins",
+    bagLabel: "Life Coins",
+    shortLabel: "Coins",
+    glyph: "$",
+    color: "#ffd45c",
+    ink: "#392406",
+    description: "Challenge reward coins from the old Pokemon Center PC."
+  },
+  [LEAVES_ITEM_ID]: {
+    id: LEAVES_ITEM_ID,
+    label: "Leaves",
+    bagLabel: "Leaves",
+    bagDetailsEligible: true,
+    shortLabel: "Leaf",
+    glyph: "L",
+    color: "#72b95a",
+    ink: "#10220c",
+    description: "Fresh leaves gathered near restored tall grass. Soft enough for simple bedding."
+  },
+  [STRAW_BED_RECIPE_ITEM_ID]: {
+    id: STRAW_BED_RECIPE_ITEM_ID,
+    label: "Straw Bed Recipe",
+    bagLabel: "Straw Bed recipe",
+    bagDetailsEligible: true,
+    shortLabel: "Recipe",
+    glyph: "R",
+    color: "#f0cf77",
+    ink: "#342309",
+    description: "Bulbasaur's notes for weaving a simple Straw Bed from sturdy sticks and plant fiber."
+  },
+  [STRAW_BED_ITEM_ID]: {
+    id: STRAW_BED_ITEM_ID,
+    label: "Straw Bed",
+    bagLabel: "Straw Bed",
+    bagDetailsEligible: true,
+    shortLabel: "Bed",
+    glyph: "B",
+    color: "#d7b65a",
+    ink: "#2d2108",
+    description: "A soft woven bed that makes grassy habitats feel easier to rest in."
+  },
+  [LEAF_DEN_KIT_ITEM_ID]: {
+    id: LEAF_DEN_KIT_ITEM_ID,
+    label: "Leaf Den Kit",
+    bagLabel: "Leaf Den Kit",
+    bagDetailsEligible: true,
+    shortLabel: "Den",
+    glyph: "D",
+    color: "#6fc46d",
+    ink: "#10240d",
+    description: "A leafy house kit from the Pokemon Center PC Shop. Professor Tangrowth says it is the first step toward proper homes."
+  },
+  [DITTO_FLAG_ITEM_ID]: {
+    id: DITTO_FLAG_ITEM_ID,
+    label: "Ditto Flag",
+    bagLabel: "Ditto Flag",
+    bagDetailsEligible: true,
+    shortLabel: "Flag",
+    glyph: "F",
+    color: "#d98bd8",
+    ink: "#2b1230",
+    description: "A celebratory flag from Professor Tangrowth. It marks the first home brought back to life on the island."
   },
   flaxFiber: {
     id: "flaxFiber",
@@ -148,6 +272,16 @@ export const ITEM_DEFS = {
 export const INVENTORY_ORDER = [
   WATER_GUN_POWER_ITEM_ID,
   "wood",
+  LEPPA_BERRY_ITEM_ID,
+  LOG_CHAIR_ITEM_ID,
+  SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID,
+  CAMPFIRE_ITEM_ID,
+  LIFE_COINS_ITEM_ID,
+  LEAVES_ITEM_ID,
+  STRAW_BED_RECIPE_ITEM_ID,
+  STRAW_BED_ITEM_ID,
+  LEAF_DEN_KIT_ITEM_ID,
+  DITTO_FLAG_ITEM_ID,
   "flaxFiber",
   "blackberry",
   "rowanberry",
@@ -163,27 +297,47 @@ export const INVENTORY_ORDER = [
 
 export const WORLD_LIMIT = 72;
 
+const HABITAT_TILE_STEP = 1.425;
+
+function createFourTileHabitatLayout(id, center, patchKind) {
+  const halfStep = HABITAT_TILE_STEP * 0.5;
+  const [centerX, centerY, centerZ] = center;
+  const offsets = [
+    [-halfStep, -halfStep],
+    [halfStep, -halfStep],
+    [-halfStep, halfStep],
+    [halfStep, halfStep]
+  ];
+
+  return offsets.map(([offsetX, offsetZ], index) => ({
+    id: `${id}-${patchKind}-${index}`,
+    habitatGroupId: id,
+    position: [
+      centerX + offsetX,
+      centerY,
+      centerZ + offsetZ
+    ]
+  }));
+}
+
 export const GROUND_GRASS_LAYOUT = [
-  { id: "grass-0", position: [6.5, 0, -4.8] },
-  { id: "grass-1", position: [9.4, 0, -6.2] },
-  { id: "grass-2", position: [11.4, 0, -2.9] },
-  { id: "grass-3", position: [13.2, 0, -7.8] },
-  { id: "grass-4", position: [15.8, 0, -4.2] },
-  { id: "grass-5", position: [18.1, 0, -8.6] },
-  { id: "grass-6", position: [4.6, 0, 1.9] },
-  { id: "grass-7", position: [21.3, 0, -1.8] },
-  { id: "grass-8", position: [23.8, 0, -5.6] },
-  { id: "grass-9", position: [26.1, 0, -9.4] },
-  { id: "grass-10", position: [28.4, 0, -2.6] },
-  { id: "grass-11", position: [30.2, 0, -7.2] }
+  ...createFourTileHabitatLayout("tall-grass-habitat-0", [8.55, 0, -5.7], "grass"),
+  ...createFourTileHabitatLayout("tall-grass-habitat-1", [17.1, 0, -9.98], "grass"),
+  ...createFourTileHabitatLayout("tall-grass-habitat-2", [25.65, 0, -5.7], "grass")
 ];
 
 export const GROUND_FLOWER_LAYOUT = [
-  { id: "flower-0", position: [7.8, 0, -7.9] },
-  { id: "flower-1", position: [10.8, 0, -9.0] },
-  { id: "flower-2", position: [14.6, 0, -5.8] },
-  { id: "flower-3", position: [17.6, 0, -7.0] }
+  ...createFourTileHabitatLayout("pretty-flower-bed-habitat-0", [12.825, 0, -7.425], "flower")
 ];
+
+export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
+export const LEPPA_TREE_DROP_OFFSET = [0.82, 0.02, 0.48];
+export const WORKBENCH_POSITION = [9.2, 0.02, 4.8];
+export const RUINED_POKEMON_CENTER_POSITION = [25.4, 0, 12.6];
+export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [22.7, 0.02, 10.8];
+export const POKEMON_CENTER_PC_POSITION = [26.25, 0.02, 13.65];
+export const BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION = [31.2, 0.02, 10.4];
+export const BOULDER_SHADED_TALL_GRASS_RADIUS = 4.6;
 
 export const WORLD_REGIONS = [
   {
@@ -279,6 +433,15 @@ export const OUTPOST_INSTANCE_LAYOUT = [
   { id: "west-ruin", offset: [-46, 0, 24], scale: 0.74, yaw: 0.12 },
 ];
 
+export const RUINED_POKEMON_CENTER_LAYOUT = [
+  {
+    id: "ruined-pokemon-center-shell",
+    offset: [...RUINED_POKEMON_CENTER_POSITION],
+    scale: 0.86,
+    yaw: -0.18
+  }
+];
+
 export const NPC_PROFILES = {
   tangrowth: {
     id: "tangrowth",
@@ -332,9 +495,36 @@ export const WORLD_MARKER_STYLES = {
   woolNest: { glyph: "Y", color: "#d8d3ca", ink: "#25231f" },
   silkNest: { glyph: "S", color: "#8fd0d6", ink: "#102326" },
   looseGranite: { glyph: "G", color: "#8b9098", ink: "#171a1d" },
+  pokemonCenter: { glyph: "+", color: "#d94a5b", ink: "#fff2f4" },
+  pokemonCenterPc: { glyph: "PC", color: "#7bc7ff", ink: "#0b1f32" },
+  challengeBoulder: { glyph: "B", color: "#8f98a3", ink: "#171b1f" },
 };
 
 export const PLACEHOLDER_RECIPES = {
+  campfire: {
+    id: "campfire",
+    title: "Campfire",
+    stationId: "workbench",
+    ingredients: {
+      wood: 3,
+    },
+    output: {
+      [CAMPFIRE_ITEM_ID]: 1,
+    },
+    note: "Simple wooden DIY recipe for the first Workbench objective.",
+  },
+  strawBed: {
+    id: "strawBed",
+    title: "Straw Bed",
+    stationId: "workbench",
+    ingredients: {
+      [LEAVES_ITEM_ID]: 2,
+    },
+    output: {
+      [STRAW_BED_ITEM_ID]: 1,
+    },
+    note: "A Bulbasaur recipe for a small woven bed.",
+  },
   bridgeKit: {
     id: "bridgeKit",
     title: "Bridge Repair Kit",
@@ -715,7 +905,7 @@ export const NPC_DEFS = [
     label: "Tangrowth",
     position: [...ACT_TWO_MONSTER_POSITION],
     facing: "down",
-    markerKey: "tangrowth",
+    markerKey: null,
     renderCharacter: false,
     role: NPC_PROFILES.tangrowth.role,
     summary: NPC_PROFILES.tangrowth.summary,
@@ -759,7 +949,7 @@ export const INTERACTABLE_DEFS = [
     id: "workbench",
     label: "Workbench",
     type: "station",
-    position: [9.2, 0.02, 4.8],
+    position: [...WORKBENCH_POSITION],
     markerKey: "workbench",
     interactDistance: 1.8,
     activeWhen: () => true,
@@ -780,7 +970,15 @@ export const INTERACTABLE_DEFS = [
     position: [...ACT_TWO_SQUIRTLE_POSITION],
     markerKey: "squirtle",
     interactDistance: 1.85,
-    activeWhen: (state) => state.questIndex === 1,
+    activeWhen: (state) => {
+      return (
+        state.questIndex === 1 ||
+        (
+          state.flags?.squirtleLeppaRequestAvailable &&
+          !state.flags?.leppaBerryGiftComplete
+        )
+      );
+    },
   },
   {
     id: "bridge",
@@ -809,9 +1007,100 @@ export const INTERACTABLE_DEFS = [
     interactDistance: 1.8,
     activeWhen: (state) => state.flags.graniteGateOpened,
   },
+  {
+    id: "ruinedPokemonCenter",
+    label: "Ruined Pokemon Center",
+    type: "site",
+    position: [...RUINED_POKEMON_CENTER_POSITION],
+    markerKey: "pokemonCenter",
+    interactDistance: 2.45,
+    activeWhen: (state) => {
+      return Boolean(
+        state.flags?.pokemonCenterGuideStarted &&
+        !state.flags?.ruinedPokemonCenterInspected
+      );
+    },
+  },
+  {
+    id: "pokemonCenterPc",
+    label: "Pokemon Center PC",
+    type: "site",
+    position: [...POKEMON_CENTER_PC_POSITION],
+    markerKey: "pokemonCenterPc",
+    interactDistance: 1.85,
+    activeWhen: (state) => {
+      return Boolean(
+        state.flags?.ruinedPokemonCenterInspected &&
+        (
+          !state.flags?.challengesUnlocked ||
+          (
+            state.flags?.boulderChallengeRewardReady &&
+            !state.flags?.boulderChallengeRewardClaimed
+          ) ||
+          (
+            state.flags?.newPcChallengesAvailable &&
+            !state.flags?.newPcChallengesChecked
+          ) ||
+          (
+            state.flags?.leafDenKitPurchaseAvailable &&
+            !state.flags?.leafDenKitPurchased
+          )
+        )
+      );
+    },
+  },
 ];
 
 export const RESOURCE_NODE_DEFS = [
+  {
+    id: "leaf-pile-1",
+    label: "Leaf Pile",
+    itemId: LEAVES_ITEM_ID,
+    markerKey: LEAVES_ITEM_ID,
+    position: [7.7, 0.02, -5.1],
+    yield: 1,
+    respawnDuration: 6,
+    interactDistance: 1.45,
+    activeWhen: (state) => {
+      return Boolean(
+        (state.flags.strawBedRecipeUnlocked && !state.flags.strawBedCrafted) ||
+        (state.flags.leafDenBuildAvailable && !state.flags.leafDenConstructionStarted && !state.flags.leafDenBuilt)
+      );
+    },
+  },
+  {
+    id: "leaf-pile-2",
+    label: "Leaf Pile",
+    itemId: LEAVES_ITEM_ID,
+    markerKey: LEAVES_ITEM_ID,
+    position: [9.4, 0.02, -6.7],
+    yield: 1,
+    respawnDuration: 6,
+    interactDistance: 1.45,
+    activeWhen: (state) => {
+      return Boolean(
+        (state.flags.strawBedRecipeUnlocked && !state.flags.strawBedCrafted) ||
+        (state.flags.leafDenBuildAvailable && !state.flags.leafDenConstructionStarted && !state.flags.leafDenBuilt)
+      );
+    },
+  },
+  {
+    id: "leaf-pile-3",
+    label: "Leaf Pile",
+    itemId: LEAVES_ITEM_ID,
+    markerKey: LEAVES_ITEM_ID,
+    position: [6.3, 0.02, -6.8],
+    yield: 1,
+    respawnDuration: 6,
+    interactDistance: 1.45,
+    activeWhen: (state) => {
+      return Boolean(
+        state.flags.leafDenBuildAvailable &&
+        !state.flags.leafDenConstructionStarted &&
+        !state.flags.leafDenBuilt
+      );
+    },
+  },
   {
     id: "flax-1",
     label: "Flax Patch",

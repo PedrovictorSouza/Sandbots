@@ -1,4 +1,8 @@
-import { NPC_DEFS, OUTPOST_INSTANCE_LAYOUT } from "../../gameplayContent.js";
+import {
+  NPC_DEFS,
+  OUTPOST_INSTANCE_LAYOUT,
+  RUINED_POKEMON_CENTER_LAYOUT
+} from "../../gameplayContent.js";
 import { buildIntroRoomScene } from "../scenes/introRoom/buildIntroRoomScene.js";
 import { createFacingStaticController } from "../../world/islandWorld.js";
 import { createChopperNpcActor } from "./chopperNpcActor.js";
@@ -9,6 +13,7 @@ export function buildSceneAssembly(session, assets) {
     groundPurifiedModel,
     houseModel,
     palmModel,
+    tallGrassModel,
     chopperBodyModel,
     chopperPropellerModel,
     robot1Model,
@@ -25,7 +30,18 @@ export function buildSceneAssembly(session, assets) {
       model: groundPurifiedModel,
       instances: session.groundPurifiedInstances,
       brightness: 0.75
-    },
+    }
+  ];
+
+  if (tallGrassModel) {
+    session.sceneObjects.push({
+      model: tallGrassModel,
+      instances: session.tallGrassInstances,
+      brightness: 1.06
+    });
+  }
+
+  session.sceneObjects.push(
     {
       model: houseModel,
       instances: [
@@ -34,10 +50,30 @@ export function buildSceneAssembly(session, assets) {
       ]
     },
     {
+      model: houseModel,
+      instances: RUINED_POKEMON_CENTER_LAYOUT,
+      brightness: 0.52
+    },
+    {
       model: palmModel,
       instances: session.palmInstances
     }
-  ];
+  );
+
+  if (session.leppaTree) {
+    session.sceneObjects.push(
+      {
+        model: palmModel,
+        instances: [session.leppaTree.deadInstance],
+        brightness: 0.42
+      },
+      {
+        model: palmModel,
+        instances: [session.leppaTree.aliveInstance],
+        brightness: 1
+      }
+    );
+  }
 
   session.npcActors = NPC_DEFS.map((npc) => ({
     ...npc,

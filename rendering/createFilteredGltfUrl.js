@@ -6,9 +6,52 @@ function isValidIndex(value) {
   return Number.isInteger(value) && value >= 0;
 }
 
+function toSet(values) {
+  return Array.isArray(values) ? new Set(values) : null;
+}
+
+function nodeNameMatches(node, nameSet) {
+  return Boolean(nameSet && node?.name && nameSet.has(node.name));
+}
+
+export function resolveFilteredSceneNodeIndices(gltf, {
+  includeNodes = null,
+  excludeNodes = [],
+  includeNodeNames = null,
+  excludeNodeNames = []
+} = {}) {
+  const sceneIndex = gltf.scene ?? 0;
+  const scene = gltf.scenes?.[sceneIndex];
+
+  if (!scene || !Array.isArray(scene.nodes)) {
+    throw new Error("GLTF sem scene.nodes válido.");
+  }
+
+  const includeNodeSet = toSet(includeNodes);
+  const includeNameSet = toSet(includeNodeNames);
+  const excludeNodeSet = toSet(excludeNodes);
+  const excludeNameSet = toSet(excludeNodeNames);
+  const hasIncludeFilter = Boolean(includeNodeSet || includeNameSet);
+
+  return scene.nodes.filter((nodeIndex) => {
+    const node = gltf.nodes?.[nodeIndex];
+    const included =
+      !hasIncludeFilter ||
+      includeNodeSet?.has(nodeIndex) ||
+      nodeNameMatches(node, includeNameSet);
+    const excluded =
+      excludeNodeSet?.has(nodeIndex) ||
+      nodeNameMatches(node, excludeNameSet);
+
+    return included && !excluded;
+  });
+}
+
 export async function createFilteredGltfUrl(gltfPath, {
   includeNodes = null,
-  excludeNodes = []
+  excludeNodes = [],
+  includeNodeNames = null,
+  excludeNodeNames = []
 } = {}) {
   const response = await fetch(gltfPath);
 
@@ -26,11 +69,12 @@ export async function createFilteredGltfUrl(gltfPath, {
     throw new Error(`GLTF sem scene.nodes válido: ${gltfPath}`);
   }
 
-  const originalSceneNodes = scene.nodes;
-
-  const selectedNodeIndices = includeNodes
-    ? originalSceneNodes.filter((nodeIndex) => includeNodes.includes(nodeIndex))
-    : originalSceneNodes.filter((nodeIndex) => !excludeNodes.includes(nodeIndex));
+  const selectedNodeIndices = resolveFilteredSceneNodeIndices(gltf, {
+    includeNodes,
+    excludeNodes,
+    includeNodeNames,
+    excludeNodeNames
+  });
 
   const selectedNodes = selectedNodeIndices
     .map((nodeIndex) => ({
@@ -98,7 +142,9 @@ export async function createFilteredGltfUrl(gltfPath, {
   console.info("Filtered GLTF", {
     gltfPath,
     selectedNodeIndices,
-    selectedMeshIndices
+    selectedMeshIndices,
+    includeNodeNames,
+    excludeNodeNames
   });
 
   const blob = new Blob([JSON.stringify(gltf)], {

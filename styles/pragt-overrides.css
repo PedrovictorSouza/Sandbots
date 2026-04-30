@@ -702,6 +702,29 @@
   min-width: 0;
 }
 
+.hud-checklist__item--tracked {
+  padding-top: 4px;
+}
+
+.hud-checklist__task-title,
+.hud-checklist__task-copy {
+  display: block;
+}
+
+.hud .hud-checklist__item .hud-checklist__task-title {
+  color: #fff7d7;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.hud .hud-checklist__item .hud-checklist__task-copy {
+  margin-top: 5px;
+  color: var(--game-ui-muted);
+  font-size: 18px;
+  line-height: 1.12;
+}
+
 .hud-control-hint {
   display: flex;
   flex-wrap: wrap;
@@ -957,6 +980,30 @@
   color: #fff7d7;
 }
 
+.mission-card__header {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: start;
+  gap: 10px;
+}
+
+.mission-card__check {
+  width: 20px;
+  height: 20px;
+  margin-top: 3px;
+  border: 3px solid #695c71;
+  background: #0f0b13;
+  box-shadow: 2px 2px 0 #050307;
+}
+
+.mission-card[data-task-done="true"] .mission-card__check {
+  border-color: #b6ef8f;
+  background:
+    linear-gradient(45deg, transparent 0 38%, #1f3c1a 38% 62%, transparent 62%),
+    linear-gradient(-45deg, transparent 0 38%, #b6ef8f 38% 62%, transparent 62%),
+    #22381f;
+}
+
 .mission-card__copy {
   font-size: 24px;
   line-height: 1.08;
@@ -1065,6 +1112,11 @@
 .skill-slot[data-unlocked="true"] {
   border-color: var(--game-ui-accent);
   background: #142a34;
+}
+
+.skill-slot[data-active="true"] {
+  border-color: #eebc40;
+  box-shadow: 0 0 0 3px rgba(238, 188, 64, 0.28);
 }
 
 .skill-slot__icon {

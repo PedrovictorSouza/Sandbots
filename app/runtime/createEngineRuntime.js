@@ -71,7 +71,12 @@ export function createEngineRuntime({
     spriteAttribs,
     spriteUniforms,
     spriteQuadBuffer,
-    spriteQuadIndices
+    spriteQuadIndices,
+    skyProgram,
+    skyAttribs,
+    skyUniforms,
+    skyQuadBuffer,
+    skyQuadIndices
   } = createWorldRenderingResources(gl);
   const camera = createPokemonCamera({
     worldCanvas,
@@ -118,6 +123,11 @@ export function createEngineRuntime({
     spriteAttribs,
     spriteQuadBuffer,
     spriteQuadIndices,
+    skyProgram,
+    skyUniforms,
+    skyAttribs,
+    skyQuadBuffer,
+    skyQuadIndices,
     jitterState
   });
   const worldTextureFactory = createWorldTextureFactory(gl);

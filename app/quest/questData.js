@@ -130,10 +130,10 @@ export const SMALL_ISLAND_QUESTS = Object.freeze([
   },
   {
     id: "inspect-rustling-grass",
-    title: "Inspect the Rustling Grass",
-    description: "Find the moving grass and meet the small helper drawn back by the revived habitat.",
-    guidance: "Follow the marker to the moving grass, stand close, then press E to inspect.",
-    giverId: "chopper",
+    title: "Talk to Bulbasaur",
+    description: "Return to Bulbasaur after watering the dry tall grass and complete the request.",
+    guidance: "Stand close to Bulbasaur, then press E to talk and learn Leafage.",
+    giverId: "leaf-helper",
     status: QUEST_STATUS.LOCKED,
     objectives: [
       { type: QUEST_EVENT.TALK, targetId: "leaf-helper", required: 1, current: 0 }

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createGameplayDialogueController } from "../app/ui/gameplayDialogueController.js";
 
 describe("createGameplayDialogueController", () => {
-  it("renders a dialogue line and advances to completion with E", () => {
+  it("renders a dialogue line and advances to completion with X", () => {
     const uiLayer = document.createElement("div");
     const clearGameFlowInput = vi.fn();
     const onComplete = vi.fn();
@@ -25,16 +25,16 @@ describe("createGameplayDialogueController", () => {
     expect(clearGameFlowInput).toHaveBeenCalled();
     expect(uiLayer.textContent).not.toContain("Line one.");
 
-    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyE", key: "e" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
     expect(uiLayer.textContent).toContain("Line one.");
 
-    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyE", key: "e" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
     expect(uiLayer.textContent).not.toContain("Line two.");
 
-    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyE", key: "e" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
     expect(uiLayer.textContent).toContain("Line two.");
 
-    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyE", key: "e" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(controller.isActive()).toBe(false);
   });

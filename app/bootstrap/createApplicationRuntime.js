@@ -6,15 +6,27 @@ import {
   ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS
 } from "../../actTwoSceneConfig.js";
 import {
-  BULBASAUR_POKEDEX_ENTRY_ID,
   SQUIRTLE_POKEDEX_ENTRY_ID
 } from "../../pokedexEntries.js";
 import { GAME_FLOW } from "../../gameFlow.js";
 import {
+  CAMPFIRE_ITEM_ID,
+  DITTO_FLAG_ITEM_ID,
   INVENTORY_ORDER,
   ITEM_DEFS,
+  LEAF_DEN_BUILD_DURATION_MS,
+  LEAF_DEN_BUILD_REQUIREMENTS,
+  LEAF_DEN_KIT_ITEM_ID,
+  LEPPA_BERRY_ITEM_ID,
+  LIFE_COINS_ITEM_ID,
+  LOG_CHAIR_ITEM_ID,
   NPC_PROFILES,
   PLACEHOLDER_RECIPES,
+  RUINED_POKEMON_CENTER_GUIDE_POSITION,
+  RUINED_POKEMON_CENTER_POSITION,
+  SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID,
+  STRAW_BED_ITEM_ID,
+  STRAW_BED_RECIPE_ITEM_ID,
   TANGROWTH_OPENING_LINE,
   WATER_GUN_POWER_ITEM_ID,
   createInitialInventory,
@@ -32,19 +44,14 @@ import {
   getRegionForPosition,
   hasItems
 } from "../../story/progression.js";
-import {
-  BULBASAUR_HABITAT_DISCOVERY_DIALOGUE,
-  SQUIRTLE_DISCOVERY_DIALOGUE,
-  TANGROWTH_FLOWER_RECOVERY_DIALOGUE,
-  TANGROWTH_ONBOARDING_DIALOGUE,
-  TANGROWTH_TALL_GRASS_RETURN_DIALOGUE
-} from "../../dialogue/gameplayDialogueContent.js";
 import { createDialogueSystem } from "../dialogue/createDialogueSystem.js";
 import { SMALL_ISLAND_DIALOGUES } from "../dialogue/dialogueData.js";
 import { createQuestSystem } from "../quest/createQuestSystem.js";
 import { QUEST_EVENT, SMALL_ISLAND_QUESTS } from "../quest/questData.js";
+import { createStoryBeatSystem } from "../story/createStoryBeatSystem.js";
+import { STORY_BEAT_IDS } from "../story/storyBeatData.js";
 import { createHabitatSystem } from "../sandbox/createHabitatSystem.js";
-import { SMALL_ISLAND_HABITATS } from "../sandbox/habitatData.js";
+import { HABITAT_EVENT, SMALL_ISLAND_HABITATS } from "../sandbox/habitatData.js";
 import {
   findNearbyGroundCell,
   purifyGroundCell,
@@ -54,13 +61,21 @@ import {
 import { createGameInputController } from "../../input/gameInputController.js";
 import {
   buildNearbyPrompt,
+  buildCampfirePlacement,
+  buildLeafDenKitPlacement,
+  buildLogChairPlacement,
+  buildStrawBedPlacement,
+  collectLeppaBerryDrops as collectLeppaBerryDropItems,
   collectWoodDrops,
   findNearbyHarvestTarget,
   findNearbyInteractable,
   isInteractableActive,
   isNpcActive,
   isResourceNodeActive,
+  syncLeppaTreeState,
   strikeNearbyPalm,
+  updateBulbasaurStrawBedChallengeCompletion,
+  waterNearbyPalm,
   updatePalmShake,
   updateResourceNodes
 } from "../../world/islandWorld.js";
@@ -100,7 +115,8 @@ const ENABLE_GAMEPLAY_DEV_BOOT = true;
 const ENABLE_QUEST_PERSISTENCE = false;
 const DEFAULT_DEV_SCENE = DEV_SCENE.GAMEPLAY;
 const GAMEPLAY_DEFAULT_UI_SECTIONS = Object.freeze([
-  "hud"
+  "hud",
+  "builder"
 ]);
 const PLAYER_SKILL_DEFS = {
   transform: {
@@ -129,6 +145,7 @@ const PLAYER_SKILL_DEFS = {
   }
 };
 const PLAYER_SKILL_ORDER = ["transform", "waterGun", "leafage"];
+const ACTIVE_FIELD_MOVE_ORDER = ["waterGun", "leafage"];
 const QUEST_COMPLETION_POP_DURATION_MS = 2400;
 const QUEST_COMPLETION_POP_MESSAGES = Object.freeze({
   "learn-to-move": "YOU TOOK YOUR FIRST STEPS!",
@@ -138,12 +155,15 @@ const QUEST_COMPLETION_POP_MESSAGES = Object.freeze({
   "record-a-memory": "YOU RECORDED A MEMORY!",
   "open-the-water-route": "YOU LEARNED WATER GUN!",
   "water-dry-grass": "YOU RESTORED THE TALL GRASS!",
-  "inspect-rustling-grass": "YOU MET A NEW HELPER!",
+  "inspect-rustling-grass": "YOU LEARNED LEAFAGE!",
   "grow-a-home-patch": "YOU GREW A HOME PATCH!",
   "chopper-first-habitat-report": "YOU REPORTED BACK!"
 });
 const CHOPPER_SECOND_TALK_APPROACH_DURATION = 1.05;
 const CHOPPER_SECOND_TALK_STOP_DISTANCE = 1.45;
+const TALL_GRASS_MEMORY_APPROACH_DURATION = 1.05;
+const POKEMON_CENTER_GUIDE_FLIGHT_DURATION = 2.8;
+const LEAF_DEN_KIT_LIFE_COIN_COST = 10;
 
 function scheduleIdleTask(windowRef, callback, timeout = 1200) {
   if (typeof windowRef.requestIdleCallback === "function") {
@@ -247,8 +267,11 @@ export function createApplicationRuntime({
   let gameSession = null;
   let uiRuntime = null;
   let sceneFlowRuntime = null;
+  let storyBeats = null;
   let questCompletionPop = null;
   let scriptedInteractionActive = false;
+  let followerCallRequested = false;
+  let activeFieldMoveId = null;
 
   function getRuntimeNow() {
     return windowRef.performance?.now?.() ?? Date.now();
@@ -304,6 +327,183 @@ export function createApplicationRuntime({
     return gameSession?.chopperNpcActor?.npcActor?.character?.getPosition?.() || null;
   }
 
+  function syncQuestPanels() {
+    uiRuntime?.syncQuestFocus(storyState);
+    uiRuntime?.syncHudInstructions(storyState);
+    uiRuntime?.renderMissionCards(storyState, inventory, uiRuntime.getNoticeMessage());
+  }
+
+  function trackFieldTask(taskId) {
+    storyState.flags.trackedTaskIds ||= [];
+
+    if (storyState.flags.trackedTaskIds.includes(taskId)) {
+      return false;
+    }
+
+    storyState.flags.trackedTaskIds.push(taskId);
+    syncQuestPanels();
+    return true;
+  }
+
+  function recordBulbasaurSturdyStickChallengeProgress(amount) {
+    const flags = storyState.flags;
+
+    if (
+      !flags.bulbasaurStrawBedChallengeAvailable ||
+      flags.strawBedRecipeUnlocked ||
+      amount <= 0
+    ) {
+      return false;
+    }
+
+    flags.sturdySticksGatheredForChallenge = Math.min(
+      10,
+      (flags.sturdySticksGatheredForChallenge || 0) + amount
+    );
+
+    const completed = updateBulbasaurStrawBedChallengeCompletion(storyState);
+
+    if (completed) {
+      flags.bulbasaurStrawBedChallengeCompletionNoticePending = true;
+    }
+
+    syncQuestPanels();
+    return true;
+  }
+
+  function inspectBag() {
+    const shouldSelectCampfireForTangrowth =
+      storyState.flags.campfireCrafted &&
+      !storyState.flags.campfireSpatOut &&
+      hasItems(inventory, { [CAMPFIRE_ITEM_ID]: 1 });
+
+    if (shouldSelectCampfireForTangrowth) {
+      uiRuntime.bagUiRuntime.selectItem(CAMPFIRE_ITEM_ID);
+
+      if (!storyState.flags.campfireSelectedForTangrowth) {
+        storyState.flags.campfireSelectedForTangrowth = true;
+        uiRuntime.pushNotice("Campfire selected.");
+        syncQuestPanels();
+      }
+    }
+
+    const shouldSelectStrawBedForBulbasaur =
+      storyState.flags.strawBedCrafted &&
+      !storyState.flags.strawBedPlacedInBulbasaurHabitat &&
+      hasItems(inventory, { [STRAW_BED_ITEM_ID]: 1 });
+
+    if (shouldSelectStrawBedForBulbasaur) {
+      uiRuntime.bagUiRuntime.selectItem(STRAW_BED_ITEM_ID);
+
+      if (!storyState.flags.strawBedSelectedForBulbasaur) {
+        storyState.flags.strawBedSelectedForBulbasaur = true;
+        uiRuntime.pushNotice("Straw Bed selected.");
+        syncQuestPanels();
+      }
+    }
+
+    const shouldSelectLeafDenKit =
+      storyState.flags.leafDenBuildAvailable &&
+      !storyState.flags.leafDenKitPlaced &&
+      hasItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 });
+
+    if (shouldSelectLeafDenKit) {
+      uiRuntime.bagUiRuntime.selectItem(LEAF_DEN_KIT_ITEM_ID);
+
+      if (!storyState.flags.leafDenKitSelected) {
+        storyState.flags.leafDenKitSelected = true;
+        uiRuntime.pushNotice("Leaf Den Kit selected.");
+        syncQuestPanels();
+      }
+    }
+
+    const shouldSelectDittoFlagForHouse =
+      storyState.flags.dittoFlagReceived &&
+      !storyState.flags.dittoFlagPlacedOnHouse &&
+      hasItems(inventory, { [DITTO_FLAG_ITEM_ID]: 1 });
+
+    if (shouldSelectDittoFlagForHouse) {
+      uiRuntime.bagUiRuntime.selectItem(DITTO_FLAG_ITEM_ID);
+
+      if (!storyState.flags.dittoFlagSelectedForHouse) {
+        storyState.flags.dittoFlagSelectedForHouse = true;
+        uiRuntime.pushNotice("Ditto Flag selected.");
+        syncQuestPanels();
+      }
+    }
+
+    uiRuntime.inspectBag();
+  }
+
+  function shouldBagButtonInteractWithNearbyCharacter() {
+    if (
+      !gameSession?.playerCharacter ||
+      !sceneFlowRuntime?.sceneDirector?.is?.(GAME_FLOW.GAMEPLAY) ||
+      uiRuntime?.pokedexUiState?.open ||
+      builderPanelOpen ||
+      gamePaused
+    ) {
+      return false;
+    }
+
+    const playerPosition = gameSession.playerCharacter.getPosition();
+    const nearbyInteractable = findNearbyInteractable(
+      playerPosition,
+      gameSession.npcActors,
+      gameSession.interactables,
+      storyState,
+      gameSession.groundGrassPatches,
+      gameSession.logChair,
+      gameSession.leafDen,
+      gameSession.timburrEncounter,
+      gameSession.charmanderEncounter
+    );
+
+    const target = nearbyInteractable?.target;
+    const characterInteractionKinds = new Set([
+      "grassEncounter",
+      "charmanderGrassEncounter",
+      "timburrGrassEncounter",
+      "bulbasaurMission",
+      "bulbasaurRequestComplete",
+      "bulbasaurStrawBedRecipe",
+      "bulbasaurStrawBedComplete",
+      "leppaBerryGift",
+      "timburrLeafDenFurnitureComplete",
+      "charmanderCelebrationRequest"
+    ]);
+
+    if (target?.id === "squirtle" || characterInteractionKinds.has(target?.kind)) {
+      return true;
+    }
+
+    if (target?.id !== "tangrowth") {
+      return false;
+    }
+
+    const activeQuest = getActiveQuest(storyState);
+
+    return (
+      activeQuest?.id === "meetTangrowth" ||
+      (
+        storyState.flags.tallGrassDiscovered &&
+        !storyState.flags.tangrowthTallGrassCommentSeen
+      ) ||
+      (
+        storyState.flags.tangrowthLogChairRequestAvailable &&
+        !storyState.flags.logChairReceived
+      ) ||
+      (
+        storyState.flags.tangrowthHouseTalkAvailable &&
+        !storyState.flags.tangrowthHouseTalkComplete
+      ) ||
+      (
+        storyState.flags.charmanderCelebrationSuggested &&
+        !storyState.flags.charmanderCelebrationComplete
+      )
+    );
+  }
+
   function buildChopperApproachTarget(playerPosition, chopperPosition) {
     const toPlayer = [
       playerPosition[0] - chopperPosition[0],
@@ -319,6 +519,246 @@ export function createApplicationRuntime({
       playerPosition[1],
       playerPosition[2] - direction[1] * CHOPPER_SECOND_TALK_STOP_DISTANCE
     ];
+  }
+
+  function getRestoredGrassHabitatPosition(restoredGrassHabitat, fallbackPosition) {
+    const patches = Array.isArray(restoredGrassHabitat?.patches) ?
+      restoredGrassHabitat.patches.filter((patch) => Array.isArray(patch?.position)) :
+      [];
+
+    if (!patches.length) {
+      return fallbackPosition;
+    }
+
+    const center = patches.reduce((sum, patch) => [
+      sum[0] + patch.position[0],
+      sum[1] + patch.position[1],
+      sum[2] + patch.position[2]
+    ], [0, 0, 0]);
+
+    return [
+      center[0] / patches.length,
+      center[1] / patches.length,
+      center[2] / patches.length
+    ];
+  }
+
+  function playTallGrassMemorySequence({
+    groundCell = null,
+    restoredGrassHabitat = null,
+    newlyDiscoveredHabitats = []
+  } = {}) {
+    if (storyBeats?.hasCompleted(STORY_BEAT_IDS.CHOPPER_TALL_GRASS_MEMORY)) {
+      storyBeats.complete(STORY_BEAT_IDS.CHOPPER_TALL_GRASS_MEMORY, {
+        discoveredHabitats: newlyDiscoveredHabitats
+      });
+      return;
+    }
+
+    const chopperActor = gameSession?.chopperNpcActor;
+    const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+    const chopperPosition = getChopperNpcPosition() || playerPosition;
+
+    if (!playerPosition || !chopperPosition) {
+      storyBeats?.complete(STORY_BEAT_IDS.CHOPPER_TALL_GRASS_MEMORY, {
+        discoveredHabitats: newlyDiscoveredHabitats
+      });
+      return;
+    }
+
+    const restoredHabitatPosition = getRestoredGrassHabitatPosition(
+      restoredGrassHabitat,
+      groundCell?.offset || playerPosition
+    );
+
+    const openMemoryConversation = () => {
+      const latestPlayerPosition = gameSession?.playerCharacter?.getPosition?.() || playerPosition;
+      const latestChopperPosition = getChopperNpcPosition() || chopperPosition;
+      chopperActor?.npcActor?.character?.faceToward?.(latestPlayerPosition);
+      if (chopperActor?.npcActor) {
+        chopperActor.npcActor.faceYaw = getYawToward(latestChopperPosition, latestPlayerPosition);
+      }
+      dialogueCamera?.focusNpcConversation({
+        targetId: "tangrowth",
+        playerPosition: latestPlayerPosition,
+        npcActors: gameSession?.npcActors || [],
+        interactables: gameSession?.interactables || []
+      });
+      storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_TALL_GRASS_MEMORY, {
+        context: {
+          discoveredHabitats: newlyDiscoveredHabitats
+        },
+        onBeforeCompleteEffects: () => {
+          scriptedInteractionActive = false;
+          dialogueCamera?.restoreGameplayCamera();
+        }
+      });
+    };
+
+    storyBeats?.markCompleted(STORY_BEAT_IDS.CHOPPER_TALL_GRASS_MEMORY);
+    scriptedInteractionActive = true;
+    clearGameFlowInput();
+    dialogueCamera?.focusWorldPoint({
+      position: restoredHabitatPosition,
+      height: 1.55
+    });
+
+    const targetPosition = buildChopperApproachTarget(restoredHabitatPosition, chopperPosition);
+    const flightStarted = startChopperNpcFlight(chopperActor, {
+      targetPosition,
+      duration: TALL_GRASS_MEMORY_APPROACH_DURATION,
+      onComplete: openMemoryConversation
+    });
+
+    if (!flightStarted) {
+      openMemoryConversation();
+    }
+  }
+
+  function startRuinedPokemonCenterGuide() {
+    if (
+      storyState.flags.pokemonCenterGuideFlightStarted ||
+      storyState.flags.challengesUnlocked
+    ) {
+      syncQuestPanels();
+      return;
+    }
+
+    storyState.flags.pokemonCenterGuideFlightStarted = true;
+    uiRuntime?.pushNotice(
+      "Follow Professor Tangrowth to the destroyed Pokemon Center.",
+      4.8
+    );
+
+    const chopperActor = gameSession?.chopperNpcActor;
+    const flightStarted = startChopperNpcFlight(chopperActor, {
+      targetPosition: RUINED_POKEMON_CENTER_GUIDE_POSITION,
+      duration: POKEMON_CENTER_GUIDE_FLIGHT_DURATION,
+      onComplete() {
+        const chopperPosition = getChopperNpcPosition();
+
+        if (!chopperPosition || !chopperActor?.npcActor) {
+          return;
+        }
+
+        chopperActor.npcActor.faceYaw = getYawToward(
+          chopperPosition,
+          RUINED_POKEMON_CENTER_POSITION
+        );
+      }
+    });
+
+    if (!flightStarted) {
+      storyState.flags.pokemonCenterGuideFlightStarted = false;
+    }
+
+    syncQuestPanels();
+  }
+
+  function getLeafDenConstructionNow() {
+    return windowRef.Date?.now?.() ?? Date.now();
+  }
+
+  function getDistance2d(fromPosition, toPosition) {
+    if (!Array.isArray(fromPosition) || !Array.isArray(toPosition)) {
+      return Infinity;
+    }
+
+    return Math.hypot(
+      fromPosition[0] - toPosition[0],
+      fromPosition[2] - toPosition[2]
+    );
+  }
+
+  function getLeafDenHelperStatus() {
+    const leafDenPosition = gameSession?.leafDen?.position;
+    const timburrPosition = gameSession?.timburrEncounter?.position;
+    const charmanderPosition = gameSession?.charmanderEncounter?.position;
+    const maxDistance = 2.85;
+
+    const timburrReady =
+      storyState.flags.timburrRevealed &&
+      storyState.flags.timburrFollowing &&
+      gameSession?.timburrEncounter?.visible &&
+      getDistance2d(timburrPosition, leafDenPosition) <= maxDistance;
+    const charmanderReady =
+      storyState.flags.charmanderRevealed &&
+      storyState.flags.charmanderFollowing &&
+      gameSession?.charmanderEncounter?.visible &&
+      getDistance2d(charmanderPosition, leafDenPosition) <= maxDistance;
+
+    return {
+      timburrReady,
+      otherReady: charmanderReady
+    };
+  }
+
+  function isCharmanderNearTangrowthForCelebration() {
+    const charmanderPosition = gameSession?.charmanderEncounter?.position;
+    const tangrowthPosition = getChopperNpcPosition();
+
+    return (
+      storyState.flags.charmanderRevealed &&
+      storyState.flags.charmanderFollowing &&
+      gameSession?.charmanderEncounter?.visible &&
+      getDistance2d(charmanderPosition, tangrowthPosition) <= 3.2
+    );
+  }
+
+  function completeLeafDenConstructionIfReady() {
+    if (
+      !storyState.flags.leafDenConstructionStarted ||
+      storyState.flags.leafDenBuilt
+    ) {
+      return false;
+    }
+
+    const completesAt = Number(storyState.flags.leafDenConstructionCompletesAt || 0);
+    if (!completesAt || getLeafDenConstructionNow() < completesAt) {
+      return false;
+    }
+
+    storyBeats.playDialogue(STORY_BEAT_IDS.LEAF_DEN_COMPLETE, {
+      onComplete: syncQuestPanels
+    });
+    return true;
+  }
+
+  function buildLeafDenFurniturePlacement(index) {
+    const anchor = gameSession?.leafDen?.position || [0, 0.02, 0];
+    const offsets = [
+      [-0.72, 0, 0.62],
+      [0.58, 0, 0.58],
+      [0.04, 0, -0.52]
+    ];
+    const offset = offsets[index % offsets.length];
+
+    return {
+      id: `leaf-den-furniture-${index}`,
+      kind: index === 0 ? "logChair" : index === 1 ? "strawBed" : "campfire",
+      position: [
+        anchor[0] + offset[0],
+        0.025,
+        anchor[2] + offset[2]
+      ],
+      size: index === 1 ? [1.24, 0.86] : [1.05, 0.92],
+      uvRect: [0, 0, 1, 1]
+    };
+  }
+
+  function buildDittoFlagPlacement() {
+    const anchor = gameSession?.leafDen?.position || [0, 0.02, 0];
+
+    return {
+      id: "ditto-flag-0",
+      position: [
+        anchor[0] + 0.9,
+        0.04,
+        anchor[2] - 0.42
+      ],
+      size: [0.68, 1.18],
+      uvRect: [0, 0, 1, 1]
+    };
   }
 
   function shouldPlayChopperSecondTalkApproach({ targetId, dialogueId }) {
@@ -348,12 +788,6 @@ export function createApplicationRuntime({
           5.2
         );
 
-        if (payload.completedQuestIds.includes("inspect-rustling-grass")) {
-          unlockPlayerSkill("leafage", {
-            silent: true
-          });
-          uiRuntime?.pushNotice("You learned Leafage.");
-        }
       }
     }
   });
@@ -364,14 +798,29 @@ export function createApplicationRuntime({
   const habitatSystem = createHabitatSystem({
     habitats: SMALL_ISLAND_HABITATS,
     storyState,
-    onDiscover({ habitat, discoveredHabitats }) {
+    onDiscover({ habitat, discoveredHabitats, context }) {
       uiRuntime?.setNearbyHabitats(discoveredHabitats.map((entry) => entry.label));
-      uiRuntime?.pushNotice(`Habitat discovered: ${habitat.label}.`);
-      if (habitat.pokedexEntryId) {
-        uiRuntime?.pokedexRuntime.setOpen(true, {
-          markSeen: true,
-          entryId: habitat.pokedexEntryId
-        });
+      const discoveryEvent = context?.event;
+      const isRestoredTallGrassHabitat =
+        discoveryEvent?.type === HABITAT_EVENT.RESTORE_HABITAT &&
+        discoveryEvent?.targetId === "tall-grass";
+      const hasSpecificRestoreNotice =
+        discoveryEvent?.type === HABITAT_EVENT.RESTORE_HABITAT &&
+        (discoveryEvent.targetId === "tall-grass" ||
+          discoveryEvent.targetId === "pretty-flower-bed" ||
+          discoveryEvent.targetId === "boulder-shaded-tall-grass");
+
+      if (discoveryEvent?.type === HABITAT_EVENT.RESTORE_HABITAT) {
+        storyState.flags.makingHabitatsComplete = true;
+        syncQuestPanels();
+      }
+
+      if (!hasSpecificRestoreNotice) {
+        uiRuntime?.pushNotice(`Habitat discovered: ${habitat.label}.`);
+      }
+
+      if (habitat.pokedexEntryId && !isRestoredTallGrassHabitat) {
+        storyBeats?.openPokedexEntry(habitat.pokedexEntryId);
       }
     }
   });
@@ -399,6 +848,7 @@ export function createApplicationRuntime({
     engine.cameraTurnKeys.clear();
     harvestRequested = false;
     interactRequested = false;
+    followerCallRequested = false;
   }
 
   function setGamePaused(paused) {
@@ -426,13 +876,74 @@ export function createApplicationRuntime({
     return Boolean(ITEM_DEFS[itemId]?.bagDetailsEligible);
   }
 
+  function getUnlockedFieldMoveIds() {
+    return ACTIVE_FIELD_MOVE_ORDER.filter((skillId) => playerSkills[skillId]);
+  }
+
+  function syncSkillsUi() {
+    uiRuntime?.syncSkillsUi(playerSkills, activeFieldMoveId);
+  }
+
+  function setActiveFieldMove(skillId, { notify = false } = {}) {
+    if (!ACTIVE_FIELD_MOVE_ORDER.includes(skillId) || !playerSkills[skillId]) {
+      return false;
+    }
+
+    if (activeFieldMoveId === skillId) {
+      return true;
+    }
+
+    activeFieldMoveId = skillId;
+    syncSkillsUi();
+
+    if (notify) {
+      uiRuntime?.pushNotice(`${PLAYER_SKILL_DEFS[skillId].label} selected.`);
+    }
+
+    return true;
+  }
+
+  function ensureActiveFieldMove() {
+    if (activeFieldMoveId && playerSkills[activeFieldMoveId]) {
+      return;
+    }
+
+    activeFieldMoveId = getUnlockedFieldMoveIds()[0] || null;
+    syncSkillsUi();
+  }
+
+  function cycleActiveFieldMove(direction = 1) {
+    const unlockedFieldMoveIds = getUnlockedFieldMoveIds();
+
+    if (unlockedFieldMoveIds.length === 0) {
+      return;
+    }
+
+    if (unlockedFieldMoveIds.length === 1) {
+      setActiveFieldMove(unlockedFieldMoveIds[0], { notify: true });
+      return;
+    }
+
+    const currentIndex = Math.max(0, unlockedFieldMoveIds.indexOf(activeFieldMoveId));
+    const step = direction < 0 ? -1 : 1;
+    const nextIndex =
+      (currentIndex + step + unlockedFieldMoveIds.length) % unlockedFieldMoveIds.length;
+
+    setActiveFieldMove(unlockedFieldMoveIds[nextIndex], { notify: true });
+  }
+
   function unlockPlayerSkill(skillId, { silent = false } = {}) {
     if (!PLAYER_SKILL_DEFS[skillId] || playerSkills[skillId]) {
       return;
     }
 
     playerSkills[skillId] = true;
-    uiRuntime.syncSkillsUi(playerSkills);
+    if (ACTIVE_FIELD_MOVE_ORDER.includes(skillId)) {
+      activeFieldMoveId = skillId;
+    } else {
+      ensureActiveFieldMove();
+    }
+    syncSkillsUi();
     if (!silent) {
       questSystem.emit({
         type: QUEST_EVENT.UNLOCK,
@@ -523,6 +1034,16 @@ export function createApplicationRuntime({
       sceneFlowRuntime?.actTwoTutorial.notifyPokedexClosed();
     }
   });
+  storyBeats = createStoryBeatSystem({
+    dialogueSystem,
+    gameplayDialogue: uiRuntime.gameplayDialogue,
+    storyState,
+    questSystem,
+    pokedexRuntime: uiRuntime.pokedexRuntime,
+    trackFieldTask,
+    unlockPlayerSkill,
+    pushNotice: uiRuntime.pushNotice
+  });
 
   const {
     findNearbyActionTarget,
@@ -540,8 +1061,7 @@ export function createApplicationRuntime({
 
       if (targetId === "tangrowth" && dialogueId === "onboarding") {
         const openOnboardingConversation = () => {
-          return uiRuntime.gameplayDialogue.openConversation({
-            lines: dialogueSystem.getConversation("chopperOnboarding") || TANGROWTH_ONBOARDING_DIALOGUE,
+          return storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_ONBOARDING, {
             onLineChange(line) {
               if (line?.id !== "notice-squirtle-sound") {
                 return;
@@ -601,22 +1121,38 @@ export function createApplicationRuntime({
       }
 
       if (targetId === "tangrowth" && dialogueId === "tallGrassReturn") {
-        return uiRuntime.gameplayDialogue.openConversation({
-          lines: dialogueSystem.getConversation("chopperTallGrassReturn") || TANGROWTH_TALL_GRASS_RETURN_DIALOGUE,
-          onComplete: restoreCameraOnComplete
+        return storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_TALL_GRASS_RETURN, {
+          onComplete: () => {
+            dialogueCamera.restoreGameplayCamera();
+          }
         });
       }
 
       if (targetId === "tangrowth" && dialogueId === "firstHabitatReport") {
-        return uiRuntime.gameplayDialogue.openConversation({
-          lines: dialogueSystem.getConversation("chopperFirstHabitatReport"),
-          onComplete: restoreCameraOnComplete
+        return storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_FIRST_HABITAT_REPORT, {
+          onComplete: () => {
+            dialogueCamera.restoreGameplayCamera();
+          }
+        });
+      }
+
+      if (targetId === "tangrowth" && dialogueId === "logChairGift") {
+        return storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_LOG_CHAIR_GIFT, {
+          onBeforeCompleteEffects: () => {
+            addItems(inventory, { [LOG_CHAIR_ITEM_ID]: 1 });
+            uiRuntime.syncInventoryUi(inventory);
+            uiRuntime.bagUiRuntime.handleItemCollected(LOG_CHAIR_ITEM_ID, storyState);
+            syncQuestPanels();
+          },
+          onComplete: () => {
+            dialogueCamera.restoreGameplayCamera();
+            syncQuestPanels();
+          }
         });
       }
 
       if (targetId === "squirtle" && dialogueId === "discovery") {
-        return uiRuntime.gameplayDialogue.openConversation({
-          lines: dialogueSystem.getConversation("strandedHelperDiscovery") || SQUIRTLE_DISCOVERY_DIALOGUE,
+        return storyBeats.playDialogue(STORY_BEAT_IDS.SQUIRTLE_DISCOVERY, {
           onComplete: restoreCameraOnComplete
         });
       }
@@ -661,9 +1197,7 @@ export function createApplicationRuntime({
       uiRuntime.syncQuestFocus(storyState);
     },
     onFlowersRecovered() {
-      uiRuntime.gameplayDialogue.openConversation({
-        lines: dialogueSystem.getConversation("chopperFlowerRecovery") || TANGROWTH_FLOWER_RECOVERY_DIALOGUE
-      });
+      storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_FLOWER_RECOVERY);
     },
     onBulbasaurRevealed({ cellId }) {
       const rustlingGrassPatch = gameSession?.groundGrassPatches?.find((groundGrassPatch) => {
@@ -691,17 +1225,449 @@ export function createApplicationRuntime({
       encounter.originPosition = originPosition;
       encounter.landingPosition = landingPosition;
       encounter.position = [...originPosition];
-      uiRuntime.gameplayDialogue.openConversation({
-        lines: dialogueSystem.getConversation("leafHelperHabitat") || BULBASAUR_HABITAT_DISCOVERY_DIALOGUE,
+
+      const openChopperEncouragement = () => {
+        const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+        const chopperPosition = getChopperNpcPosition();
+
+        if (playerPosition && chopperPosition) {
+          gameSession?.chopperNpcActor?.npcActor?.character?.faceToward?.(playerPosition);
+          if (gameSession?.chopperNpcActor?.npcActor) {
+            gameSession.chopperNpcActor.npcActor.faceYaw = getYawToward(chopperPosition, playerPosition);
+          }
+          dialogueCamera?.focusNpcConversation({
+            targetId: "tangrowth",
+            playerPosition,
+            npcActors: gameSession?.npcActors || [],
+            interactables: gameSession?.interactables || []
+          });
+        }
+
+        storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_BULBASAUR_ENCOURAGEMENT, {
+          onBeforeCompleteEffects: () => {
+            dialogueCamera?.restoreGameplayCamera();
+          }
+        });
+      };
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_HABITAT_DISCOVERY, {
+        onComplete: openChopperEncouragement
+      });
+    },
+    onBulbasaurDryGrassMissionAccepted() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_DRY_GRASS_REQUEST);
+    },
+    onBulbasaurDryGrassRequestCompleted() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_LEAFAGE_REWARD);
+    },
+    onBulbasaurStrawBedRecipeRequested() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_STRAW_BED_RECIPE, {
+        onBeforeCompleteEffects: () => {
+          if (!hasItems(inventory, { [STRAW_BED_RECIPE_ITEM_ID]: 1 })) {
+            addItems(inventory, { [STRAW_BED_RECIPE_ITEM_ID]: 1 });
+          }
+          uiRuntime.syncInventoryUi(inventory);
+          uiRuntime.bagUiRuntime.handleItemCollected(STRAW_BED_RECIPE_ITEM_ID, storyState);
+          syncQuestPanels();
+        },
+        onComplete: syncQuestPanels
+      });
+    },
+    onCharmanderRevealed({ cellId }) {
+      const rustlingGrassPatch = gameSession?.groundGrassPatches?.find((groundGrassPatch) => {
+        return groundGrassPatch.cellId === cellId;
+      });
+      const encounter = gameSession?.charmanderEncounter;
+
+      if (rustlingGrassPatch && encounter) {
+        encounter.visible = true;
+        encounter.position = [
+          rustlingGrassPatch.position[0] + 0.72,
+          rustlingGrassPatch.position[1] + 0.02,
+          rustlingGrassPatch.position[2] - 0.18
+        ];
+        encounter.targetPosition = [...encounter.position];
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.CHARMANDER_DISCOVERY, {
+        onComplete: syncQuestPanels
+      });
+    },
+    onTimburrRevealed({ cellId }) {
+      const rustlingGrassPatch = gameSession?.groundGrassPatches?.find((groundGrassPatch) => {
+        return groundGrassPatch.cellId === cellId;
+      });
+      const encounter = gameSession?.timburrEncounter;
+
+      if (rustlingGrassPatch && encounter) {
+        encounter.visible = true;
+        encounter.position = [
+          rustlingGrassPatch.position[0] + 0.58,
+          rustlingGrassPatch.position[1] + 0.02,
+          rustlingGrassPatch.position[2] - 0.28
+        ];
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.TIMBURR_DISCOVERY, {
+        onComplete: syncQuestPanels
+      });
+    },
+    onLeppaBerryGiftRequested({ targetId = "bulbasaur" } = {}) {
+      if (!hasItems(inventory, { [LEPPA_BERRY_ITEM_ID]: 1 })) {
+        uiRuntime.pushNotice("You need a Leppa Berry to show them.");
+        return;
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.LEPPA_BERRY_DELIVERY, {
+        context: {
+          targetId
+        },
+        onBeforeCompleteEffects: () => {
+          consumeItems(inventory, { [LEPPA_BERRY_ITEM_ID]: 1 });
+          uiRuntime.syncInventoryUi(inventory);
+          syncQuestPanels();
+        },
+        onComplete: syncQuestPanels
+      });
+    },
+    onChopperLogChairGiftRequested() {
+      addItems(inventory, { [LOG_CHAIR_ITEM_ID]: 1 });
+      storyState.flags.logChairReceived = true;
+      uiRuntime.syncInventoryUi(inventory);
+      uiRuntime.bagUiRuntime.handleItemCollected(LOG_CHAIR_ITEM_ID, storyState);
+      uiRuntime.pushNotice("You got a Log Chair.");
+      syncQuestPanels();
+    },
+    onTangrowthHouseTalkRequested() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.TANGROWTH_HOUSE_BUILDING_TALK, {
         onComplete: () => {
-          questSystem.emit({
-            type: QUEST_EVENT.TALK,
-            targetId: "leaf-helper"
-          });
-          uiRuntime.pokedexRuntime.setOpen(true, {
-            markSeen: true,
-            entryId: BULBASAUR_POKEDEX_ENTRY_ID
-          });
+          dialogueCamera.restoreGameplayCamera();
+          syncQuestPanels();
+        }
+      });
+    },
+    onLeafDenKitPlacementRequested({ playerPosition }) {
+      if (!hasItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 })) {
+        uiRuntime.pushNotice("You need a Leaf Den Kit before you can place it.");
+        return;
+      }
+
+      gameSession.leafDen = buildLeafDenKitPlacement(playerPosition);
+      consumeItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 });
+      storyState.flags.leafDenKitPlaced = true;
+      storyState.flags.leafDenKitSelected = false;
+      uiRuntime.syncInventoryUi(inventory);
+      uiRuntime.pushNotice("You placed the Leaf Den Kit.");
+      syncQuestPanels();
+    },
+    onLeafDenConstructionRequested() {
+      if (!storyState.flags.leafDenKitPlaced || !gameSession?.leafDen) {
+        uiRuntime.pushNotice("Place the Leaf Den Kit first.");
+        return;
+      }
+
+      if (storyState.flags.leafDenConstructionStarted) {
+        if (completeLeafDenConstructionIfReady()) {
+          return;
+        }
+
+        uiRuntime.pushNotice("Leaf Den construction is still underway.");
+        syncQuestPanels();
+        return;
+      }
+
+      if (!hasItems(inventory, LEAF_DEN_BUILD_REQUIREMENTS)) {
+        uiRuntime.pushNotice(`Missing: ${formatRequirementSummary(LEAF_DEN_BUILD_REQUIREMENTS, inventory)}`);
+        syncQuestPanels();
+        return;
+      }
+
+      const helperStatus = getLeafDenHelperStatus();
+      if (!helperStatus.timburrReady || !helperStatus.otherReady) {
+        uiRuntime.pushNotice("Call Timburr and Charmander with D-Pad Up or Arrow Up, then lead them to the Leaf Den Kit.");
+        syncQuestPanels();
+        return;
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.LEAF_DEN_CONSTRUCTION_STARTED, {
+        onBeforeCompleteEffects: () => {
+          const now = getLeafDenConstructionNow();
+          consumeItems(inventory, LEAF_DEN_BUILD_REQUIREMENTS);
+          storyState.flags.leafDenConstructionStartedAt = now;
+          storyState.flags.leafDenConstructionCompletesAt = now + LEAF_DEN_BUILD_DURATION_MS;
+          storyState.flags.timburrFollowing = false;
+          storyState.flags.charmanderFollowing = false;
+          uiRuntime.syncInventoryUi(inventory);
+          syncQuestPanels();
+        },
+        onComplete: syncQuestPanels
+      });
+    },
+    onLeafDenEnterRequested() {
+      if (!storyState.flags.leafDenBuilt) {
+        uiRuntime.pushNotice("The Leaf Den is not ready yet.");
+        return;
+      }
+
+      storyState.flags.leafDenInteriorEntered = true;
+      uiRuntime.pushNotice("You entered the Leaf Den.");
+      syncQuestPanels();
+    },
+    onLeafDenFurniturePlacementRequested() {
+      if (!storyState.flags.leafDenInteriorEntered) {
+        uiRuntime.pushNotice("Enter the Leaf Den first.");
+        return;
+      }
+
+      const current = Math.min(3, Number(storyState.flags.leafDenFurniturePlacedCount || 0));
+      if (current >= 3) {
+        uiRuntime.pushNotice("The Leaf Den already has enough furniture. Talk to Timburr.");
+        return;
+      }
+
+      gameSession.leafDenFurniture ||= [];
+      gameSession.leafDenFurniture.push(buildLeafDenFurniturePlacement(current));
+      storyState.flags.leafDenFurniturePlacedCount = current + 1;
+      uiRuntime.pushNotice(
+        storyState.flags.leafDenFurniturePlacedCount >= 3 ?
+          "All furniture is placed. Talk to Timburr." :
+          `Furniture placed inside the Leaf Den. ${storyState.flags.leafDenFurniturePlacedCount}/3.`
+      );
+      syncQuestPanels();
+    },
+    onTimburrLeafDenFurnitureCompleteRequested() {
+      if (Number(storyState.flags.leafDenFurniturePlacedCount || 0) < 3) {
+        uiRuntime.pushNotice("Place 3 furniture pieces inside the Leaf Den first.");
+        return;
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.TIMBURR_LEAF_DEN_FURNITURE_COMPLETE, {
+        onComplete: syncQuestPanels
+      });
+    },
+    onCharmanderCelebrationSuggested() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.CHARMANDER_CELEBRATION_SUGGESTION, {
+        onComplete: syncQuestPanels
+      });
+    },
+    onCharmanderCelebrationTangrowthRequested() {
+      if (!storyState.flags.charmanderCelebrationSuggested) {
+        uiRuntime.pushNotice("Talk to Charmander about the celebration first.");
+        dialogueCamera.restoreGameplayCamera();
+        return;
+      }
+
+      if (!isCharmanderNearTangrowthForCelebration()) {
+        uiRuntime.pushNotice("Bring Charmander closer to Professor Tangrowth first.");
+        dialogueCamera.restoreGameplayCamera();
+        syncQuestPanels();
+        return;
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.CHARMANDER_CELEBRATION_CUTSCENE, {
+        onBeforeCompleteEffects: () => {
+          if (!storyState.flags.dittoFlagReceived && !hasItems(inventory, { [DITTO_FLAG_ITEM_ID]: 1 })) {
+            addItems(inventory, { [DITTO_FLAG_ITEM_ID]: 1 });
+          }
+          storyState.flags.charmanderFollowing = false;
+          uiRuntime.syncInventoryUi(inventory);
+          uiRuntime.bagUiRuntime.handleItemCollected(DITTO_FLAG_ITEM_ID, storyState);
+          syncQuestPanels();
+        },
+        onComplete: () => {
+          dialogueCamera.restoreGameplayCamera();
+          syncQuestPanels();
+        }
+      });
+    },
+    onDittoFlagPlacementRequested() {
+      if (!storyState.flags.dittoFlagSelectedForHouse) {
+        uiRuntime.pushNotice("Open the bag with X and select the Ditto Flag first.");
+        return;
+      }
+
+      if (!storyState.flags.leafDenBuilt || !gameSession?.leafDen) {
+        uiRuntime.pushNotice("The Leaf Den needs to be complete before you can mark it.");
+        return;
+      }
+
+      if (!hasItems(inventory, { [DITTO_FLAG_ITEM_ID]: 1 })) {
+        uiRuntime.pushNotice("You need a Ditto Flag in your bag.");
+        return;
+      }
+
+      gameSession.dittoFlag = buildDittoFlagPlacement();
+      consumeItems(inventory, { [DITTO_FLAG_ITEM_ID]: 1 });
+      storyState.flags.dittoFlagSelectedForHouse = false;
+      uiRuntime.syncInventoryUi(inventory);
+      storyBeats.complete(STORY_BEAT_IDS.DITTO_FLAG_PLACED_ON_HOUSE);
+      syncQuestPanels();
+    },
+    onLogChairPlacementRequested({ playerPosition }) {
+      if (!hasItems(inventory, { [LOG_CHAIR_ITEM_ID]: 1 })) {
+        uiRuntime.pushNotice("You need a Log Chair before you can place it.");
+        return;
+      }
+
+      gameSession.logChair = buildLogChairPlacement(playerPosition);
+      consumeItems(inventory, { [LOG_CHAIR_ITEM_ID]: 1 });
+      storyState.flags.logChairPlaced = true;
+      uiRuntime.syncInventoryUi(inventory);
+      uiRuntime.pushNotice("You placed the Log Chair.");
+      syncQuestPanels();
+    },
+    onLogChairSitRequested() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.LOG_CHAIR_REST, {
+        onComplete: syncQuestPanels
+      });
+    },
+    onWorkbenchRecipesRequested() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.WORKBENCH_DIY_RECIPES, {
+        onBeforeCompleteEffects: () => {
+          if (!hasItems(inventory, { [SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID]: 1 })) {
+            addItems(inventory, { [SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID]: 1 });
+          }
+          uiRuntime.syncInventoryUi(inventory);
+          uiRuntime.bagUiRuntime.handleItemCollected(SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID, storyState);
+          syncQuestPanels();
+        },
+        onComplete: syncQuestPanels
+      });
+    },
+    onCampfireCrafted() {
+      uiRuntime.bagUiRuntime.handleItemCollected(CAMPFIRE_ITEM_ID, storyState);
+      storyBeats.complete(STORY_BEAT_IDS.CAMPFIRE_CREATED);
+      syncQuestPanels();
+    },
+    onStrawBedCrafted() {
+      uiRuntime.bagUiRuntime.handleItemCollected(STRAW_BED_ITEM_ID, storyState);
+      storyBeats.complete(STORY_BEAT_IDS.STRAW_BED_CREATED);
+      syncQuestPanels();
+    },
+    onStrawBedPlacementRequested({ placementTarget }) {
+      if (!hasItems(inventory, { [STRAW_BED_ITEM_ID]: 1 })) {
+        uiRuntime.pushNotice("You need a Straw Bed in your bag.");
+        return;
+      }
+
+      if (!placementTarget?.center) {
+        uiRuntime.pushNotice("Move closer to Bulbasaur's restored tall grass habitat.");
+        return;
+      }
+
+      gameSession.strawBed = buildStrawBedPlacement(placementTarget.center);
+      consumeItems(inventory, { [STRAW_BED_ITEM_ID]: 1 });
+      storyState.flags.strawBedPlacedInBulbasaurHabitat = true;
+      uiRuntime.syncInventoryUi(inventory);
+      uiRuntime.pushNotice("You placed the Straw Bed in Bulbasaur's habitat.");
+      syncQuestPanels();
+    },
+    onBulbasaurStrawBedRequestCompleted() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_STRAW_BED_REQUEST_COMPLETE, {
+        onComplete: syncQuestPanels
+      });
+    },
+    onCampfireSpitOutRequested() {
+      if (!storyState.flags.campfireSelectedForTangrowth) {
+        uiRuntime.pushNotice("Open the bag with X and select the Campfire first.");
+        return;
+      }
+
+      if (!hasItems(inventory, { [CAMPFIRE_ITEM_ID]: 1 })) {
+        uiRuntime.pushNotice("You need a Campfire in your bag.");
+        return;
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.CAMPFIRE_SPIT_OUT, {
+        onBeforeCompleteEffects: () => {
+          const playerPosition = gameSession?.playerCharacter?.getPosition?.() || getChopperNpcPosition();
+          gameSession.campfire = buildCampfirePlacement(playerPosition);
+          consumeItems(inventory, { [CAMPFIRE_ITEM_ID]: 1 });
+          uiRuntime.syncInventoryUi(inventory);
+          syncQuestPanels();
+        },
+        onComplete: syncQuestPanels
+      });
+    },
+    onRuinedPokemonCenterInspectRequested() {
+      storyBeats.playDialogue(STORY_BEAT_IDS.RUINED_POKEMON_CENTER_INSPECTED, {
+        onComplete: () => {
+          dialogueCamera.restoreGameplayCamera();
+          syncQuestPanels();
+        }
+      });
+    },
+    onPokemonCenterPcCheckRequested() {
+      if (
+        storyState.flags.challengesUnlocked &&
+        storyState.flags.boulderChallengeRewardReady &&
+        !storyState.flags.boulderChallengeRewardClaimed
+      ) {
+        storyBeats.playDialogue(STORY_BEAT_IDS.BOULDER_CHALLENGE_REWARD, {
+          onBeforeCompleteEffects: () => {
+            addItems(inventory, { [LIFE_COINS_ITEM_ID]: 10 });
+            uiRuntime.syncInventoryUi(inventory);
+            uiRuntime.bagUiRuntime.handleItemCollected(LIFE_COINS_ITEM_ID, storyState);
+            syncQuestPanels();
+          },
+          onComplete: () => {
+            dialogueCamera.restoreGameplayCamera();
+            syncQuestPanels();
+          }
+        });
+        return;
+      }
+
+      if (
+        storyState.flags.newPcChallengesAvailable &&
+        !storyState.flags.newPcChallengesChecked
+      ) {
+        storyBeats.playDialogue(STORY_BEAT_IDS.NEW_PC_CHALLENGES, {
+          onComplete: () => {
+            dialogueCamera.restoreGameplayCamera();
+            syncQuestPanels();
+          }
+        });
+        return;
+      }
+
+      if (
+        storyState.flags.leafDenKitPurchaseAvailable &&
+        !storyState.flags.leafDenKitPurchased
+      ) {
+        if (!hasItems(inventory, { [LIFE_COINS_ITEM_ID]: LEAF_DEN_KIT_LIFE_COIN_COST })) {
+          uiRuntime.pushNotice(`You need ${LEAF_DEN_KIT_LIFE_COIN_COST} ${getItemLabel(LIFE_COINS_ITEM_ID)} to purchase the Leaf Den Kit.`);
+          dialogueCamera.restoreGameplayCamera();
+          syncQuestPanels();
+          return;
+        }
+
+        storyBeats.playDialogue(STORY_BEAT_IDS.LEAF_DEN_KIT_PURCHASED, {
+          onBeforeCompleteEffects: () => {
+            consumeItems(inventory, { [LIFE_COINS_ITEM_ID]: LEAF_DEN_KIT_LIFE_COIN_COST });
+            addItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 });
+            uiRuntime.syncInventoryUi(inventory);
+            uiRuntime.bagUiRuntime.handleItemCollected(LEAF_DEN_KIT_ITEM_ID, storyState);
+            syncQuestPanels();
+          },
+          onComplete: () => {
+            dialogueCamera.restoreGameplayCamera();
+            syncQuestPanels();
+          }
+        });
+        return;
+      }
+
+      if (storyState.flags.challengesUnlocked) {
+        uiRuntime.pushNotice("No completed Challenges to claim right now.");
+        dialogueCamera.restoreGameplayCamera();
+        return;
+      }
+
+      storyBeats.playDialogue(STORY_BEAT_IDS.CHALLENGES_UNLOCKED, {
+        onComplete: () => {
+          dialogueCamera.restoreGameplayCamera();
+          syncQuestPanels();
         }
       });
     },
@@ -710,6 +1676,17 @@ export function createApplicationRuntime({
     },
     questSystem,
     habitatSystem,
+    onTallGrassHabitatRestored({
+      groundCell = null,
+      restoredGrassHabitat = null,
+      newlyDiscoveredHabitats = []
+    } = {}) {
+      playTallGrassMemorySequence({
+        groundCell,
+        restoredGrassHabitat,
+        newlyDiscoveredHabitats
+      });
+    },
     onNaturePatchRevived({ patch, type }) {
       if (!gameSession?.natureRevivalEffects || !patch) {
         return;
@@ -733,6 +1710,7 @@ export function createApplicationRuntime({
     reviveGroundFlower,
     reviveGroundGrass,
     strikeNearbyPalm,
+    waterNearbyPalm,
     syncInventoryUi: uiRuntime.syncInventoryUi,
     pushNotice: uiRuntime.pushNotice
   });
@@ -776,7 +1754,15 @@ export function createApplicationRuntime({
       interactRequested = true;
     },
     requestPauseToggle: toggleGamePaused,
-    inspectBag: uiRuntime.inspectBag,
+    requestPokedexOpen: () => {
+      uiRuntime.pokedexRuntime.setOpen(true);
+    },
+    requestFollowerCall: () => {
+      followerCallRequested = true;
+    },
+    requestMoveCycle: cycleActiveFieldMove,
+    shouldBagButtonInteract: shouldBagButtonInteractWithNearbyCharacter,
+    inspectBag,
     windowRef
   });
 
@@ -834,6 +1820,7 @@ export function createApplicationRuntime({
         isSkillLearnActive: () => uiRuntime.skillLearnOverlay.isActive(),
         isScriptedInteractionActive: () => scriptedInteractionActive,
         isPrimaryActionActive: gameInput.isPrimaryActionActive,
+        getActiveMoveId: () => activeFieldMoveId,
         inventory,
         playerSkills,
         storyState,
@@ -841,6 +1828,7 @@ export function createApplicationRuntime({
         clearPendingActions() {
           harvestRequested = false;
           interactRequested = false;
+          followerCallRequested = false;
         },
         clearMovementInput() {
           pressedKeys.clear();
@@ -863,12 +1851,48 @@ export function createApplicationRuntime({
           interactRequested = false;
           return true;
         },
+        consumeFollowerCallRequest() {
+          if (!followerCallRequested) {
+            return false;
+          }
+
+          followerCallRequested = false;
+          return true;
+        },
+        onCharmanderCampfireLit() {
+          storyBeats.playDialogue(STORY_BEAT_IDS.CHARMANDER_CAMPFIRE_LIT, {
+            onComplete: () => {
+              startRuinedPokemonCenterGuide();
+              syncQuestPanels();
+            }
+          });
+        },
         consumeCameraZoomCycleRequest: gameInput.consumeCameraZoomCycleRequest
       },
       cameraOrbit: engine.cameraOrbitConfig,
       cameraZoomPresets: ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS,
       gameplay: {
         buildNearbyPrompt,
+        collectLeppaBerryDrops(playerPosition, leppaBerryDrops, inventoryState) {
+          const collectedLeppaBerryCount = collectLeppaBerryDropItems(
+            playerPosition,
+            leppaBerryDrops,
+            inventoryState,
+            storyState
+          );
+
+          if (collectedLeppaBerryCount > 0) {
+            uiRuntime.bagUiRuntime.handleItemCollected(LEPPA_BERRY_ITEM_ID, storyState);
+            questSystem.emit({
+              type: QUEST_EVENT.COLLECT,
+              targetId: LEPPA_BERRY_ITEM_ID,
+              amount: collectedLeppaBerryCount
+            });
+            syncQuestPanels();
+          }
+
+          return collectedLeppaBerryCount;
+        },
         collectWoodDrops(playerPosition, woodDrops, inventoryState) {
           const collectedWoodCount = collectWoodDrops(playerPosition, woodDrops, inventoryState);
 
@@ -879,6 +1903,7 @@ export function createApplicationRuntime({
               targetId: "wood",
               amount: collectedWoodCount
             });
+            recordBulbasaurSturdyStickChallengeProgress(collectedWoodCount);
           }
 
           return collectedWoodCount;
@@ -897,6 +1922,7 @@ export function createApplicationRuntime({
           return questSystem.emit(event);
         },
         tangrowthOpeningLine: TANGROWTH_OPENING_LINE,
+        syncLeppaTreeState,
         updatePalmShake,
         updateResourceNodes
       },

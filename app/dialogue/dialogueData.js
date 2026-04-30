@@ -50,6 +50,21 @@ export const SMALL_ISLAND_DIALOGUES = Object.freeze({
       }
     ]
   },
+  chopperTallGrassHabitatRestored: {
+    id: "chopperTallGrassHabitatRestored",
+    speakerId: "chopper",
+    lines: [
+      {
+        text: "Ohh, this brings back memories!"
+      },
+      {
+        text: "Back in the day, there was tall grass like this all over the place around here!"
+      },
+      {
+        text: "Seeing such fresh, green tall grass makes me feel like Pokemon might return at any moment..."
+      }
+    ]
+  },
   chopperFlowerRecovery: {
     id: "chopperFlowerRecovery",
     speakerId: "chopper",
@@ -62,18 +77,58 @@ export const SMALL_ISLAND_DIALOGUES = Object.freeze({
       }
     ]
   },
-  leafHelperHabitat: {
-    id: "leafHelperHabitat",
-    speakerId: "leaf-helper",
+  chopperBulbasaurEncouragement: {
+    id: "chopperBulbasaurEncouragement",
+    speakerId: "chopper",
     lines: [
       {
-        text: "Yeehp, nice to meet you!"
+        text: "Seems like you're doing a great job, if you want something, just ask me"
+      }
+    ]
+  },
+  leafHelperHabitat: {
+    id: "leafHelperHabitat",
+    speakerId: "bulbasaur",
+    lines: [
+      {
+        text: "Yippee! Nice to meet you! This plot of tall grass is kinda small, but I like it!"
       },
       {
-        text: "This grass is small, but it smells like a home trying to happen."
+        text: "I love leaves and grass and stuff. And living by lotsa green things!"
+      }
+    ]
+  },
+  bulbasaurDryGrassRequest: {
+    id: "bulbasaurDryGrassRequest",
+    speakerId: "bulbasaur",
+    lines: [
+      {
+        text: "The ground here is too dry, and the grass is all wilty, and... And it's nothing like where I lived before!"
       },
       {
-        text: "Bring more green things together and I bet more helpers will visit."
+        text: "Can you help? Would you water the dry tall grass? Please?"
+      },
+      {
+        text: "If you do that, I'll teach you something really neat"
+      }
+    ]
+  },
+  bulbasaurLeafageReward: {
+    id: "bulbasaurLeafageReward",
+    speakerId: "bulbasaur",
+    lines: [
+      {
+        text: "You did it! The tall grass feels soft and springy again!"
+      },
+      {
+        text: "A promise is a promise. Watch closely, okay?"
+      },
+      {
+        text: "This is Leafage! Use it to grow tall grass one square at a time."
+      },
+      {
+        speakerId: "",
+        text: "You learned Leafage."
       }
     ]
   },
