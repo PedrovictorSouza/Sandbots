@@ -1,8 +1,10 @@
 import {
   INTRO_ROOM_CAMERA_POSE,
   INTRO_ROOM_CHOPPER_ACTOR,
+  INTRO_ROOM_CORRUPTION_FOCUS_POINT,
   INTRO_ROOM_ENTRY_DELAY,
-  INTRO_ROOM_ENTRY_KEYFRAMES
+  INTRO_ROOM_ENTRY_KEYFRAMES,
+  INTRO_ROOM_FLOOR_INSTANCES
 } from "./introRoomConfig.js";
 
 const INTRO_ROOM_ENTRY_DURATION = INTRO_ROOM_ENTRY_KEYFRAMES.at(-1)?.time || 0;
@@ -33,6 +35,11 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function smoothstep(edge0, edge1, value) {
+  const amount = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return amount * amount * (3 - 2 * amount);
+}
+
 function catmullRom(previous, current, next, following, amount) {
   const t = clamp(amount, 0, 1);
   const t2 = t * t;
@@ -59,6 +66,34 @@ function createEntrySegments(keyframes) {
     index,
     distance: Math.max(0.001, getVectorDistance(keyframe.position, keyframes[index + 1].position))
   }));
+}
+
+function cloneSceneInstance(instance) {
+  return {
+    ...instance,
+    offset: [...instance.offset]
+  };
+}
+
+function isIntroRestoredFloorInstance(instance) {
+  return Math.abs(instance.offset?.[0] || 0) < 0.001 &&
+    Math.abs(instance.offset?.[2] || 0) < 0.001;
+}
+
+function normalizeAngle(angle) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function getYawToward(fromPosition, toPosition) {
+  const deltaX = toPosition[0] - fromPosition[0];
+  const deltaZ = toPosition[2] - fromPosition[2];
+  return Math.atan2(deltaX, deltaZ);
+}
+
+function getIntroConcernWeight(elapsed) {
+  const leanIn = smoothstep(0.2, 1.1, elapsed);
+  const leanOut = 1 - smoothstep(3.2, 4.3, elapsed);
+  return leanIn * leanOut;
 }
 
 function interpolateVector(keyframes, index, amount, field) {
@@ -171,6 +206,12 @@ export function buildIntroRoomScene(assets) {
     localYaw: 0,
     localPivot: [0.125, 2, 0]
   };
+  const introDeadFloorInstances = INTRO_ROOM_FLOOR_INSTANCES
+    .filter((instance) => !isIntroRestoredFloorInstance(instance))
+    .map(cloneSceneInstance);
+  const introRestoredFloorInstances = INTRO_ROOM_FLOOR_INSTANCES
+    .filter(isIntroRestoredFloorInstance)
+    .map(cloneSceneInstance);
   const sceneObjects = [
      {
       model: assets.chopperBodyModel,
@@ -183,11 +224,29 @@ export function buildIntroRoomScene(assets) {
       brightness: 1
     }
   ];
+
+  if (assets.groundDeadModel && introDeadFloorInstances.length) {
+    sceneObjects.push({
+      model: assets.groundDeadModel,
+      instances: introDeadFloorInstances,
+      brightness: 0.5
+    });
+  }
+
+  if (assets.groundPurifiedModel && introRestoredFloorInstances.length) {
+    sceneObjects.push({
+      model: assets.groundPurifiedModel,
+      instances: introRestoredFloorInstances,
+      brightness: 0.86
+    });
+  }
+
   let active = false;
   let debugControlsActive = false;
   const animationState = {
     startedAt: 0,
-    complete: false
+    complete: false,
+    completedAt: 0
   };
   const propellerState = {
     angle: 0,
@@ -272,6 +331,7 @@ export function buildIntroRoomScene(assets) {
       debugControlsActive = false;
       animationState.startedAt = getTimeSeconds();
       animationState.complete = false;
+      animationState.completedAt = 0;
       const firstPose = INTRO_ROOM_ENTRY_KEYFRAMES[0];
       chopperIntroActor.position = [...firstPose.position];
       chopperIntroActor.rotation = { ...firstPose.rotation };
@@ -302,6 +362,9 @@ export function buildIntroRoomScene(assets) {
 
         applyChopperPose(entryPose);
         animationState.complete = elapsed >= INTRO_ROOM_ENTRY_TOTAL_DURATION;
+        if (animationState.complete && animationState.completedAt === 0) {
+          animationState.completedAt = time;
+        }
 
         if (!animationState.complete) {
           return;
@@ -309,13 +372,33 @@ export function buildIntroRoomScene(assets) {
       }
 
       const idleTime = time + deltaTime;
+      const concernWeight = debugControlsActive || animationState.completedAt === 0 ?
+        0 :
+        getIntroConcernWeight(time - animationState.completedAt);
+      const corruptionYaw = getYawToward(
+        chopperIntroActor.position,
+        INTRO_ROOM_CORRUPTION_FOCUS_POINT
+      );
+      const concernYaw = normalizeAngle(
+        corruptionYaw - chopperIntroActor.rotation.yaw
+      ) * concernWeight;
       const idleYaw = debugControlsActive ? 0 : Math.sin(idleTime * 1.55) * 0.035;
-      const idleRoll = debugControlsActive ? 0 : Math.sin(idleTime * 1.35 + 0.8) * 0.045;
+      const idlePitch = debugControlsActive ? 0 : -0.09 * concernWeight;
+      const idleRoll = debugControlsActive ?
+        0 :
+        Math.sin(idleTime * 1.35 + 0.8) * 0.045 - 0.075 * concernWeight;
       const idleXOffset = debugControlsActive ? 0 : Math.sin(idleTime * 1.25) * 0.08;
       const idleYOffset = debugControlsActive ? 0 : Math.sin(idleTime * 2.1) * 0.055;
       const idleZOffset = debugControlsActive ? 0 : Math.cos(idleTime * 1.15) * 0.025;
 
-      syncChopperInstance({ idleYaw, idleRoll, idleXOffset, idleYOffset, idleZOffset });
+      syncChopperInstance({
+        idleYaw: idleYaw + concernYaw,
+        idlePitch,
+        idleRoll,
+        idleXOffset,
+        idleYOffset,
+        idleZOffset
+      });
     },
 
     getRenderSnapshot({ camera, worldCanvas }) {

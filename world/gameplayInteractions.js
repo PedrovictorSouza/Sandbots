@@ -1137,6 +1137,11 @@ export function createGameplayInteractions({
 
     if (target.kind === "bulbasaurMission") {
       storyState.flags.bulbasaurDryGrassMissionAccepted = true;
+      if (
+        (storyState.flags.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
+      ) {
+        storyState.flags.bulbasaurDryGrassMissionComplete = true;
+      }
       onBulbasaurDryGrassMissionAccepted();
       return true;
     }

@@ -116,6 +116,40 @@ describe("findNearbyInteractable", () => {
     });
   });
 
+  it("still detects Bulbasaur mission interaction if enough grass was watered before accepting it", () => {
+    const result = findNearbyInteractable(
+      [8.1, 0, -3.9],
+      [],
+      [],
+      {
+        flags: {
+          bulbasaurRevealed: true,
+          bulbasaurDryGrassMissionAccepted: false,
+          restoredGrassCount: 10,
+          rustlingGrassCellId: "ground-3-1"
+        }
+      },
+      [
+        {
+          id: "grass-3",
+          cellId: "ground-3-1",
+          position: [8.4, 0.02, -4.2],
+          state: "alive"
+        }
+      ]
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "bulbasaurMission",
+        id: "bulbasaurDryGrassMission",
+        label: "Talk to Bulbasaur",
+        cellId: "ground-3-1"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
   it("detects Bulbasaur request turn-in after 10 grass patches are watered", () => {
     const result = findNearbyInteractable(
       [8.1, 0, -3.9],

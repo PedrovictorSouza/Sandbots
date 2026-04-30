@@ -101,6 +101,68 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="water-dry-tall-grass"');
   });
 
+  it("prioritizes Bulbasaur's request over the background habitat note", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        bulbasaurRevealed: true,
+        restoredGrassCount: 10,
+        trackedTaskIds: ["making-habitats"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+    const bulbasaurIndex = checklistHtml.indexOf("Talk to Bulbasaur");
+    const habitatIndex = checklistHtml.indexOf("Making habitats");
+
+    expect(bulbasaurIndex).toBeGreaterThan(-1);
+    expect(habitatIndex).toBeGreaterThan(-1);
+    expect(bulbasaurIndex).toBeLessThan(habitatIndex);
+    expect(checklistHtml).toContain("he will teach you a new move");
+    expect(logHtml).toContain('data-task-id="bulbasaur-dry-grass-request"');
+    expect(logHtml).toContain("field note");
+  });
+
+  it("shows the Leafage turn-in above old habitat notes after 10 dry grass patches", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "inspect-rustling-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        bulbasaurRevealed: true,
+        bulbasaurDryGrassMissionAccepted: true,
+        bulbasaurDryGrassMissionComplete: true,
+        restoredGrassCount: 10,
+        trackedTaskIds: ["making-habitats", "water-dry-tall-grass"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+    const returnIndex = checklistHtml.indexOf("Return to Bulbasaur");
+    const habitatIndex = checklistHtml.indexOf("Making habitats");
+    const waterIndex = checklistHtml.indexOf("Water dry tall grass");
+
+    expect(returnIndex).toBeGreaterThan(-1);
+    expect(habitatIndex).toBeGreaterThan(-1);
+    expect(waterIndex).toBeGreaterThan(-1);
+    expect(returnIndex).toBeLessThan(habitatIndex);
+    expect(returnIndex).toBeLessThan(waterIndex);
+    expect(checklistHtml).toContain("learn Leafage");
+    expect(logHtml).toContain('data-task-id="bulbasaur-leafage-reward"');
+  });
+
   it("renders the Leppa Berry task with step-specific guidance", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
@@ -122,6 +184,35 @@ describe("createQuestLog", () => {
     expect(checklistHtml).toContain("Give Leppa Berry to Bulbasaur");
     expect(checklistHtml).toContain("Headbutt the revived tree");
     expect(logHtml).toContain('data-task-id="give-leppa-berry"');
+  });
+
+  it("prioritizes current incomplete field tasks over old completed habitat notes", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "grow-a-home-patch");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        makingHabitatsComplete: true,
+        bulbasaurDryGrassMissionComplete: true,
+        squirtleLeppaRequestAvailable: true,
+        trackedTaskIds: ["making-habitats", "water-dry-tall-grass"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const leppaIndex = checklistHtml.indexOf("Give Leppa Berry to Bulbasaur");
+    const habitatIndex = checklistHtml.indexOf("Making habitats");
+    const dryGrassIndex = checklistHtml.indexOf("Water dry tall grass");
+
+    expect(leppaIndex).toBeGreaterThan(-1);
+    expect(habitatIndex).toBeGreaterThan(-1);
+    expect(dryGrassIndex).toBeGreaterThan(-1);
+    expect(leppaIndex).toBeLessThan(habitatIndex);
+    expect(leppaIndex).toBeLessThan(dryGrassIndex);
   });
 
   it("renders Chopper's log chair task with step-specific guidance", () => {

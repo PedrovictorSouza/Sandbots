@@ -12,7 +12,7 @@ function createAssets() {
 }
 
 describe("buildIntroRoomScene", () => {
-  it("uses the real chopper model for the intro actor", () => {
+  it("uses Chopper plus broken/restored floor models for the intro contract", () => {
     const assets = createAssets();
     const scene = buildIntroRoomScene(assets);
     const snapshot = scene.getRenderSnapshot({
@@ -27,8 +27,10 @@ describe("buildIntroRoomScene", () => {
 
     expect(snapshot.sceneObjects.some((sceneObject) => sceneObject.model === assets.chopperBodyModel)).toBe(true);
     expect(snapshot.sceneObjects.some((sceneObject) => sceneObject.model === assets.chopperPropellerModel)).toBe(true);
-    expect(snapshot.sceneObjects.every((sceneObject) => sceneObject.model !== assets.groundDeadModel)).toBe(true);
-    expect(snapshot.sceneObjects.every((sceneObject) => sceneObject.model !== assets.groundPurifiedModel)).toBe(true);
+    expect(snapshot.sceneObjects.some((sceneObject) => sceneObject.model === assets.groundDeadModel)).toBe(true);
+    expect(snapshot.sceneObjects.some((sceneObject) => sceneObject.model === assets.groundPurifiedModel)).toBe(true);
+    expect(snapshot.sceneObjects.find((sceneObject) => sceneObject.model === assets.groundDeadModel).instances).toHaveLength(8);
+    expect(snapshot.sceneObjects.find((sceneObject) => sceneObject.model === assets.groundPurifiedModel).instances).toHaveLength(1);
   });
 
   it("passes yaw, pitch, and roll into the intro chopper instance", () => {

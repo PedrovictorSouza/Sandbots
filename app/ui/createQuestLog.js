@@ -1,4 +1,7 @@
-import { SMALL_ISLAND_FIELD_TASKS } from "../story/storyBeatData.js";
+import {
+  FIELD_TASK_IDS,
+  SMALL_ISLAND_FIELD_TASKS
+} from "../story/storyBeatData.js";
 
 function escapeHtml(value) {
   return String(value)
@@ -75,20 +78,82 @@ function renderObjectiveHintHtml(objective) {
   `;
 }
 
-function getTrackedTasks(storyState = {}) {
-  const taskIds = storyState.flags?.trackedTaskIds;
+function getDerivedTrackedTaskIds(storyState = {}) {
+  const flags = storyState.flags || {};
+  const derivedTaskIds = [];
 
-  if (!Array.isArray(taskIds)) {
-    return [];
+  if (
+    flags.bulbasaurRevealed &&
+    !flags.bulbasaurDryGrassMissionAccepted
+  ) {
+    derivedTaskIds.push(FIELD_TASK_IDS.BULBASAUR_DRY_GRASS_REQUEST);
+  } else if (
+    flags.bulbasaurDryGrassMissionAccepted &&
+    !flags.bulbasaurDryGrassMissionComplete
+  ) {
+    derivedTaskIds.push(FIELD_TASK_IDS.WATER_DRY_TALL_GRASS);
+  } else if (
+    flags.bulbasaurDryGrassMissionAccepted &&
+    flags.bulbasaurDryGrassMissionComplete &&
+    !flags.bulbasaurDryGrassRequestTurnedIn
+  ) {
+    derivedTaskIds.push(FIELD_TASK_IDS.BULBASAUR_LEAFAGE_REWARD);
   }
 
-  return taskIds
-    .map((taskId) => SMALL_ISLAND_FIELD_TASKS[taskId])
-    .filter(Boolean);
+  if (
+    flags.squirtleLeppaRequestAvailable &&
+    !flags.leppaBerryGiftComplete
+  ) {
+    derivedTaskIds.push(FIELD_TASK_IDS.GIVE_LEPPA_BERRY);
+  }
+
+  return derivedTaskIds;
+}
+
+function getTrackedTaskEntries(storyState = {}) {
+  const taskIds = Array.isArray(storyState.flags?.trackedTaskIds) ?
+    storyState.flags.trackedTaskIds :
+    [];
+  const trackedTaskIds = [...taskIds];
+
+  for (const taskId of getDerivedTrackedTaskIds(storyState)) {
+    if (!trackedTaskIds.includes(taskId)) {
+      trackedTaskIds.push(taskId);
+    }
+  }
+
+  return trackedTaskIds
+    .map((taskId, index) => ({
+      index,
+      task: SMALL_ISLAND_FIELD_TASKS[taskId]
+    }))
+    .filter((entry) => Boolean(entry.task));
 }
 
 function isTrackedTaskDone(storyState = {}, task) {
   return Boolean(task?.completeFlag && storyState.flags?.[task.completeFlag]);
+}
+
+function getTrackedTasks(storyState = {}) {
+  return getTrackedTaskEntries(storyState)
+    .sort((left, right) => {
+      const leftDone = isTrackedTaskDone(storyState, left.task);
+      const rightDone = isTrackedTaskDone(storyState, right.task);
+
+      if (leftDone !== rightDone) {
+        return leftDone ? 1 : -1;
+      }
+
+      const leftBackground = Boolean(left.task.background);
+      const rightBackground = Boolean(right.task.background);
+
+      if (leftBackground !== rightBackground) {
+        return leftBackground ? 1 : -1;
+      }
+
+      return right.index - left.index;
+    })
+    .map((entry) => entry.task);
 }
 
 function getTrackedTaskDescription(storyState = {}, task) {
@@ -155,7 +220,7 @@ function renderQuestMissionCardHtml(quest) {
 
 function renderTrackedTaskCardHtml(storyState = {}, task) {
   return renderMissionCardHtml({
-    eyebrow: "tracked",
+    eyebrow: task.background ? "field note" : "tracked",
     title: task.title,
     copy: getTrackedTaskDescription(storyState, task),
     done: isTrackedTaskDone(storyState, task),

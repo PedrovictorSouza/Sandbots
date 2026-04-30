@@ -18,6 +18,8 @@ export const INTRO_ROOM_CHOPPER_ACTOR = Object.freeze({
   state: "intro-speaking"
 });
 
+export const INTRO_ROOM_CORRUPTION_FOCUS_POINT = Object.freeze([3.8, 0.2, -3.8]);
+
 export const INTRO_ROOM_ENTRY_DELAY = 0.5;
 
 export const INTRO_ROOM_ENTRY_KEYFRAMES = Object.freeze([

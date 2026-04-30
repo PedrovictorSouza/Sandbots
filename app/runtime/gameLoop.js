@@ -1366,8 +1366,7 @@ export function startGameLoop({
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
       controls.storyState.flags.bulbasaurRevealed &&
-      !controls.storyState.flags.bulbasaurDryGrassMissionAccepted &&
-      (controls.storyState.flags.restoredGrassCount || 0) < BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT;
+      !controls.storyState.flags.bulbasaurDryGrassMissionAccepted;
     const shouldShowBulbasaurWorkbenchGuideSpeech =
       !shouldShowTangrowthSpeech &&
       !shouldShowTangrowthLogChairSpeech &&

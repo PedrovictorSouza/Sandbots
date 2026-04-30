@@ -741,7 +741,6 @@ export function findNearbyInteractable(
   const bulbasaurMissionActive =
     storyState?.flags?.bulbasaurRevealed &&
     !storyState?.flags?.bulbasaurDryGrassMissionAccepted &&
-    (storyState?.flags?.restoredGrassCount || 0) < BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT &&
     Boolean(rustlingGrassCellId);
   const bulbasaurRequestReady =
     storyState?.flags?.bulbasaurRevealed &&

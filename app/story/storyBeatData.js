@@ -24,7 +24,9 @@ import { QUEST_EVENT } from "../quest/questData.js";
 
 export const FIELD_TASK_IDS = Object.freeze({
   MAKING_HABITATS: "making-habitats",
+  BULBASAUR_DRY_GRASS_REQUEST: "bulbasaur-dry-grass-request",
   WATER_DRY_TALL_GRASS: "water-dry-tall-grass",
+  BULBASAUR_LEAFAGE_REWARD: "bulbasaur-leafage-reward",
   GIVE_LEPPA_BERRY: "give-leppa-berry",
   TANGROWTH_LOG_CHAIR: "tangrowth-log-chair",
   WORKBENCH_CAMPFIRE: "workbench-campfire",
@@ -97,7 +99,14 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
     id: FIELD_TASK_IDS.MAKING_HABITATS,
     title: "Making habitats",
     description: "Arrange tall grass, trees, rocks and furniture into the right combinations to create a Pokemon Habitat!",
-    completeFlag: "makingHabitatsComplete"
+    completeFlag: "makingHabitatsComplete",
+    background: true
+  },
+  [FIELD_TASK_IDS.BULBASAUR_DRY_GRASS_REQUEST]: {
+    id: FIELD_TASK_IDS.BULBASAUR_DRY_GRASS_REQUEST,
+    title: "Talk to Bulbasaur",
+    description: "Bulbasaur has a request. Help him, and he will teach you a new move.",
+    completeFlag: "bulbasaurDryGrassMissionAccepted"
   },
   [FIELD_TASK_IDS.WATER_DRY_TALL_GRASS]: {
     id: FIELD_TASK_IDS.WATER_DRY_TALL_GRASS,
@@ -107,6 +116,12 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       return `Water the dry tall grass for Bulbasaur. ${current}/10 restored.`;
     },
     completeFlag: "bulbasaurDryGrassMissionComplete"
+  },
+  [FIELD_TASK_IDS.BULBASAUR_LEAFAGE_REWARD]: {
+    id: FIELD_TASK_IDS.BULBASAUR_LEAFAGE_REWARD,
+    title: "Return to Bulbasaur",
+    description: "Talk to Bulbasaur to complete the request and learn Leafage.",
+    completeFlag: "bulbasaurDryGrassRequestTurnedIn"
   },
   [FIELD_TASK_IDS.GIVE_LEPPA_BERRY]: {
     id: FIELD_TASK_IDS.GIVE_LEPPA_BERRY,

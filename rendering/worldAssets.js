@@ -130,7 +130,7 @@ const SCENE_FRAGMENT_SOURCE = `
     }
 
     vec3 normal = normalize(gl_FrontFacing ? vWorldNormal : -vWorldNormal);
-    vec3 lightDirection = normalize(vec3(-0.55, 0.78, -0.35));
+    vec3 lightDirection = normalize(vec3(0.55, 0.78, 0.35));
     float light = dot(normal, lightDirection);
     float sideFace = 1.0 - smoothstep(0.45, 0.86, normal.y);
     float halfShadow = sideFace * (1.0 - smoothstep(0.05, 0.72, light));
