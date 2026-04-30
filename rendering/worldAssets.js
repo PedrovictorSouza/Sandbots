@@ -18,6 +18,7 @@ export const GROUND_FLOWER_SIZE = [0.94, 0.72];
 const SCENE_VERTEX_SOURCE = `
   attribute vec3 aPosition;
   attribute vec2 aTexCoord;
+  attribute vec3 aNormal;
 
   uniform mat4 uViewProjection;
   uniform vec3 uModelOffset;
@@ -36,6 +37,7 @@ const SCENE_VERTEX_SOURCE = `
   uniform float uTime;
 
   varying vec2 vTexCoord;
+  varying vec3 vWorldNormal;
 
   void main() {
     vec3 local = aPosition * uModelScale + uModelOffset;
@@ -45,11 +47,17 @@ const SCENE_VERTEX_SOURCE = `
 
     float localYawSine = sin(uLocalYaw);
     float localYawCosine = cos(uLocalYaw);
+    vec3 normal = aNormal;
 
     local = vec3(
       local.x * localYawCosine - local.z * localYawSine,
       local.y,
       local.x * localYawSine + local.z * localYawCosine
+    );
+    normal = vec3(
+      normal.x * localYawCosine - normal.z * localYawSine,
+      normal.y,
+      normal.x * localYawSine + normal.z * localYawCosine
     );
 
     local += localPivot;
@@ -64,12 +72,22 @@ const SCENE_VERTEX_SOURCE = `
       scaled.x * rollSine + scaled.y * rollCosine,
       scaled.z
     );
+    normal = vec3(
+      normal.x * rollCosine - normal.y * rollSine,
+      normal.x * rollSine + normal.y * rollCosine,
+      normal.z
+    );
     float pitchSine = sin(uInstancePitch);
     float pitchCosine = cos(uInstancePitch);
     vec3 pitched = vec3(
       rolled.x,
       rolled.y * pitchCosine - rolled.z * pitchSine,
       rolled.y * pitchSine + rolled.z * pitchCosine
+    );
+    normal = vec3(
+      normal.x,
+      normal.y * pitchCosine - normal.z * pitchSine,
+      normal.y * pitchSine + normal.z * pitchCosine
     );
     float sine = sin(uInstanceYaw);
     float cosine = cos(uInstanceYaw);
@@ -78,6 +96,11 @@ const SCENE_VERTEX_SOURCE = `
       pitched.y,
       pitched.x * sine + pitched.z * cosine
     ) + uInstanceOffset;
+    normal = normalize(vec3(
+      normal.x * cosine - normal.z * sine,
+      normal.y,
+      normal.x * sine + normal.z * cosine
+    ));
     vec4 clip = uViewProjection * vec4(world, 1.0);
 
     float phase = uTime * 8.0 + world.x * 1.7 + world.y * 2.3 + world.z * 1.1;
@@ -88,6 +111,7 @@ const SCENE_VERTEX_SOURCE = `
     clip.xy = snapped * clip.w;
     gl_Position = clip;
     vTexCoord = aTexCoord;
+    vWorldNormal = normal;
   }
 `;
 
@@ -97,13 +121,27 @@ const SCENE_FRAGMENT_SOURCE = `
   uniform sampler2D uTexture;
   uniform float uBrightness;
   varying vec2 vTexCoord;
+  varying vec3 vWorldNormal;
 
   void main() {
     vec4 texel = texture2D(uTexture, vTexCoord);
     if (texel.a < 0.5) {
       discard;
     }
-    gl_FragColor = vec4(texel.rgb * uBrightness, texel.a);
+
+    vec3 normal = normalize(gl_FrontFacing ? vWorldNormal : -vWorldNormal);
+    vec3 lightDirection = normalize(vec3(-0.55, 0.78, -0.35));
+    float light = dot(normal, lightDirection);
+    float sideFace = 1.0 - smoothstep(0.45, 0.86, normal.y);
+    float halfShadow = sideFace * (1.0 - smoothstep(0.05, 0.72, light));
+    float deepShadow = sideFace * (1.0 - smoothstep(-0.34, 0.16, light));
+    vec2 ditherCell = floor(gl_FragCoord.xy / 4.0);
+    float checker = mod(ditherCell.x + ditherCell.y, 2.0);
+    float solidShade = mix(1.0, 0.82, halfShadow);
+    float ditherShade = mix(0.66, 0.78, checker);
+    float shade = mix(solidShade, ditherShade, deepShadow);
+
+    gl_FragColor = vec4(texel.rgb * shade * uBrightness, texel.a);
   }
 `;
 
@@ -242,7 +280,17 @@ export function createNoopWebGlContext() {
     drawElements: noop,
     enable: noop,
     enableVertexAttribArray: noop,
-    getAttribLocation: (_, name) => name === "aTexCoord" ? 1 : 0,
+    getAttribLocation: (_, name) => {
+      if (name === "aTexCoord") {
+        return 1;
+      }
+
+      if (name === "aNormal") {
+        return 2;
+      }
+
+      return 0;
+    },
     getProgramInfoLog: () => "",
     getProgramParameter: () => true,
     getShaderInfoLog: () => "",
@@ -303,7 +351,8 @@ export function createWorldRenderingResources(gl) {
   const program = createProgram(gl, SCENE_VERTEX_SOURCE, SCENE_FRAGMENT_SOURCE);
   const attribs = {
     position: gl.getAttribLocation(program, "aPosition"),
-    texCoord: gl.getAttribLocation(program, "aTexCoord")
+    texCoord: gl.getAttribLocation(program, "aTexCoord"),
+    normal: gl.getAttribLocation(program, "aNormal")
   };
   const uniforms = {
     viewProjection: gl.getUniformLocation(program, "uViewProjection"),
@@ -441,19 +490,78 @@ function readAccessor(gltf, accessorIndex, binBuffer) {
   return new ArrayType(binBuffer, byteOffset, length);
 }
 
-function interleavePositionsAndUVs(positions, uvs) {
-  const vertexCount = positions.length / 3;
-  const interleaved = new Float32Array(vertexCount * 5);
+function normalizeVector3(vector) {
+  const length = Math.hypot(vector[0], vector[1], vector[2]) || 1;
+
+  return [
+    vector[0] / length,
+    vector[1] / length,
+    vector[2] / length
+  ];
+}
+
+function createSequentialIndices(vertexCount) {
+  const IndexArray = vertexCount > 65535 ? Uint32Array : Uint16Array;
+  const indices = new IndexArray(vertexCount);
 
   for (let index = 0; index < vertexCount; index += 1) {
-    interleaved[index * 5 + 0] = positions[index * 3 + 0];
-    interleaved[index * 5 + 1] = positions[index * 3 + 1];
-    interleaved[index * 5 + 2] = positions[index * 3 + 2];
-    interleaved[index * 5 + 3] = uvs[index * 2 + 0];
-    interleaved[index * 5 + 4] = uvs[index * 2 + 1];
+    indices[index] = index;
   }
 
-  return interleaved;
+  return indices;
+}
+
+function buildFlatShadedInterleaved(positions, uvs, indices) {
+  const vertexCount = indices.length;
+  const interleaved = new Float32Array(vertexCount * 8);
+
+  for (let triangleIndex = 0; triangleIndex < indices.length; triangleIndex += 3) {
+    const sourceIndices = [
+      indices[triangleIndex],
+      indices[triangleIndex + 1],
+      indices[triangleIndex + 2]
+    ];
+    const points = sourceIndices.map((sourceIndex) => [
+      positions[sourceIndex * 3 + 0],
+      positions[sourceIndex * 3 + 1],
+      positions[sourceIndex * 3 + 2]
+    ]);
+    const edgeA = [
+      points[1][0] - points[0][0],
+      points[1][1] - points[0][1],
+      points[1][2] - points[0][2]
+    ];
+    const edgeB = [
+      points[2][0] - points[0][0],
+      points[2][1] - points[0][1],
+      points[2][2] - points[0][2]
+    ];
+    const normal = normalizeVector3([
+      edgeA[1] * edgeB[2] - edgeA[2] * edgeB[1],
+      edgeA[2] * edgeB[0] - edgeA[0] * edgeB[2],
+      edgeA[0] * edgeB[1] - edgeA[1] * edgeB[0]
+    ]);
+
+    for (let vertexOffset = 0; vertexOffset < 3; vertexOffset += 1) {
+      const sourceIndex = sourceIndices[vertexOffset];
+      const targetIndex = triangleIndex + vertexOffset;
+      const writeOffset = targetIndex * 8;
+
+      interleaved[writeOffset + 0] = positions[sourceIndex * 3 + 0];
+      interleaved[writeOffset + 1] = positions[sourceIndex * 3 + 1];
+      interleaved[writeOffset + 2] = positions[sourceIndex * 3 + 2];
+      interleaved[writeOffset + 3] = uvs[sourceIndex * 2 + 0] || 0;
+      interleaved[writeOffset + 4] = uvs[sourceIndex * 2 + 1] || 0;
+      interleaved[writeOffset + 5] = normal[0];
+      interleaved[writeOffset + 6] = normal[1];
+      interleaved[writeOffset + 7] = normal[2];
+    }
+  }
+
+  return {
+    interleaved,
+    indices: createSequentialIndices(vertexCount)
+  };
 }
 
 function createGLPrimitive(gl, interleaved, indices) {
@@ -1314,9 +1422,9 @@ export async function loadPicoModel({
       const positions = readAccessor(gltf, primitive.attributes.POSITION, binBuffer);
       const texcoords = readAccessor(gltf, primitive.attributes.TEXCOORD_0, binBuffer);
       const indices = readAccessor(gltf, primitive.indices, binBuffer);
-      const interleaved = interleavePositionsAndUVs(positions, texcoords);
+      const flatMesh = buildFlatShadedInterleaved(positions, texcoords, indices);
       primitives.push({
-        ...createGLPrimitive(gl, interleaved, indices),
+        ...createGLPrimitive(gl, flatMesh.interleaved, flatMesh.indices),
         positions
       });
     }
@@ -1398,9 +1506,9 @@ export async function loadTexturedModel({
       const positions = readAccessor(gltf, primitive.attributes.POSITION, binBuffer);
       const texcoords = readAccessor(gltf, primitive.attributes.TEXCOORD_0, binBuffer);
       const indices = readAccessor(gltf, primitive.indices, binBuffer);
-      const interleaved = interleavePositionsAndUVs(positions, texcoords);
+      const flatMesh = buildFlatShadedInterleaved(positions, texcoords, indices);
       primitives.push({
-        ...createGLPrimitive(gl, interleaved, indices),
+        ...createGLPrimitive(gl, flatMesh.interleaved, flatMesh.indices),
         positions
       });
     }

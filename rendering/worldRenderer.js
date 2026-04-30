@@ -100,9 +100,13 @@ export function createWorldRenderer({
   function bindScenePrimitive(primitive) {
     gl.bindBuffer(gl.ARRAY_BUFFER, primitive.vertexBuffer);
     gl.enableVertexAttribArray(attribs.position);
-    gl.vertexAttribPointer(attribs.position, 3, gl.FLOAT, false, 20, 0);
+    gl.vertexAttribPointer(attribs.position, 3, gl.FLOAT, false, 32, 0);
     gl.enableVertexAttribArray(attribs.texCoord);
-    gl.vertexAttribPointer(attribs.texCoord, 2, gl.FLOAT, false, 20, 12);
+    gl.vertexAttribPointer(attribs.texCoord, 2, gl.FLOAT, false, 32, 12);
+    if (attribs.normal >= 0) {
+      gl.enableVertexAttribArray(attribs.normal);
+      gl.vertexAttribPointer(attribs.normal, 3, gl.FLOAT, false, 32, 20);
+    }
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, primitive.indexBuffer);
   }
 
