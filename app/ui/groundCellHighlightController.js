@@ -25,6 +25,8 @@ export function createGroundCellHighlightController({ mount } = {}) {
   svg.setAttribute("height", "100%");
   svg.setAttribute("preserveAspectRatio", "none");
 
+  const markedGroup = createSvgElement("g");
+
   const halo = createSvgElement("polygon");
   halo.setAttribute("fill", "rgba(127, 231, 255, 0.12)");
   halo.setAttribute("stroke", "rgba(12, 20, 34, 0.92)");
@@ -38,36 +40,57 @@ export function createGroundCellHighlightController({ mount } = {}) {
   outline.setAttribute("stroke-linejoin", "round");
   outline.setAttribute("vector-effect", "non-scaling-stroke");
 
-  svg.append(halo, outline);
+  svg.append(markedGroup, halo, outline);
   layer.append(svg);
   mount.append(layer);
 
   const state = {
     active: false,
     elevation: 0.06,
-    groundCell: null
+    groundCell: null,
+    markedGroundCells: [],
+    pulsePhase: 0
   };
 
   function hide() {
     state.active = false;
     state.groundCell = null;
+    state.markedGroundCells = [];
     layer.hidden = true;
   }
 
-  function show({ groundCell, elevation = 0.06 } = {}) {
-    if (!groundCell) {
+  function setHighlightState({
+    groundCell = null,
+    markedGroundCells = [],
+    elevation = 0.06,
+    pulsePhase = 0
+  } = {}) {
+    const filteredMarkedGroundCells = (markedGroundCells || []).filter(Boolean);
+
+    if (!groundCell && !filteredMarkedGroundCells.length) {
       hide();
       return;
     }
 
     state.active = true;
     state.groundCell = groundCell;
+    state.markedGroundCells = filteredMarkedGroundCells;
     state.elevation = elevation;
+    state.pulsePhase = pulsePhase;
     layer.hidden = false;
   }
 
+  function show({ groundCell = null, markedGroundCells = [], elevation = 0.06, pulsePhase = 0 } = {}) {
+    setHighlightState({
+      groundCell,
+      markedGroundCells,
+      elevation,
+      pulsePhase
+    });
+  }
+
   function setGroundCell(groundCell) {
-    if (!groundCell) {
+    if (!groundCell && !state.markedGroundCells.length) {
       hide();
       return;
     }
@@ -75,14 +98,10 @@ export function createGroundCellHighlightController({ mount } = {}) {
     state.groundCell = groundCell;
   }
 
-  function update(camera, viewportWidth, viewportHeight) {
-    if (!state.active || !state.groundCell) {
-      return;
-    }
-
-    const halfSpan = (state.groundCell.tileSpan || 0) * 0.5;
-    const [centerX,, centerZ] = state.groundCell.offset;
-    const surfaceY = (state.groundCell.surfaceY || 0) + state.elevation;
+  function getProjectedGroundCellPoints(camera, groundCell, viewportWidth, viewportHeight) {
+    const halfSpan = (groundCell.tileSpan || 0) * 0.5;
+    const [centerX,, centerZ] = groundCell.offset;
+    const surfaceY = (groundCell.surfaceY || 0) + state.elevation;
     const corners = [
       [centerX - halfSpan, surfaceY, centerZ - halfSpan],
       [centerX + halfSpan, surfaceY, centerZ - halfSpan],
@@ -93,21 +112,104 @@ export function createGroundCellHighlightController({ mount } = {}) {
       return camera.project(corner, viewportWidth, viewportHeight);
     });
 
-    const allClipped = projectedCorners.every((point) => point.depth > 1);
-    if (allClipped) {
-      layer.hidden = true;
+    return {
+      clipped: projectedCorners.every((point) => point.depth > 1),
+      points: projectedCorners.map((point) => {
+        return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+      }).join(" ")
+    };
+  }
+
+  function getMarkedPolygonPair(index) {
+    const pairIndex = index * 2;
+    let fillPolygon = markedGroup.children[pairIndex];
+    let outlinePolygon = markedGroup.children[pairIndex + 1];
+
+    if (!fillPolygon || !outlinePolygon) {
+      fillPolygon = createSvgElement("polygon");
+      fillPolygon.setAttribute("fill", "#ffd447");
+      fillPolygon.setAttribute("stroke", "rgba(80, 52, 0, 0.78)");
+      fillPolygon.setAttribute("stroke-width", "5");
+      fillPolygon.setAttribute("stroke-linejoin", "round");
+      fillPolygon.setAttribute("vector-effect", "non-scaling-stroke");
+
+      outlinePolygon = createSvgElement("polygon");
+      outlinePolygon.setAttribute("fill", "none");
+      outlinePolygon.setAttribute("stroke", "#fff0a1");
+      outlinePolygon.setAttribute("stroke-width", "2");
+      outlinePolygon.setAttribute("stroke-linejoin", "round");
+      outlinePolygon.setAttribute("vector-effect", "non-scaling-stroke");
+
+      markedGroup.append(fillPolygon, outlinePolygon);
+    }
+
+    return [fillPolygon, outlinePolygon];
+  }
+
+  function hideUnusedMarkedPolygons(activeCount) {
+    for (let index = activeCount * 2; index < markedGroup.children.length; index += 1) {
+      markedGroup.children[index].setAttribute("display", "none");
+    }
+  }
+
+  function update(camera, viewportWidth, viewportHeight) {
+    if (!state.active) {
       return;
     }
 
-    layer.hidden = false;
+    let hasVisibleGroundCell = false;
     svg.setAttribute("viewBox", `0 0 ${viewportWidth} ${viewportHeight}`);
 
-    const points = projectedCorners.map((point) => {
-      return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
-    }).join(" ");
+    if (state.groundCell) {
+      const projectedGroundCell = getProjectedGroundCellPoints(
+        camera,
+        state.groundCell,
+        viewportWidth,
+        viewportHeight
+      );
 
-    halo.setAttribute("points", points);
-    outline.setAttribute("points", points);
+      if (!projectedGroundCell.clipped) {
+        hasVisibleGroundCell = true;
+        halo.removeAttribute("display");
+        outline.removeAttribute("display");
+        halo.setAttribute("points", projectedGroundCell.points);
+        outline.setAttribute("points", projectedGroundCell.points);
+      } else {
+        halo.setAttribute("display", "none");
+        outline.setAttribute("display", "none");
+      }
+    } else {
+      halo.setAttribute("display", "none");
+      outline.setAttribute("display", "none");
+    }
+
+    const pulseOpacity = 0.16 + state.pulsePhase * 0.22;
+    let markedVisibleCount = 0;
+
+    for (const markedGroundCell of state.markedGroundCells) {
+      const projectedGroundCell = getProjectedGroundCellPoints(
+        camera,
+        markedGroundCell,
+        viewportWidth,
+        viewportHeight
+      );
+
+      if (projectedGroundCell.clipped) {
+        continue;
+      }
+
+      const [fillPolygon, outlinePolygon] = getMarkedPolygonPair(markedVisibleCount);
+      fillPolygon.removeAttribute("display");
+      outlinePolygon.removeAttribute("display");
+      fillPolygon.setAttribute("points", projectedGroundCell.points);
+      outlinePolygon.setAttribute("points", projectedGroundCell.points);
+      fillPolygon.setAttribute("fill-opacity", pulseOpacity.toFixed(3));
+      outlinePolygon.setAttribute("stroke-opacity", (0.52 + state.pulsePhase * 0.38).toFixed(3));
+      markedVisibleCount += 1;
+    }
+
+    hideUnusedMarkedPolygons(markedVisibleCount);
+    layer.hidden = !hasVisibleGroundCell && markedVisibleCount === 0;
   }
 
   return {
@@ -116,6 +218,7 @@ export function createGroundCellHighlightController({ mount } = {}) {
       return state.active;
     },
     setGroundCell,
+    setHighlightState,
     show,
     update
   };

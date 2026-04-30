@@ -1253,9 +1253,10 @@ export function createGameplayInteractions({
     groundGrassPatches = [],
     canPurifyGround = false,
     canUseLeafage = false,
-    useWaterGun = false
+    useWaterGun = false,
+    forcedHarvestTarget = null
   }) {
-    const nearbyHarvestTarget = findNearbyActionTarget({
+    const nearbyHarvestTarget = forcedHarvestTarget || findNearbyActionTarget({
       playerPosition,
       palmModel,
       palmInstances,
@@ -1554,6 +1555,10 @@ export function createGameplayInteractions({
 
         pushNotice("Chao purificado.");
         return true;
+      }
+
+      if (forcedHarvestTarget?.groundCell) {
+        return false;
       }
     }
 

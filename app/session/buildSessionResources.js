@@ -62,6 +62,32 @@ function createNatureRevivalSparkCanvas() {
   return canvas;
 }
 
+function createSquirtleWaterSprayCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 24;
+  canvas.height = 24;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(191, 244, 255, 0.92)";
+  context.fillRect(8, 3, 8, 4);
+  context.fillRect(5, 7, 14, 8);
+  context.fillRect(8, 15, 8, 5);
+
+  context.fillStyle = "rgba(76, 181, 255, 0.82)";
+  context.fillRect(5, 10, 4, 6);
+  context.fillRect(15, 9, 4, 7);
+  context.fillRect(10, 17, 5, 3);
+
+  context.fillStyle = "rgba(255, 255, 255, 0.9)";
+  context.fillRect(9, 6, 4, 3);
+
+  return canvas;
+}
+
 function createLeppaBerryCanvas() {
   const canvas = document.createElement("canvas");
   canvas.width = 48;
@@ -536,6 +562,8 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.playerDustTexture = worldTextureFactory.fromCanvas(createPlayerDustCanvas());
   session.playerDust = createPlayerDustState();
   session.natureRevivalSparkTexture = worldTextureFactory.fromCanvas(createNatureRevivalSparkCanvas());
+  session.squirtleWaterSprayTexture = worldTextureFactory.fromCanvas(createSquirtleWaterSprayCanvas());
+  session.squirtleWaterGunQueue = [];
   session.natureRevivalEffects = createNatureRevivalEffectState();
   session.colliderGizmoTextures = createColliderGizmoTextures(worldTextureFactory);
   session.bulbasaurTexture = worldTextureFactory.createBulbasaurTexture();

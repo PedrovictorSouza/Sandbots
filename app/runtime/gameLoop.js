@@ -23,6 +23,13 @@ const CHARMANDER_CAMPFIRE_LIGHT_DISTANCE = 1.9;
 const TIMBURR_FOLLOW_SPEED = 2.45;
 const TIMBURR_FOLLOW_DISTANCE = 1.62;
 const TALL_GRASS_MIN_FOOTPRINT = 1.28;
+const SQUIRTLE_WATER_GUN_SPEED = 4.8;
+const SQUIRTLE_WATER_GUN_STAND_DISTANCE = 1.18;
+const SQUIRTLE_WATER_GUN_ARRIVE_DISTANCE = 0.08;
+const SQUIRTLE_WATER_GUN_SPRAY_DURATION = 0.82;
+const SQUIRTLE_WATER_GUN_IMPACT_TIME = 0.34;
+const SQUIRTLE_WATER_GUN_ARC_HEIGHT = 0.86;
+const SQUIRTLE_WATER_GUN_PARTICLE_COUNT = 9;
 
 function getTallGrassInstanceScale(tallGrassModel, groundGrassPatch, revivalScale) {
   const modelFootprint = Math.max(
@@ -106,6 +113,314 @@ export function startGameLoop({
     const deltaX = toPosition[0] - fromPosition[0];
     const deltaZ = toPosition[2] - fromPosition[2];
     return Math.atan2(deltaX, deltaZ);
+  }
+
+  function getGroundCellCenterPosition(groundCell) {
+    const offset = groundCell?.offset || [0, 0, 0];
+    return [
+      offset[0] || 0,
+      (offset[1] || 0) + 0.04,
+      offset[2] || 0
+    ];
+  }
+
+  function syncSquirtleModelInstance() {
+    if (!session.actTwoSquirtle?.modelInstance || !Array.isArray(session.actTwoSquirtle.position)) {
+      return;
+    }
+
+    session.actTwoSquirtle.modelInstance.offset = [...session.actTwoSquirtle.position];
+  }
+
+  function getSquirtleWaterGunApproachPosition(targetPosition, playerPosition = null) {
+    const squirtlePosition =
+      session.actTwoSquirtle?.position ||
+      session.actTwoSquirtle?.modelInstance?.offset ||
+      playerPosition ||
+      [0, 0.04, 0];
+    let deltaX = squirtlePosition[0] - targetPosition[0];
+    let deltaZ = squirtlePosition[2] - targetPosition[2];
+    let distance = Math.hypot(deltaX, deltaZ);
+
+    if (distance < 0.001 && playerPosition) {
+      deltaX = playerPosition[0] - targetPosition[0];
+      deltaZ = playerPosition[2] - targetPosition[2];
+      distance = Math.hypot(deltaX, deltaZ);
+    }
+
+    if (distance < 0.001) {
+      deltaX = 0;
+      deltaZ = 1;
+      distance = 1;
+    }
+
+    return [
+      targetPosition[0] + (deltaX / distance) * SQUIRTLE_WATER_GUN_STAND_DISTANCE,
+      0.04,
+      targetPosition[2] + (deltaZ / distance) * SQUIRTLE_WATER_GUN_STAND_DISTANCE
+    ];
+  }
+
+  function getSquirtleWaterGunQueue() {
+    if (!Array.isArray(session.squirtleWaterGunQueue)) {
+      session.squirtleWaterGunQueue = [];
+    }
+
+    return session.squirtleWaterGunQueue;
+  }
+
+  function isSquirtleWaterGunCellPending(groundCell) {
+    if (!groundCell?.id) {
+      return false;
+    }
+
+    if (session.squirtleWaterGunAction?.groundCell?.id === groundCell.id) {
+      return true;
+    }
+
+    return getSquirtleWaterGunQueue().some((queuedAction) => {
+      return queuedAction?.groundCell?.id === groundCell.id;
+    });
+  }
+
+  function enqueueSquirtleWaterGunAction({ groundCell, playerPosition }) {
+    if (!groundCell) {
+      return "unavailable";
+    }
+
+    if (isSquirtleWaterGunCellPending(groundCell)) {
+      return "duplicate";
+    }
+
+    const targetPosition = getGroundCellCenterPosition(groundCell);
+    getSquirtleWaterGunQueue().push({
+      groundCell,
+      targetPosition,
+      playerPosition: playerPosition ? [...playerPosition] : null
+    });
+
+    return "queued";
+  }
+
+  function startSquirtleWaterGunAction({ groundCell, playerPosition }) {
+    if (!groundCell) {
+      return "unavailable";
+    }
+
+    if (session.squirtleWaterGunAction) {
+      return enqueueSquirtleWaterGunAction({
+        groundCell,
+        playerPosition
+      });
+    }
+
+    const squirtle = session.actTwoSquirtle;
+    if (!squirtle?.modelInstance || !squirtle.recovered) {
+      return "unavailable";
+    }
+
+    if (!Array.isArray(squirtle.position)) {
+      squirtle.position = [...(squirtle.modelInstance.offset || playerPosition || [0, 0.04, 0])];
+    }
+
+    const targetPosition = getGroundCellCenterPosition(groundCell);
+    const approachPosition = getSquirtleWaterGunApproachPosition(
+      targetPosition,
+      playerPosition
+    );
+
+    session.squirtleWaterGunAction = {
+      phase: "approach",
+      groundCell,
+      targetPosition,
+      approachPosition,
+      sprayElapsed: 0,
+      impactApplied: false
+    };
+    squirtle.modelInstance.active = true;
+    squirtle.modelInstance.yaw = getYawToward(squirtle.position, targetPosition);
+    syncSquirtleModelInstance();
+
+    return "started";
+  }
+
+  function startNextQueuedSquirtleWaterGunAction() {
+    if (session.squirtleWaterGunAction) {
+      return;
+    }
+
+    const queue = getSquirtleWaterGunQueue();
+    while (queue.length) {
+      const nextAction = queue.shift();
+      if (!nextAction?.groundCell) {
+        continue;
+      }
+
+      if (!session.groundDeadInstances?.includes(nextAction.groundCell)) {
+        continue;
+      }
+
+      startSquirtleWaterGunAction({
+        groundCell: nextAction.groundCell,
+        playerPosition: nextAction.playerPosition || session.playerCharacter?.getPosition?.() || null
+      });
+      return;
+    }
+  }
+
+  function getPendingSquirtleWaterGunGroundCells() {
+    const pendingGroundCells = [];
+
+    if (
+      session.squirtleWaterGunAction?.phase === "approach" &&
+      session.squirtleWaterGunAction.groundCell
+    ) {
+      pendingGroundCells.push(session.squirtleWaterGunAction.groundCell);
+    }
+
+    for (const queuedAction of getSquirtleWaterGunQueue()) {
+      if (
+        queuedAction?.groundCell &&
+        session.groundDeadInstances?.includes(queuedAction.groundCell)
+      ) {
+        pendingGroundCells.push(queuedAction.groundCell);
+      }
+    }
+
+    return pendingGroundCells;
+  }
+
+  function applySquirtleWaterGunImpact(action) {
+    return gameplay.performHarvestAction({
+      playerPosition: action.approachPosition,
+      palmModel: session.palmModel,
+      palmInstances: session.palmInstances,
+      resourceNodes: session.resourceNodes,
+      leppaTree: session.leppaTree,
+      inventory: controls.inventory,
+      canPurifyGround: true,
+      groundDeadInstances: session.groundDeadInstances,
+      groundFlowerPatches: session.groundFlowerPatches,
+      groundGrassPatches: session.groundGrassPatches,
+      groundPurifiedInstances: session.groundPurifiedInstances,
+      storyState: controls.storyState,
+      leafDen: session.leafDen,
+      woodDrops: session.woodDrops,
+      leppaBerryDrops: session.leppaBerryDrops,
+      canUseLeafage: false,
+      useWaterGun: true,
+      forcedHarvestTarget: {
+        groundCell: action.groundCell,
+        distance: 0
+      }
+    });
+  }
+
+  function updateSquirtleWaterGunAction(deltaTime) {
+    const action = session.squirtleWaterGunAction;
+    const squirtle = session.actTwoSquirtle;
+
+    if (!action || !squirtle?.modelInstance) {
+      return;
+    }
+
+    if (!Array.isArray(squirtle.position)) {
+      squirtle.position = [...(squirtle.modelInstance.offset || action.approachPosition)];
+    }
+
+    if (action.phase === "approach") {
+      const deltaX = action.approachPosition[0] - squirtle.position[0];
+      const deltaZ = action.approachPosition[2] - squirtle.position[2];
+      const distance = Math.hypot(deltaX, deltaZ);
+      const travel = Math.min(SQUIRTLE_WATER_GUN_SPEED * deltaTime, distance);
+
+      if (distance > SQUIRTLE_WATER_GUN_ARRIVE_DISTANCE && travel > 0) {
+        squirtle.position = [
+          squirtle.position[0] + (deltaX / distance) * travel,
+          0.04,
+          squirtle.position[2] + (deltaZ / distance) * travel
+        ];
+      } else {
+        squirtle.position = [...action.approachPosition];
+        action.phase = "spray";
+        action.sprayElapsed = 0;
+      }
+
+      squirtle.modelInstance.yaw = getYawToward(squirtle.position, action.targetPosition);
+      syncSquirtleModelInstance();
+      return;
+    }
+
+    if (action.phase !== "spray") {
+      session.squirtleWaterGunAction = null;
+      return;
+    }
+
+    action.sprayElapsed += deltaTime;
+    squirtle.modelInstance.yaw = getYawToward(squirtle.position, action.targetPosition);
+    syncSquirtleModelInstance();
+
+    if (!action.impactApplied && action.sprayElapsed >= SQUIRTLE_WATER_GUN_IMPACT_TIME) {
+      action.impactApplied = true;
+      applySquirtleWaterGunImpact(action);
+    }
+
+    if (action.sprayElapsed >= SQUIRTLE_WATER_GUN_SPRAY_DURATION) {
+      session.squirtleWaterGunAction = null;
+      startNextQueuedSquirtleWaterGunAction();
+    }
+  }
+
+  function getSquirtleMouthPosition() {
+    const squirtle = session.actTwoSquirtle;
+    const position = squirtle?.position || squirtle?.modelInstance?.offset || [0, 0, 0];
+    const yaw = squirtle?.modelInstance?.yaw || 0;
+
+    return [
+      position[0] + Math.sin(yaw) * 0.34,
+      (position[1] || 0) + 0.66,
+      position[2] + Math.cos(yaw) * 0.34
+    ];
+  }
+
+  function getSquirtleWaterGunBillboards(action, texture, uvRect) {
+    if (!action || action.phase !== "spray" || !texture) {
+      return [];
+    }
+
+    const progress = Math.min(
+      1,
+      Math.max(0, action.sprayElapsed / SQUIRTLE_WATER_GUN_SPRAY_DURATION)
+    );
+    const mouthPosition = getSquirtleMouthPosition();
+    const targetPosition = action.targetPosition;
+    const streamDirectionX = targetPosition[0] - mouthPosition[0];
+    const streamDirectionZ = targetPosition[2] - mouthPosition[2];
+    const streamLength = Math.hypot(streamDirectionX, streamDirectionZ) || 1;
+    const sideX = -streamDirectionZ / streamLength;
+    const sideZ = streamDirectionX / streamLength;
+    const billboards = [];
+
+    for (let index = 0; index < SQUIRTLE_WATER_GUN_PARTICLE_COUNT; index += 1) {
+      const pathProgress = (progress * 1.55 + index * 0.105) % 1;
+      const wobble = Math.sin(progress * 18 + index * 1.7) * 0.035;
+      const size = 0.095 + (index % 3) * 0.018;
+
+      billboards.push({
+        texture,
+        position: [
+          mouthPosition[0] + (targetPosition[0] - mouthPosition[0]) * pathProgress + sideX * wobble,
+          mouthPosition[1] +
+            (targetPosition[1] - mouthPosition[1]) * pathProgress +
+            Math.sin(pathProgress * Math.PI) * SQUIRTLE_WATER_GUN_ARC_HEIGHT,
+          mouthPosition[2] + (targetPosition[2] - mouthPosition[2]) * pathProgress + sideZ * wobble
+        ],
+        size: [size, size],
+        uvRect
+      });
+    }
+
+    return billboards;
   }
 
   function faceInteractionTargetTowardPlayer({
@@ -571,7 +886,7 @@ export function startGameLoop({
     );
 
     function performHarvestAction(playerPosition, options = {}) {
-      gameplay.performHarvestAction({
+      return gameplay.performHarvestAction({
         playerPosition,
         palmModel: session.palmModel,
         palmInstances: session.palmInstances,
@@ -588,7 +903,8 @@ export function startGameLoop({
         woodDrops: session.woodDrops,
         leppaBerryDrops: session.leppaBerryDrops,
         canUseLeafage: leafageEquipped,
-        useWaterGun: Boolean(options.useWaterGun)
+        useWaterGun: Boolean(options.useWaterGun),
+        forcedHarvestTarget: options.forcedHarvestTarget || null
       });
     }
 
@@ -675,7 +991,21 @@ export function startGameLoop({
           }
         });
       } else if (!dialogueActive) {
-        performHarvestAction(playerPosition);
+        if (waterGunEquipped && primaryActionTarget?.groundCell) {
+          const squirtleWaterGunResult = startSquirtleWaterGunAction({
+            groundCell: primaryActionTarget.groundCell,
+            playerPosition
+          });
+
+          if (squirtleWaterGunResult === "unavailable") {
+            performHarvestAction(playerPosition, {
+              useWaterGun: true,
+              forcedHarvestTarget: primaryActionTarget
+            });
+          }
+        } else {
+          performHarvestAction(playerPosition);
+        }
       }
     } else if (
       controls.isPrimaryActionActive?.() &&
@@ -706,8 +1036,19 @@ export function startGameLoop({
         canUseLeafage: false
       });
 
-      if (
-        waterGunTarget?.groundCell ||
+      if (waterGunTarget?.groundCell) {
+        const squirtleWaterGunResult = startSquirtleWaterGunAction({
+          groundCell: waterGunTarget.groundCell,
+          playerPosition
+        });
+
+        if (squirtleWaterGunResult === "unavailable") {
+          performHarvestAction(playerPosition, {
+            useWaterGun: true,
+            forcedHarvestTarget: waterGunTarget
+          });
+        }
+      } else if (
         waterGunTarget?.leppaTree?.action === "water" ||
         (
           waterGunTarget?.palm &&
@@ -809,6 +1150,7 @@ export function startGameLoop({
     updateBulbasaurEncounter(deltaTime);
     updateCharmanderEncounter(deltaTime);
     updateTimburrEncounter(deltaTime);
+    updateSquirtleWaterGunAction(deltaTime);
 
     if (cinematicActive) {
       actTwoSequence.update(deltaTime);
@@ -911,6 +1253,14 @@ export function startGameLoop({
       !scriptedInteractionActive &&
       !gameplayDialogue.isActive() &&
       Boolean(nearbyHarvestTarget?.groundCell || nearbyHarvestTarget?.leafageGroundCell);
+    const pendingWaterGunGroundCells =
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive ?
+        getPendingSquirtleWaterGunGroundCells() :
+        [];
 
     if (!cinematicActive && !tutorialActive && !pokedexModalOpen && !skillLearnActive) {
       nextFrame.hud.active = true;
@@ -1252,6 +1602,12 @@ export function startGameLoop({
         nearbyHarvestTarget.groundCell || nearbyHarvestTarget.leafageGroundCell;
     }
 
+    if (pendingWaterGunGroundCells.length) {
+      nextFrame.groundCellHighlight.visible = true;
+      nextFrame.groundCellHighlight.markedGroundCells.push(...pendingWaterGunGroundCells);
+      nextFrame.groundCellHighlight.pulsePhase = (Math.sin(now * 0.012) + 1) * 0.5;
+    }
+
     const questCompletionPop = gameplay.getQuestCompletionPop?.();
     if (
       questCompletionPop?.text &&
@@ -1489,8 +1845,18 @@ export function startGameLoop({
         session.actTwoSquirtle :
         null;
     if (session.actTwoSquirtle?.modelInstance) {
-      session.actTwoSquirtle.modelInstance.active = Boolean(visibleActTwoSquirtle);
+      syncSquirtleModelInstance();
+      session.actTwoSquirtle.modelInstance.active = Boolean(
+        visibleActTwoSquirtle || session.squirtleWaterGunAction
+      );
     }
+    nextFrame.render.genericBillboards.push(
+      ...getSquirtleWaterGunBillboards(
+        session.squirtleWaterGunAction,
+        session.squirtleWaterSprayTexture,
+        rendering.fullUvRect
+      )
+    );
     nextFrame.render.genericBillboards.push({
       texture: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.texture : null,
       position: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.position : null,

@@ -182,6 +182,50 @@ describe("createGameplayInteractions", () => {
     expect(pushNotice).toHaveBeenCalledWith("Chao purificado.");
   });
 
+  it("can purify a specific ground cell through a forced harvest target", () => {
+    const groundCell = {
+      id: "ground-2-2",
+      offset: [2, 0, 2],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0
+    };
+    const groundDeadInstances = [groundCell];
+    const groundPurifiedInstances = [];
+    const findNearbyGroundCell = vi.fn(() => null);
+    const purifyGroundCell = vi.fn(() => true);
+    const interactions = createInteractions({
+      findNearbyGroundCell,
+      purifyGroundCell
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [10, 0, 10],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundDeadInstances,
+      groundGrassPatches: [],
+      groundPurifiedInstances,
+      canPurifyGround: true,
+      forcedHarvestTarget: {
+        groundCell,
+        distance: 0
+      }
+    });
+
+    expect(result).toBe(true);
+    expect(findNearbyGroundCell).not.toHaveBeenCalled();
+    expect(purifyGroundCell).toHaveBeenCalledWith(
+      groundCell,
+      groundDeadInstances,
+      groundPurifiedInstances
+    );
+  });
+
   it("emits a ground-item callback when harvesting a resource node", () => {
     const resourceNode = {
       id: "reed-node",

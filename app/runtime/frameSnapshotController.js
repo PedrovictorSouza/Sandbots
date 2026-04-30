@@ -25,7 +25,9 @@ function createFrameSnapshot() {
     },
     groundCellHighlight: {
       visible: false,
-      groundCell: null
+      groundCell: null,
+      markedGroundCells: [],
+      pulsePhase: 0
     },
     colliderGizmos: {
       visible: false,
@@ -73,6 +75,8 @@ function resetFrameSnapshot(snapshot) {
 
   snapshot.groundCellHighlight.visible = false;
   snapshot.groundCellHighlight.groundCell = null;
+  snapshot.groundCellHighlight.markedGroundCells.length = 0;
+  snapshot.groundCellHighlight.pulsePhase = 0;
 
   snapshot.colliderGizmos.visible = false;
   snapshot.colliderGizmos.colliders = [];
@@ -187,10 +191,24 @@ function commitTaskPop(worldSpeechController, snapshot, previousSnapshot) {
 }
 
 function commitGroundCellHighlight(highlightController, snapshot, previousSnapshot) {
-  if (!snapshot.groundCellHighlight.visible) {
-    if (previousSnapshot.groundCellHighlight.visible) {
+  const hasMarkedGroundCells = snapshot.groundCellHighlight.markedGroundCells.length > 0;
+  const wasVisible =
+    previousSnapshot.groundCellHighlight.visible ||
+    previousSnapshot.groundCellHighlight.markedGroundCells.length > 0;
+
+  if (!snapshot.groundCellHighlight.visible && !hasMarkedGroundCells) {
+    if (wasVisible) {
       highlightController.hide();
     }
+    return;
+  }
+
+  if (highlightController.setHighlightState) {
+    highlightController.setHighlightState({
+      groundCell: snapshot.groundCellHighlight.groundCell,
+      markedGroundCells: snapshot.groundCellHighlight.markedGroundCells,
+      pulsePhase: snapshot.groundCellHighlight.pulsePhase
+    });
     return;
   }
 
