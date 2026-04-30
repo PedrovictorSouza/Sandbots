@@ -12,6 +12,7 @@ import {
 import { getColliderGizmoBillboards } from "../session/colliderGizmos.js";
 import { updateIntroRoomFrame } from "../scenes/introRoom/introRoomSequence.js";
 import { updateChopperNpcActor } from "../session/chopperNpcActor.js";
+import { createGameplayCameraDirector } from "./gameplayCameraDirector.js";
 
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
@@ -30,6 +31,13 @@ const SQUIRTLE_WATER_GUN_SPRAY_DURATION = 0.82;
 const SQUIRTLE_WATER_GUN_IMPACT_TIME = 0.34;
 const SQUIRTLE_WATER_GUN_ARC_HEIGHT = 0.86;
 const SQUIRTLE_WATER_GUN_PARTICLE_COUNT = 9;
+const CAMERA_DEBUG_ENABLED = (() => {
+  try {
+    return new URLSearchParams(globalThis.location?.search || "").get("cameraDebug") === "1";
+  } catch {
+    return false;
+  }
+})();
 
 function getTallGrassInstanceScale(tallGrassModel, groundGrassPatch, revivalScale) {
   const modelFootprint = Math.max(
@@ -108,6 +116,59 @@ export function startGameLoop({
     camera,
     presets: cameraZoomPresets
   });
+  const gameplayCameraDirector = createGameplayCameraDirector({
+    camera,
+    cameraOrbit
+  });
+  let cameraDebugElement = null;
+  const cameraDebugErrors = [];
+
+  function pushCameraDebugError(message) {
+    cameraDebugErrors.push({
+      at: Math.round(performance.now()),
+      message
+    });
+
+    if (cameraDebugErrors.length > 4) {
+      cameraDebugErrors.shift();
+    }
+  }
+
+  if (CAMERA_DEBUG_ENABLED && typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("error", (event) => {
+      pushCameraDebugError(event?.message || "Unknown window error");
+    });
+    globalThis.addEventListener("unhandledrejection", (event) => {
+      pushCameraDebugError(String(event?.reason?.message || event?.reason || "Unhandled rejection"));
+    });
+  }
+
+  function updateCameraDebugOverlay(debugState) {
+    if (!CAMERA_DEBUG_ENABLED || typeof document === "undefined") {
+      return;
+    }
+
+    if (!cameraDebugElement) {
+      cameraDebugElement = document.createElement("pre");
+      cameraDebugElement.style.cssText = [
+        "position:absolute",
+        "right:12px",
+        "top:12px",
+        "z-index:9999",
+        "margin:0",
+        "padding:10px",
+        "max-width:360px",
+        "background:rgba(0,0,0,0.78)",
+        "color:#7dff9a",
+        "font:12px/1.35 monospace",
+        "pointer-events:none",
+        "white-space:pre-wrap"
+      ].join(";");
+      mount.append(cameraDebugElement);
+    }
+
+    cameraDebugElement.textContent = JSON.stringify(debugState, null, 2);
+  }
 
   function getYawToward(fromPosition, toPosition) {
     const deltaX = toPosition[0] - fromPosition[0];
@@ -743,6 +804,53 @@ export function startGameLoop({
 
     camera.resizeCanvases();
     camera.update(deltaTime);
+    const gameplayOpeningCameraActive =
+      gameplayCameraDirector.beginFrame({
+        now,
+        gameplayActive: isGameFlow(gameFlowValues.GAMEPLAY),
+        hasPlayer: Boolean(session.playerCharacter)
+      });
+    const movementBlocked = Boolean(
+      tutorialMovementLocked ||
+      pokedexModalOpen ||
+      dialogueActive ||
+      skillLearnActive ||
+      scriptedInteractionActive
+    );
+    const cameraTransitionActive = camera.isTargetTransitionActive();
+
+    if (CAMERA_DEBUG_ENABLED) {
+      updateCameraDebugOverlay({
+        frame: Math.round(now),
+        flow: {
+          gameplay: isGameFlow(gameFlowValues.GAMEPLAY),
+          cinematic: cinematicActive,
+          intro: introActive,
+          tutorial: tutorialActive
+        },
+        blockers: {
+          movementBlocked,
+          tutorialMovementLocked,
+          pokedexModalOpen,
+          dialogueActive,
+          skillLearnActive,
+          scriptedInteractionActive,
+          paused: Boolean(controls.isPaused?.())
+        },
+        camera: {
+          ...gameplayCameraDirector.getState(now),
+          openingCameraActiveForInput: gameplayOpeningCameraActive,
+          transitionActive: cameraTransitionActive,
+          pose: camera.getPose?.() || null
+        },
+        quest: {
+          system: gameplay.getActiveSystemQuest?.()?.id || null,
+          ui: gameplay.getActiveQuest?.(controls.storyState)?.id || null
+        },
+        errors: cameraDebugErrors,
+        player: session.playerCharacter?.getPosition?.() || null
+      });
+    }
 
     if (
       introActive &&
@@ -785,6 +893,7 @@ export function startGameLoop({
     const canRotateCamera =
       session.playerCharacter &&
       !cinematicActive &&
+      !gameplayOpeningCameraActive &&
       !controls.isBuilderPanelOpen() &&
       !pokedexModalOpen &&
       !skillLearnActive &&
@@ -795,6 +904,7 @@ export function startGameLoop({
       session.playerCharacter &&
       !cinematicActive &&
       !tutorialActive &&
+      !gameplayOpeningCameraActive &&
       !controls.isBuilderPanelOpen() &&
       !pokedexModalOpen &&
       !skillLearnActive &&
@@ -1194,6 +1304,13 @@ export function startGameLoop({
           direction: cameraOrbit.getDirection(),
           zoom: 3.95,
           distance: 7.35
+        });
+      } else if (isGameFlow(gameFlowValues.GAMEPLAY)) {
+        gameplayCameraDirector.update({
+          now,
+          gameplayActive: true,
+          playerPosition: session.playerCharacter.getPosition(),
+          canFollow: !dialogueActive && !camera.isTargetTransitionActive()
         });
       } else if (!dialogueActive && !camera.isTargetTransitionActive()) {
         camera.follow(session.playerCharacter.getPosition());

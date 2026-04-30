@@ -139,6 +139,7 @@ export function createEngineRuntime({
     cameraOrbitConfig: {
       getDirection: cameraOrbit.getDirection,
       rotate: cameraOrbit.rotate,
+      sync: cameraOrbit.sync,
       turnSpeed: CAMERA_TURN_SPEED
     },
     cameraTurnKeys,

@@ -5,6 +5,13 @@ export const ACT_TWO_PLAYER_CAMERA_TARGET_HEIGHT = 1.2;
 export const ACT_TWO_PLAYER_CAMERA_ZOOM = 5.35;
 export const ACT_TWO_PLAYER_CAMERA_DISTANCE = 8.2;
 export const ACT_TWO_PLAYER_CAMERA_FOLLOW_LEAD = 1.6;
+export const ACT_TWO_GAMEPLAY_OPENING_CAMERA_HOLD = 3;
+export const ACT_TWO_GAMEPLAY_OPENING_CAMERA_POSE = Object.freeze({
+  target: [9.05, ACT_TWO_PLAYER_CAMERA_TARGET_HEIGHT, -4.05],
+  direction: [3.25, 1.3, -6.95],
+  zoom: 6.05,
+  distance: 7.78
+});
 export const ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS = Object.freeze([
   {
     id: "default",
