@@ -1,3 +1,5 @@
+import { getInventoryPresentationOrder } from "../ui/inventoryPresentation.js";
+
 export function createBagUiRuntime({
   bagOnboarding,
   bagDetails,
@@ -40,8 +42,8 @@ export function createBagUiRuntime({
     }
 
     return (
-      inventoryOrder.find(
-        (itemId) => isBagDetailItemId(itemId) && (inventory[itemId] || 0) > 0
+      getInventoryPresentationOrder(inventory, inventoryOrder, itemDefs).find(
+        (itemId) => isBagDetailItemId(itemId)
       ) || null
     );
   }

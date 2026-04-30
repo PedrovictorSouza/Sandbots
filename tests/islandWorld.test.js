@@ -706,4 +706,46 @@ describe("findNearbyInteractable", () => {
       getItemLabel: (itemId) => itemId
     })).toBe("[Enter] Use Leafage to grow tall grass");
   });
+
+  it("describes active moves when no target is available", () => {
+    expect(buildNearbyPrompt({
+      harvestTarget: null,
+      interactTarget: null,
+      activeMoveId: "leafage",
+      quest: {
+        title: "Plant Leafage for Bulbasaur",
+        actionLabel: "Grow"
+      },
+      getItemLabel: (itemId) => itemId
+    })).toBe("Leafage: grow tall grass on restored ground.");
+
+    expect(buildNearbyPrompt({
+      harvestTarget: null,
+      interactTarget: null,
+      activeMoveId: "waterGun",
+      pendingWaterGunCount: 2,
+      quest: {
+        title: "Water dry grass!",
+        actionLabel: "Restore"
+      },
+      getItemLabel: (itemId) => itemId
+    })).toBe("Water Gun: Squirtle has 2 tiles queued.");
+  });
+
+  it("shows Squirtle queue status in the Water Gun ground prompt", () => {
+    expect(buildNearbyPrompt({
+      harvestTarget: {
+        groundCell: {
+          id: "ground-2-2"
+        }
+      },
+      activeMoveId: "waterGun",
+      pendingWaterGunCount: 1,
+      quest: {
+        title: "Water dry grass!",
+        actionLabel: "Restore"
+      },
+      getItemLabel: (itemId) => itemId
+    })).toBe("[Enter] Mark dry ground for Squirtle • 1 queued");
+  });
 });

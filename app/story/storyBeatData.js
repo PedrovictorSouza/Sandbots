@@ -27,6 +27,7 @@ export const FIELD_TASK_IDS = Object.freeze({
   BULBASAUR_DRY_GRASS_REQUEST: "bulbasaur-dry-grass-request",
   WATER_DRY_TALL_GRASS: "water-dry-tall-grass",
   BULBASAUR_LEAFAGE_REWARD: "bulbasaur-leafage-reward",
+  BULBASAUR_GREEN_CORNER_PLAY_SEED: "bulbasaur-green-corner-play-seed",
   GIVE_LEPPA_BERRY: "give-leppa-berry",
   TANGROWTH_LOG_CHAIR: "tangrowth-log-chair",
   WORKBENCH_CAMPFIRE: "workbench-campfire",
@@ -122,6 +123,23 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
     title: "Return to Bulbasaur",
     description: "Talk to Bulbasaur to complete the request and learn Leafage.",
     completeFlag: "bulbasaurDryGrassRequestTurnedIn"
+  },
+  [FIELD_TASK_IDS.BULBASAUR_GREEN_CORNER_PLAY_SEED]: {
+    id: FIELD_TASK_IDS.BULBASAUR_GREEN_CORNER_PLAY_SEED,
+    title: "Make a green corner",
+    description(storyState = {}) {
+      const flags = storyState.flags || {};
+      const current = Math.min(4, Number(flags.leafageTallGrassCount || 0));
+
+      if (flags.leafageTallGrassHabitatCreated) {
+        return "Bulbasaur's green corner is ready. Pokemon have a cozy place to gather.";
+      }
+
+      return `Use Leafage where you want Pokemon to gather. ${current}/4 tall grass grown.`;
+    },
+    completeFlag: "leafageTallGrassHabitatCreated",
+    background: true,
+    eyebrow: "play seed"
   },
   [FIELD_TASK_IDS.GIVE_LEPPA_BERRY]: {
     id: FIELD_TASK_IDS.GIVE_LEPPA_BERRY,

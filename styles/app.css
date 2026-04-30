@@ -3802,6 +3802,43 @@
         color: var(--muted);
       }
 
+      .hud-current-action {
+        display: grid;
+        gap: 5px;
+        padding: 0 0 10px 10px;
+        border-left: 3px solid rgba(185, 243, 255, 0.72);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .hud-current-action[data-action-kind="water"] {
+        border-left-color: #78d8ff;
+      }
+
+      .hud-current-action[data-action-kind="leafage"] {
+        border-left-color: #9ee774;
+      }
+
+      .hud-current-action[data-action-kind="talk"] {
+        border-left-color: #ffd889;
+      }
+
+      .hud-current-action[data-action-kind="build"] {
+        border-left-color: #f5a96b;
+      }
+
+      .hud .hud-current-action__eyebrow {
+        color: rgba(255, 247, 215, 0.62);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hud .hud-current-action__body {
+        color: #fff7d7;
+        font-size: 15px;
+        line-height: 1.18;
+      }
+
       .hud__signals {
         display: flex;
         flex-wrap: wrap;
@@ -4052,6 +4089,21 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: rgba(255, 241, 232, 0.72);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .inventory-slot__role {
+        position: absolute;
+        left: 4px;
+        top: 3px;
+        max-width: calc(100% - 28px);
+        overflow: hidden;
+        color: rgba(255, 241, 232, 0.58);
+        font-size: 9px;
+        line-height: 1;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
         text-overflow: ellipsis;
         white-space: nowrap;
       }

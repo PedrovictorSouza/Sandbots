@@ -28,6 +28,7 @@ export const ITEM_DEFS = {
     glyph: "T",
     color: "#65c7ff",
     ink: "#081f33",
+    slotRole: "key",
     description: "A strange relic that resonates with the water power Squirtle shared with you."
   },
   wood: {
@@ -39,6 +40,7 @@ export const ITEM_DEFS = {
     glyph: "W",
     color: "#8c5a34",
     ink: "#fff1e8",
+    slotRole: "material",
     description: "A branch that fell off a tree somewhere. Perfect for making various toys and everyday items."
   },
   [LEPPA_BERRY_ITEM_ID]: {
@@ -50,6 +52,7 @@ export const ITEM_DEFS = {
     glyph: "L",
     color: "#e85e50",
     ink: "#fff7de",
+    slotRole: "gift",
     description: "A vivid red berry with a warm, restorative scent. Bulbasaur keeps glancing at it."
   },
   [LOG_CHAIR_ITEM_ID]: {
@@ -61,6 +64,7 @@ export const ITEM_DEFS = {
     glyph: "C",
     color: "#9a6842",
     ink: "#fff2d6",
+    slotRole: "placeable",
     description: "A sturdy little chair carved from a log. Chopper says every habitat needs a place to rest."
   },
   [SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID]: {
@@ -72,6 +76,7 @@ export const ITEM_DEFS = {
     glyph: "D",
     color: "#d2a36a",
     ink: "#2a1809",
+    slotRole: "recipe",
     description: "A starter bundle of wooden DIY plans. The Campfire recipe is circled in the corner."
   },
   [CAMPFIRE_ITEM_ID]: {
@@ -83,6 +88,7 @@ export const ITEM_DEFS = {
     glyph: "F",
     color: "#f07d38",
     ink: "#2a1205",
+    slotRole: "placeable",
     description: "A simple campfire made at the Workbench. Warmth makes the habitat feel more welcoming."
   },
   [LIFE_COINS_ITEM_ID]: {
@@ -93,6 +99,7 @@ export const ITEM_DEFS = {
     glyph: "$",
     color: "#ffd45c",
     ink: "#392406",
+    slotRole: "currency",
     description: "Challenge reward coins from the old Pokemon Center PC."
   },
   [LEAVES_ITEM_ID]: {
@@ -104,6 +111,7 @@ export const ITEM_DEFS = {
     glyph: "L",
     color: "#72b95a",
     ink: "#10220c",
+    slotRole: "material",
     description: "Fresh leaves gathered near restored tall grass. Soft enough for simple bedding."
   },
   [STRAW_BED_RECIPE_ITEM_ID]: {
@@ -115,6 +123,7 @@ export const ITEM_DEFS = {
     glyph: "R",
     color: "#f0cf77",
     ink: "#342309",
+    slotRole: "recipe",
     description: "Bulbasaur's notes for weaving a simple Straw Bed from sturdy sticks and plant fiber."
   },
   [STRAW_BED_ITEM_ID]: {
@@ -126,6 +135,7 @@ export const ITEM_DEFS = {
     glyph: "B",
     color: "#d7b65a",
     ink: "#2d2108",
+    slotRole: "placeable",
     description: "A soft woven bed that makes grassy habitats feel easier to rest in."
   },
   [LEAF_DEN_KIT_ITEM_ID]: {
@@ -137,6 +147,7 @@ export const ITEM_DEFS = {
     glyph: "D",
     color: "#6fc46d",
     ink: "#10240d",
+    slotRole: "placeable",
     description: "A leafy house kit from the Pokemon Center PC Shop. Professor Tangrowth says it is the first step toward proper homes."
   },
   [DITTO_FLAG_ITEM_ID]: {
@@ -148,6 +159,7 @@ export const ITEM_DEFS = {
     glyph: "F",
     color: "#d98bd8",
     ink: "#2b1230",
+    slotRole: "placeable",
     description: "A celebratory flag from Professor Tangrowth. It marks the first home brought back to life on the island."
   },
   flaxFiber: {
@@ -159,6 +171,7 @@ export const ITEM_DEFS = {
     glyph: "F",
     color: "#6f9f61",
     ink: "#0f1710",
+    slotRole: "material",
     description: "A soft strand of plant fiber. Useful for weaving cloth and sturdy cords."
   },
   blackberry: {
@@ -170,6 +183,7 @@ export const ITEM_DEFS = {
     glyph: "B",
     color: "#4b2c6f",
     ink: "#fff1e8",
+    slotRole: "food",
     description: "A dark, sweet berry with a sharp scent. It looks good enough to eat on the spot."
   },
   rowanberry: {
@@ -181,6 +195,7 @@ export const ITEM_DEFS = {
     glyph: "R",
     color: "#b04642",
     ink: "#fff1e8",
+    slotRole: "food",
     description: "A bright berry with a tart skin. Handy for field rations and simple recipes."
   },
   elderberry: {
@@ -192,6 +207,7 @@ export const ITEM_DEFS = {
     glyph: "E",
     color: "#5b3f88",
     ink: "#fff1e8",
+    slotRole: "food",
     description: "A cluster of deep berries that stains your hands. Tangrowth says Pokemon used to love these."
   },
   granite: {
@@ -203,6 +219,7 @@ export const ITEM_DEFS = {
     glyph: "G",
     color: "#7f848d",
     ink: "#16181d",
+    slotRole: "material",
     description: "Just a normal stone you can find anywhere. It can be used as a material for a lot of different things."
   },
   woolYarn: {
@@ -214,6 +231,7 @@ export const ITEM_DEFS = {
     glyph: "Y",
     color: "#d8d3ca",
     ink: "#25231f",
+    slotRole: "material",
     description: "A warm roll of yarn spun from wool. Good for soft repairs and village crafts."
   },
   silkYarn: {
@@ -225,6 +243,7 @@ export const ITEM_DEFS = {
     glyph: "S",
     color: "#8fd0d6",
     ink: "#102326",
+    slotRole: "material",
     description: "A glossy thread bundle with a light shimmer. Rare, delicate, and surprisingly strong."
   },
   bridgeKit: {
@@ -235,6 +254,8 @@ export const ITEM_DEFS = {
     glyph: "K",
     color: "#c89c66",
     ink: "#20140c",
+    slotRole: "placeable",
+    slotRoleLabel: "Repair",
     description: "A compact repair kit packed for mending old crossings and broken supports."
   },
   marshPie: {
@@ -245,6 +266,7 @@ export const ITEM_DEFS = {
     glyph: "P",
     color: "#d58a52",
     ink: "#281108",
+    slotRole: "food",
     description: "A hand-baked pie with a rich marsh aroma. Comfort food with enough heft for a long hike."
   },
   granitePickaxe: {
@@ -255,6 +277,7 @@ export const ITEM_DEFS = {
     glyph: "T",
     color: "#7398b7",
     ink: "#101a22",
+    slotRole: "tool",
     description: "A sturdy pickaxe fitted for breaking hard stone and old barriers."
   },
   burrowRepairKit: {
@@ -265,6 +288,8 @@ export const ITEM_DEFS = {
     glyph: "H",
     color: "#9b7c55",
     ink: "#18120c",
+    slotRole: "placeable",
+    slotRoleLabel: "Repair",
     description: "A field kit with everything needed to patch the old burrow back together."
   },
 };

@@ -696,8 +696,13 @@ describe("createGameplayInteractions", () => {
       active: true,
       purifiable: true
     };
+    const pushNotice = vi.fn();
     const interactions = createInteractions({
-      pushNotice: vi.fn()
+      findNearbyGroundCell: vi.fn(() => ({
+        groundCell: dryGroundCell,
+        distance: 0.2
+      })),
+      pushNotice
     });
     const groundGrassPatches = [];
 
@@ -721,6 +726,9 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(false);
     expect(groundGrassPatches).toEqual([]);
+    expect(pushNotice).toHaveBeenCalledWith(
+      "Leafage needs restored ground. Use Water Gun here first."
+    );
   });
 
   it("shows a tall grass habitat notice when a full grass group is restored", () => {

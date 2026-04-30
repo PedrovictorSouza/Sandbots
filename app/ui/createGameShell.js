@@ -257,7 +257,10 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
             <div class="bag-details-panel__body" id="bag-details-description"></div>
           </aside>
           <div class="hud" id="hud-panel">
-            <span id="hud-instructions">Use WASD ou o analogico esquerdo para falar com Chopper. Ele te orientara no que fazer.</span>
+            <section class="hud-current-action" id="hud-current-action" data-action-kind="neutral" aria-live="polite" aria-label="Current action">
+              <span class="hud-current-action__eyebrow">Current Action</span>
+              <span class="hud-current-action__body" id="hud-instructions">Use WASD ou o analogico esquerdo para falar com Chopper. Ele te orientara no que fazer.</span>
+            </section>
             <div class="hud-context" id="hud-context" aria-live="polite"></div>
             <div class="hud-checklist" id="hud-checklist" aria-label="Quest checks"></div>
             <span id="hud-meta"></span>

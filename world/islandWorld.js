@@ -987,7 +987,9 @@ export function buildNearbyPrompt({
   quest,
   transientMessage,
   getItemLabel,
-  storyState = null
+  storyState = null,
+  activeMoveId = null,
+  pendingWaterGunCount = 0
 }) {
   if (transientMessage) {
     return transientMessage;
@@ -1091,7 +1093,19 @@ export function buildNearbyPrompt({
   }
 
   if (harvestTarget?.groundCell) {
-    return "[Enter] Restore the dry ground";
+    return pendingWaterGunCount > 0 ?
+      `[Enter] Mark dry ground for Squirtle • ${pendingWaterGunCount} queued` :
+      "[Enter] Mark dry ground for Squirtle";
+  }
+
+  if (activeMoveId === "leafage") {
+    return "Leafage: grow tall grass on restored ground.";
+  }
+
+  if (activeMoveId === "waterGun") {
+    return pendingWaterGunCount > 0 ?
+      `Water Gun: Squirtle has ${pendingWaterGunCount} tile${pendingWaterGunCount === 1 ? "" : "s"} queued.` :
+      "Water Gun: mark dry ground for Squirtle to restore.";
   }
 
   return `${quest.title} • ${quest.actionLabel}`;

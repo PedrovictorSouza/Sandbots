@@ -146,9 +146,9 @@ export const SMALL_ISLAND_QUESTS = Object.freeze([
   },
   {
     id: "grow-a-home-patch",
-    title: "Grow a Home Patch",
-    description: "Use the new growth power to prepare a small home patch for the stranded helper.",
-    guidance: "Use Leafage on a clear patch near the helper habitat.",
+    title: "Plant Leafage for Bulbasaur",
+    description: "Use Leafage once on restored ground to start a new green corner for Bulbasaur.",
+    guidance: "Switch to Leafage, choose restored ground near the helper habitat, then press Enter. Keep growing more if you want to shape the full corner.",
     giverId: "leaf-helper",
     status: QUEST_STATUS.LOCKED,
     objectives: [

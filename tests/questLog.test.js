@@ -163,6 +163,39 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="bulbasaur-leafage-reward"');
   });
 
+  it("shows a non-blocking play seed after Leafage is learned", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "grow-a-home-patch");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        bulbasaurDryGrassRequestTurnedIn: true,
+        trackedTaskIds: ["making-habitats"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+    const playSeedIndex = checklistHtml.indexOf("Make a green corner");
+    const habitatIndex = checklistHtml.indexOf("Making habitats");
+
+    expect(quest.title).toBe("Plant Leafage for Bulbasaur");
+    expect(playSeedIndex).toBeGreaterThan(-1);
+    expect(habitatIndex).toBeGreaterThan(-1);
+    expect(playSeedIndex).toBeLessThan(habitatIndex);
+    expect(checklistHtml).toContain("0/4 tall grass grown");
+    expect(logHtml).toContain("play seed");
+    expect(logHtml).toContain('data-task-id="bulbasaur-green-corner-play-seed"');
+
+    storyState.flags.leafageTallGrassCount = 2;
+
+    expect(questLog.renderChecklistHtml(storyState)).toContain("2/4 tall grass grown");
+  });
+
   it("renders the Leppa Berry task with step-specific guidance", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({

@@ -101,6 +101,13 @@ function getDerivedTrackedTaskIds(storyState = {}) {
   }
 
   if (
+    flags.bulbasaurDryGrassRequestTurnedIn &&
+    !flags.leafageTallGrassHabitatCreated
+  ) {
+    derivedTaskIds.push(FIELD_TASK_IDS.BULBASAUR_GREEN_CORNER_PLAY_SEED);
+  }
+
+  if (
     flags.squirtleLeppaRequestAvailable &&
     !flags.leppaBerryGiftComplete
   ) {
@@ -220,7 +227,7 @@ function renderQuestMissionCardHtml(quest) {
 
 function renderTrackedTaskCardHtml(storyState = {}, task) {
   return renderMissionCardHtml({
-    eyebrow: task.background ? "field note" : "tracked",
+    eyebrow: task.eyebrow || (task.background ? "field note" : "tracked"),
     title: task.title,
     copy: getTrackedTaskDescription(storyState, task),
     done: isTrackedTaskDone(storyState, task),

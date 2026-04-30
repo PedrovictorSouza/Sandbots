@@ -1435,6 +1435,12 @@ export function createGameplayInteractions({
           return true;
         }
       }
+
+      const nearbyDryGroundCell = findNearbyGroundCell(playerPosition, groundDeadInstances);
+      if (nearbyDryGroundCell?.groundCell) {
+        pushNotice("Leafage needs restored ground. Use Water Gun here first.");
+        return false;
+      }
     }
 
     if (nearbyHarvestTarget?.groundCell) {

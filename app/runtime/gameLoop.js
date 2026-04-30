@@ -1235,6 +1235,14 @@ export function startGameLoop({
         null;
     const activeQuest = gameplay.getActiveQuest(controls.storyState);
     const activeSystemQuest = gameplay.getActiveSystemQuest?.() || null;
+    const pendingWaterGunGroundCells =
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive ?
+        getPendingSquirtleWaterGunGroundCells() :
+        [];
     const promptCopy = cinematicActive || tutorialActive || skillLearnActive || scriptedInteractionActive ?
       "" :
       gameplay.buildNearbyPrompt({
@@ -1243,7 +1251,9 @@ export function startGameLoop({
         quest: activeQuest,
         transientMessage: hud.getNoticeMessage(),
         getItemLabel: gameplay.getItemLabel,
-        storyState: controls.storyState
+        storyState: controls.storyState,
+        activeMoveId,
+        pendingWaterGunCount: pendingWaterGunGroundCells.length
       });
     const shouldShowGroundCellHighlight =
       !cinematicActive &&
@@ -1253,14 +1263,6 @@ export function startGameLoop({
       !scriptedInteractionActive &&
       !gameplayDialogue.isActive() &&
       Boolean(nearbyHarvestTarget?.groundCell || nearbyHarvestTarget?.leafageGroundCell);
-    const pendingWaterGunGroundCells =
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !scriptedInteractionActive ?
-        getPendingSquirtleWaterGunGroundCells() :
-        [];
 
     if (!cinematicActive && !tutorialActive && !pokedexModalOpen && !skillLearnActive) {
       nextFrame.hud.active = true;

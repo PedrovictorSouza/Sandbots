@@ -1,4 +1,9 @@
 import { createQuestLog } from "./createQuestLog.js";
+import {
+  getInventoryPresentationOrder,
+  getInventorySlotRole,
+  getInventorySlotRoleLabel
+} from "./inventoryPresentation.js";
 
 export function createGameHudController({
   statusElement,
@@ -67,10 +72,8 @@ export function createGameHudController({
     questId: null,
     until: 0
   };
-  const inventorySlotState = {
-    collectedOrder: []
-  };
   const hudBoardElement = hudInstructionsElement?.closest?.(".hud") || hudMetaElement?.closest?.(".hud") || null;
+  const hudCurrentActionElement = hudInstructionsElement?.closest?.(".hud-current-action") || null;
   let hudBoardFlashTimeout = 0;
   let hudBoardEntranceVariant = false;
   const questLog = questSystem ? createQuestLog({ questSystem }) : null;
@@ -123,6 +126,52 @@ export function createGameHudController({
     }
 
     return Date.now();
+  }
+
+  function getHudActionKind(copy = "") {
+    const normalizedCopy = String(copy).toLowerCase();
+
+    if (normalizedCopy.includes("leafage") || normalizedCopy.includes("tall grass")) {
+      return "leafage";
+    }
+
+    if (
+      normalizedCopy.includes("workbench") ||
+      normalizedCopy.includes("campfire") ||
+      normalizedCopy.includes("build") ||
+      normalizedCopy.includes("craft")
+    ) {
+      return "build";
+    }
+
+    if (
+      normalizedCopy.includes("talk") ||
+      normalizedCopy.includes("fale") ||
+      normalizedCopy.includes("[a / e]") ||
+      normalizedCopy.includes("chopper") ||
+      normalizedCopy.includes("bulbasaur")
+    ) {
+      return "talk";
+    }
+
+    if (
+      normalizedCopy.includes("water gun") ||
+      normalizedCopy.includes("dry ground") ||
+      normalizedCopy.includes("queued") ||
+      normalizedCopy.includes("restore")
+    ) {
+      return "water";
+    }
+
+    return "neutral";
+  }
+
+  function syncHudActionKind(copy = "") {
+    if (!hudCurrentActionElement) {
+      return;
+    }
+
+    hudCurrentActionElement.dataset.actionKind = getHudActionKind(copy);
   }
 
   function formatTrackedRecipe(recipe) {
@@ -194,29 +243,24 @@ export function createGameHudController({
       return;
     }
 
-    inventorySlotState.collectedOrder = inventorySlotState.collectedOrder.filter(
-      (itemId) => (inventory[itemId] || 0) > 0
-    );
-
-    for (const itemId of inventoryOrder) {
-      if ((inventory[itemId] || 0) <= 0) {
-        continue;
-      }
-
-      if (!inventorySlotState.collectedOrder.includes(itemId)) {
-        inventorySlotState.collectedOrder.push(itemId);
-      }
-    }
-
-    const visibleItemIds = inventorySlotState.collectedOrder.slice(0, MAX_VISIBLE_INVENTORY_SLOTS);
+    const presentedItemIds = getInventoryPresentationOrder(inventory, inventoryOrder, itemDefs);
+    const visibleItemIds = presentedItemIds.slice(0, MAX_VISIBLE_INVENTORY_SLOTS);
     const emptySlotCount = Math.max(0, MAX_VISIBLE_INVENTORY_SLOTS - visibleItemIds.length);
 
     const filledSlotsHtml = visibleItemIds.map((itemId) => {
       const item = itemDefs[itemId];
       const count = inventory[itemId] || 0;
+      const slotRole = getInventorySlotRole(item);
+      const slotRoleLabel = getInventorySlotRoleLabel(item);
 
       return `
-        <div class="inventory-slot" data-filled="true" data-empty="false">
+        <div
+          class="inventory-slot"
+          data-filled="true"
+          data-empty="false"
+          data-slot-role="${escapeHtml(slotRole)}"
+        >
+          <span class="inventory-slot__role">${escapeHtml(slotRoleLabel)}</span>
           <div
             class="inventory-slot__icon"
             style="--slot-color:${item.color}; --slot-ink:${item.ink}"
@@ -524,11 +568,13 @@ export function createGameHudController({
 
     if (questSystem?.getActiveQuest) {
       const activeQuest = questSystem.getActiveQuest();
-      const nextText = activeQuest ?
-        activeQuest.description :
+      const nextText = promptCopy ||
+        activeQuest?.guidance ||
+        activeQuest?.description ||
         "Explore freely, restore habitats, and check in with helpers.";
       const questChanged = activeQuest?.id && uiCache.hudQuestId !== activeQuest.id;
       uiCache.hudQuestId = activeQuest?.id || uiCache.hudQuestId;
+      syncHudActionKind(nextText);
 
       if (uiCache.hudInstructions === nextText) {
         if (questChanged) {
@@ -548,9 +594,10 @@ export function createGameHudController({
     }
 
     const activeQuest = getActiveQuest(storyState);
-    const nextText = HUD_GUIDE_BY_QUEST_ID[activeQuest?.id] || INITIAL_GAMEPLAY_GUIDE;
+    const nextText = promptCopy || HUD_GUIDE_BY_QUEST_ID[activeQuest?.id] || INITIAL_GAMEPLAY_GUIDE;
     const questChanged = activeQuest?.id && uiCache.hudQuestId !== activeQuest.id;
     uiCache.hudQuestId = activeQuest?.id || uiCache.hudQuestId;
+    syncHudActionKind(nextText);
 
     if (uiCache.hudInstructions === nextText) {
       if (questChanged) {

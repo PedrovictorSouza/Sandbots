@@ -621,6 +621,54 @@
   color: var(--game-ui-muted);
 }
 
+.hud-current-action {
+  display: grid;
+  gap: 5px;
+  padding: 0 0 10px 12px;
+  border-left: 4px solid #b9f3ff;
+  border-bottom: 3px solid #2b202c;
+  background:
+    linear-gradient(90deg, rgba(185, 243, 255, 0.12), rgba(185, 243, 255, 0) 68%);
+}
+
+.hud-current-action[data-action-kind="water"] {
+  border-left-color: #72d7ff;
+  background:
+    linear-gradient(90deg, rgba(68, 183, 255, 0.16), rgba(68, 183, 255, 0) 68%);
+}
+
+.hud-current-action[data-action-kind="leafage"] {
+  border-left-color: #9be56f;
+  background:
+    linear-gradient(90deg, rgba(128, 218, 86, 0.16), rgba(128, 218, 86, 0) 68%);
+}
+
+.hud-current-action[data-action-kind="talk"] {
+  border-left-color: #ffd783;
+  background:
+    linear-gradient(90deg, rgba(255, 215, 131, 0.16), rgba(255, 215, 131, 0) 68%);
+}
+
+.hud-current-action[data-action-kind="build"] {
+  border-left-color: #f2a35f;
+  background:
+    linear-gradient(90deg, rgba(242, 163, 95, 0.16), rgba(242, 163, 95, 0) 68%);
+}
+
+.hud .hud-current-action__eyebrow {
+  color: #b9f3ff;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.hud .hud-current-action__body {
+  color: #fff7d7;
+  font-size: 27px;
+  line-height: 1.05;
+}
+
 .hud-context {
   display: grid;
   gap: 6px;
@@ -1074,6 +1122,38 @@
   font-size: 16px;
   line-height: 1;
   letter-spacing: 0;
+}
+
+.inventory-slot__role {
+  left: 4px;
+  top: 4px;
+  max-width: calc(100% - 28px);
+  color: #b9f3ff;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.inventory-slot[data-slot-role="placeable"] .inventory-slot__role {
+  color: #ffd783;
+}
+
+.inventory-slot[data-slot-role="material"] .inventory-slot__role {
+  color: #9be56f;
+}
+
+.inventory-slot[data-slot-role="recipe"] .inventory-slot__role {
+  color: #f2a35f;
+}
+
+.inventory-slot[data-slot-role="gift"],
+.inventory-slot[data-slot-role="food"] {
+  border-color: #6f557f;
+}
+
+.inventory-slot[data-slot-role="gift"] .inventory-slot__role,
+.inventory-slot[data-slot-role="food"] .inventory-slot__role {
+  color: #ffc2d9;
 }
 
 .inventory-count {

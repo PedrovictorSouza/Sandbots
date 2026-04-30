@@ -120,6 +120,44 @@ describe("createBagUiRuntime", () => {
     expect(bagDetails.setItem).toHaveBeenCalledWith(itemDefs.berry, 2);
   });
 
+  it("uses field-use priority when choosing the first detail item", () => {
+    const bagDetails = {
+      setItem: vi.fn()
+    };
+    const itemDefs = {
+      wood: {
+        id: "wood",
+        bagDetailsEligible: true,
+        label: "Wood",
+        slotRole: "material"
+      },
+      campfire: {
+        id: "campfire",
+        bagDetailsEligible: true,
+        label: "Campfire",
+        slotRole: "placeable"
+      }
+    };
+    const runtime = createBagUiRuntime({
+      bagOnboarding: {
+        setHint: vi.fn()
+      },
+      bagDetails,
+      gameplayUiVisibility: createGameplayUiVisibility(["quest"]),
+      inventory: {
+        wood: 3,
+        campfire: 1
+      },
+      inventoryOrder: ["wood", "campfire"],
+      itemDefs,
+      isBagDetailItemId: (itemId) => Boolean(itemDefs[itemId]?.bagDetailsEligible)
+    });
+
+    runtime.inspect();
+
+    expect(bagDetails.setItem).toHaveBeenCalledWith(itemDefs.campfire, 1);
+  });
+
   it("refreshes details when a collected item becomes selected while details are open", () => {
     const { bagDetails, itemDefs, runtime, storyState } = createRuntime({
       storyState: {
