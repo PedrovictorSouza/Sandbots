@@ -114,9 +114,13 @@ export function createGameScenes({
         introRoomDebugPanel?.hide?.();
         session?.introRoomScene?.exit?.();
         gameplayDialogue?.close?.();
-        session?.spawnActTwoPlayer?.({
-          preserveCamera: previousSceneId === gameFlowValues.CINEMATIC
-        });
+        if (session && !session.playerCharacter) {
+          session.gameplayOpeningRequested = true;
+        } else {
+          session?.spawnActTwoPlayer?.({
+            preserveCamera: false
+          });
+        }
         setUiLayerMode(uiLayer, "game");
         gameplayUiVisibility?.hideAll?.();
         gameplayUiVisibility?.showSections?.(GAMEPLAY_DEFAULT_UI_SECTIONS);

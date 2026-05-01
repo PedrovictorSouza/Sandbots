@@ -46,31 +46,40 @@ export function configurePlayerSpawner(
     consumeJumpRequest
   });
 
-  session.spawnActTwoPlayer = ({ preserveCamera = false } = {}) => {
+  session.spawnActTwoPlayer = ({
+    preserveCamera = false,
+    configureCamera = true,
+    position = ACT_TWO_PLAYER_SPAWN
+  } = {}) => {
     if (session.playerCharacter) {
       return;
     }
 
     session.playerCharacter = characterFactory.createCharacter({
       id: "player",
-      position: ACT_TWO_PLAYER_SPAWN,
+      position,
       speed: 5.1,
       worldHeight: 1.55,
       controller: keyboardController,
       collisionTest
     });
 
+    if (!configureCamera) {
+      syncHudMeta(storyState, inventory, session.playerCharacter.getPosition());
+      return;
+    }
+
     if (preserveCamera) {
       const currentPose = camera.getPose();
 
       camera.startTargetTransition(
-        [ACT_TWO_PLAYER_SPAWN[0], ACT_TWO_PLAYER_CAMERA_TARGET_HEIGHT, ACT_TWO_PLAYER_SPAWN[2]],
+        [position[0], ACT_TWO_PLAYER_CAMERA_TARGET_HEIGHT, position[2]],
         { duration: 1.15 }
       );
       cameraOrbit.sync(currentPose.direction);
     } else {
       camera.setPose({
-        target: [ACT_TWO_PLAYER_SPAWN[0], ACT_TWO_PLAYER_CAMERA_TARGET_HEIGHT, ACT_TWO_PLAYER_SPAWN[2]],
+        target: [position[0], ACT_TWO_PLAYER_CAMERA_TARGET_HEIGHT, position[2]],
         direction: ACT_TWO_PLAYER_CAMERA_DIRECTION,
         zoom: ACT_TWO_PLAYER_CAMERA_ZOOM,
         distance: ACT_TWO_PLAYER_CAMERA_DISTANCE

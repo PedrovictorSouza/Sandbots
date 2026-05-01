@@ -1958,7 +1958,9 @@ export function createApplicationRuntime({
         }
       }
       if (sceneFlowRuntime.sceneDirector.is(GAME_FLOW.GAMEPLAY)) {
-        session.spawnActTwoPlayer?.();
+        if (!session.playerCharacter) {
+          session.gameplayOpeningRequested = true;
+        }
         if (dom.uiLayer instanceof HTMLElement) {
           dom.uiLayer.dataset.mode = "game";
         }

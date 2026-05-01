@@ -804,13 +804,18 @@ export function startGameLoop({
 
     camera.resizeCanvases();
     camera.update(deltaTime);
+    if (session.gameplayOpeningRequested) {
+      gameplayCameraDirector.requestOpening();
+      session.gameplayOpeningRequested = false;
+    }
+
     const gameplayOpeningCameraActive =
       gameplayCameraDirector.beginFrame({
         now,
-        gameplayActive: isGameFlow(gameFlowValues.GAMEPLAY),
-        hasPlayer: Boolean(session.playerCharacter)
+        gameplayActive: isGameFlow(gameFlowValues.GAMEPLAY)
       });
     const movementBlocked = Boolean(
+      gameplayOpeningCameraActive ||
       tutorialMovementLocked ||
       pokedexModalOpen ||
       dialogueActive ||
@@ -848,7 +853,10 @@ export function startGameLoop({
           ui: gameplay.getActiveQuest?.(controls.storyState)?.id || null
         },
         errors: cameraDebugErrors,
-        player: session.playerCharacter?.getPosition?.() || null
+        player: session.playerCharacter?.getPosition?.() || null,
+        ship: session.gameplayOpeningShip?.visible ?
+          session.gameplayOpeningShip.position :
+          null
       });
     }
 
@@ -867,11 +875,18 @@ export function startGameLoop({
       return;
     }
 
-    if (tutorialActive || pokedexModalOpen || skillLearnActive || scriptedInteractionActive) {
+    if (
+      gameplayOpeningCameraActive ||
+      tutorialActive ||
+      pokedexModalOpen ||
+      skillLearnActive ||
+      scriptedInteractionActive
+    ) {
       controls.clearPendingActions();
     }
 
     if (
+      gameplayOpeningCameraActive ||
       tutorialMovementLocked ||
       pokedexModalOpen ||
       dialogueActive ||
@@ -1297,8 +1312,10 @@ export function startGameLoop({
           hud.pushNotice(`+${collectedLeppaBerryCount} Leppa Berry`);
         }
       }
+    }
 
-      if (tutorialCameraFocus) {
+    if (!cinematicActive) {
+      if (tutorialCameraFocus && session.playerCharacter) {
         camera.setPose({
           target: [tutorialCameraFocus[0], 1.25, tutorialCameraFocus[2]],
           direction: cameraOrbit.getDirection(),
@@ -1309,10 +1326,21 @@ export function startGameLoop({
         gameplayCameraDirector.update({
           now,
           gameplayActive: true,
-          playerPosition: session.playerCharacter.getPosition(),
-          canFollow: !dialogueActive && !camera.isTargetTransitionActive()
+          playerPosition: session.playerCharacter?.getPosition?.() || null,
+          canFollow: !dialogueActive && !camera.isTargetTransitionActive(),
+          spawnPlayer(spawnPosition) {
+            session.spawnActTwoPlayer?.({
+              configureCamera: false,
+              position: spawnPosition
+            });
+            return session.playerCharacter?.getPosition?.() || null;
+          },
+          movePlayer(playerPosition) {
+            session.playerCharacter?.setPosition?.(playerPosition);
+          },
+          ship: session.gameplayOpeningShip
         });
-      } else if (!dialogueActive && !camera.isTargetTransitionActive()) {
+      } else if (session.playerCharacter && !dialogueActive && !camera.isTargetTransitionActive()) {
         camera.follow(session.playerCharacter.getPosition());
       }
     }
@@ -1861,6 +1889,38 @@ export function startGameLoop({
           uvRect: rendering.fullUvRect
         }))
     );
+    if (session.gameplayOpeningShip?.visible) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.gameplayOpeningShipTexture,
+        position: session.gameplayOpeningShip.position,
+        size: session.gameplayOpeningShip.size,
+        uvRect: rendering.fullUvRect
+      });
+      nextFrame.render.genericBillboards.push(
+        ...(session.gameplayOpeningShip.dust || []).map((dustParticle) => ({
+          texture: session.playerDustTexture,
+          position: dustParticle.position,
+          size: dustParticle.size,
+          uvRect: rendering.fullUvRect
+        }))
+      );
+      nextFrame.render.genericBillboards.push(
+        ...(session.gameplayOpeningShip.smoke || []).map((smokeParticle) => ({
+          texture: session.gameplayOpeningShipSmokeTexture,
+          position: smokeParticle.position,
+          size: smokeParticle.size,
+          uvRect: rendering.fullUvRect
+        }))
+      );
+      if (session.gameplayOpeningShip.flash) {
+        nextFrame.render.genericBillboards.push({
+          texture: session.gameplayOpeningShipFlashTexture,
+          position: session.gameplayOpeningShip.flash.position,
+          size: session.gameplayOpeningShip.flash.size,
+          uvRect: rendering.fullUvRect
+        });
+      }
+    }
     if (session.logChair && controls.storyState.flags.logChairPlaced) {
       nextFrame.render.genericBillboards.push({
         texture: session.logChairTexture,

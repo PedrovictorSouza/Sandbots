@@ -737,6 +737,45 @@ function createGuideMonsterCanvas() {
   return canvas;
 }
 
+function createOpeningShipCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 96;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(54, 42, 32, 0.32)";
+  context.fillRect(27, 68, 44, 10);
+
+  context.fillStyle = "#8d979b";
+  context.fillRect(24, 26, 48, 34);
+  context.fillStyle = "#657074";
+  context.fillRect(24, 60, 48, 12);
+  context.fillStyle = "#b9c8c8";
+  context.fillRect(30, 20, 36, 12);
+  context.fillStyle = "#f06c57";
+  context.fillRect(30, 38, 18, 14);
+  context.fillStyle = "#6ec7f5";
+  context.fillRect(52, 34, 14, 12);
+
+  context.fillStyle = "#41494d";
+  context.fillRect(18, 48, 10, 18);
+  context.fillRect(68, 48, 10, 18);
+  context.fillStyle = "#e0e2d4";
+  context.fillRect(38, 26, 20, 6);
+  context.fillStyle = "rgba(255, 255, 255, 0.28)";
+  context.fillRect(29, 28, 36, 6);
+
+  context.strokeStyle = "#2d2626";
+  context.lineWidth = 4;
+  context.strokeRect(24, 26, 48, 46);
+
+  return canvas;
+}
+
 function createSquirtlePlaceholderCanvas({ recovered = false } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = 128;
@@ -1309,6 +1348,10 @@ export function createWorldTextureFactory(gl) {
 
     createGuideMonsterTexture() {
       return createTextureFromSource(gl, createGuideMonsterCanvas());
+    },
+
+    createOpeningShipTexture() {
+      return createTextureFromSource(gl, createOpeningShipCanvas());
     },
 
     createSquirtleTexture(options) {

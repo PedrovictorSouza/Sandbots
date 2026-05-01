@@ -70,7 +70,9 @@ export function applyLaunchModeRuntime(launchMode, {
   startScreen?.dismiss?.();
   introSequence?.dismiss?.();
   clearGameFlowInput?.();
-  session?.spawnActTwoPlayer?.();
+  if (session && !session.playerCharacter) {
+    session.gameplayOpeningRequested = true;
+  }
 
   if (launchMode !== LAUNCH_MODE.GAMEPLAY_DEV) {
     return;

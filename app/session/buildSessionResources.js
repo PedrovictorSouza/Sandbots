@@ -39,6 +39,45 @@ function createPlayerDustCanvas() {
   return canvas;
 }
 
+function createShipSmokeCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 36;
+  canvas.height = 32;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(22, 22, 25, 0.78)";
+  context.fillRect(8, 15, 12, 8);
+  context.fillRect(17, 10, 10, 10);
+  context.fillStyle = "rgba(68, 68, 72, 0.62)";
+  context.fillRect(11, 11, 8, 6);
+  context.fillRect(22, 16, 6, 6);
+
+  return canvas;
+}
+
+function createShipImpactFlashCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(255, 245, 186, 0.94)";
+  context.fillRect(13, 3, 6, 26);
+  context.fillRect(3, 13, 26, 6);
+  context.fillStyle = "rgba(255, 117, 67, 0.86)";
+  context.fillRect(10, 10, 12, 12);
+
+  return canvas;
+}
+
 function createNatureRevivalSparkCanvas() {
   const canvas = document.createElement("canvas");
   canvas.width = 24;
@@ -561,6 +600,17 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     null;
   session.playerDustTexture = worldTextureFactory.fromCanvas(createPlayerDustCanvas());
   session.playerDust = createPlayerDustState();
+  session.gameplayOpeningShipTexture = worldTextureFactory.createOpeningShipTexture();
+  session.gameplayOpeningShipSmokeTexture = worldTextureFactory.fromCanvas(createShipSmokeCanvas());
+  session.gameplayOpeningShipFlashTexture = worldTextureFactory.fromCanvas(createShipImpactFlashCanvas());
+  session.gameplayOpeningShip = {
+    visible: false,
+    position: null,
+    size: null,
+    dust: [],
+    flash: null,
+    smoke: []
+  };
   session.natureRevivalSparkTexture = worldTextureFactory.fromCanvas(createNatureRevivalSparkCanvas());
   session.squirtleWaterSprayTexture = worldTextureFactory.fromCanvas(createSquirtleWaterSprayCanvas());
   session.squirtleWaterGunQueue = [];

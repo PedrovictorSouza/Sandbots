@@ -91,6 +91,7 @@ describe("launchMode", () => {
       "seen:true"
     ]);
     expect(playerMemory.foundPokedex).toBe(true);
+    expect(session.gameplayOpeningRequested).toBe(true);
     expect(session.actTwoRepairPlant.fixed).toBe(true);
     expect(session.actTwoSquirtle.recovered).toBe(true);
   });
