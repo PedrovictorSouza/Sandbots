@@ -8,14 +8,13 @@ import {
   ACT_TWO_SQUIRTLE_POSITION,
   ACT_TWO_BULBASAUR_SIZE,
   ACT_TWO_CHARMANDER_SIZE,
-  ACT_TWO_POKEDEX_CACHE_POSITION,
-  ACT_TWO_POKEDEX_CACHE_SIZE,
   ACT_TWO_REPAIR_PLANT_POSITION,
   ACT_TWO_REPAIR_PLANT_SIZE
 } from "../../rendering/worldAssets.js";
 import { createPlayerDustState } from "./playerDustParticles.js";
 import { createNatureRevivalEffectState } from "./natureRevivalEffects.js";
 import { createColliderGizmoTextures } from "./colliderGizmos.js";
+import { createGameplayOpeningShipState } from "./gameplayOpeningShip.js";
 
 function createPlayerDustCanvas() {
   const canvas = document.createElement("canvas");
@@ -571,7 +570,7 @@ function createDittoFlagCanvas() {
 }
 
 export function buildSessionResources(session, assets, { worldTextureFactory }) {
-  const { characterFactory, woodImage, skyImage } = assets;
+  const { characterFactory, woodImage, skyImage, gameplayOpeningShipModel } = assets;
   const characterAssets = characterFactory.getSharedAssets();
 
   session.characterTextures = {
@@ -603,14 +602,9 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.gameplayOpeningShipTexture = worldTextureFactory.createOpeningShipTexture();
   session.gameplayOpeningShipSmokeTexture = worldTextureFactory.fromCanvas(createShipSmokeCanvas());
   session.gameplayOpeningShipFlashTexture = worldTextureFactory.fromCanvas(createShipImpactFlashCanvas());
-  session.gameplayOpeningShip = {
-    visible: false,
-    position: null,
-    size: null,
-    dust: [],
-    flash: null,
-    smoke: []
-  };
+  session.gameplayOpeningShip = createGameplayOpeningShipState({
+    model: gameplayOpeningShipModel
+  });
   session.natureRevivalSparkTexture = worldTextureFactory.fromCanvas(createNatureRevivalSparkCanvas());
   session.squirtleWaterSprayTexture = worldTextureFactory.fromCanvas(createSquirtleWaterSprayCanvas());
   session.squirtleWaterGunQueue = [];
@@ -629,7 +623,6 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     revived: true
   });
 
-  session.pokedexCacheTexture = worldTextureFactory.createPokedexCacheTexture();
   session.repairPlantBrokenTexture = worldTextureFactory.createRepairPlantTexture();
   session.repairPlantFixedTexture = worldTextureFactory.createRepairPlantTexture({
     fixed: true
@@ -671,12 +664,6 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     size: [0.96, 0.96],
     visible: false,
     position: null
-  };
-
-  session.actTwoPokedexCache = {
-    texture: session.pokedexCacheTexture,
-    position: [...ACT_TWO_POKEDEX_CACHE_POSITION],
-    size: ACT_TWO_POKEDEX_CACHE_SIZE
   };
 
   session.actTwoRepairPlant = {

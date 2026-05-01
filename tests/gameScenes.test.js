@@ -44,7 +44,7 @@ describe("createGameScenes", () => {
     expect(session.gameplayOpeningRequested).toBe(true);
     expect(gameplayDialogue.close).toHaveBeenCalled();
     expect(gameplayUiVisibility.hideAll).toHaveBeenCalled();
-    expect(gameplayUiVisibility.showSections).toHaveBeenCalledWith(["hud"]);
+    expect(gameplayUiVisibility.showSections).not.toHaveBeenCalled();
   });
 
   it("does not re-arm the opening when gameplay already has a player", () => {

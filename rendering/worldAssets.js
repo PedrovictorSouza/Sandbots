@@ -9,7 +9,6 @@ export const ACT_TWO_SQUIRTLE_SIZE = [2.24, 2.12];
 export const ACT_TWO_BULBASAUR_SIZE = [2.26, 2.14];
 export const ACT_TWO_CHARMANDER_SIZE = [2.18, 2.08];
 export const ACT_TWO_POKEDEX_CACHE_POSITION = [9.65, 0.02, -8.65];
-export const ACT_TWO_POKEDEX_CACHE_SIZE = [3.1, 2.42];
 export const ACT_TWO_REPAIR_PLANT_POSITION = [28.4, 0.02, -4.4];
 export const ACT_TWO_REPAIR_PLANT_SIZE = [2.8, 2.42];
 export const GROUND_GRASS_SIZE = [1.18, 0.96];
@@ -155,15 +154,22 @@ const SPRITE_VERTEX_SOURCE = `
   uniform vec3 uQuadRight;
   uniform vec3 uQuadUp;
   uniform vec4 uUvRect;
+  uniform float uSpriteRotation;
   uniform vec2 uPixelSnap;
 
   varying vec2 vTexCoord;
 
   void main() {
+    float rotationSine = sin(uSpriteRotation);
+    float rotationCosine = cos(uSpriteRotation);
+    vec2 rotatedCorner = vec2(
+      aCorner.x * rotationCosine - aCorner.y * rotationSine,
+      aCorner.x * rotationSine + aCorner.y * rotationCosine
+    );
     vec3 world =
       uWorldPosition +
-      uQuadRight * (aCorner.x * uSpriteSize.x) +
-      uQuadUp * (aCorner.y * uSpriteSize.y);
+      uQuadRight * (rotatedCorner.x * uSpriteSize.x) +
+      uQuadUp * (rotatedCorner.y * uSpriteSize.y);
 
     vec4 clip = uViewProjection * vec4(world, 1.0);
     vec2 snapped = floor((clip.xy / clip.w) * uPixelSnap + 0.5) / uPixelSnap;
@@ -181,14 +187,16 @@ const SPRITE_FRAGMENT_SOURCE = `
   precision mediump float;
 
   uniform sampler2D uSpriteTexture;
+  uniform float uSpriteAlpha;
   varying vec2 vTexCoord;
 
   void main() {
     vec4 texel = texture2D(uSpriteTexture, vTexCoord);
-    if (texel.a < 0.5) {
+    float alpha = texel.a * uSpriteAlpha;
+    if (alpha < 0.03) {
       discard;
     }
-    gl_FragColor = texel;
+    gl_FragColor = vec4(texel.rgb, alpha);
   }
 `;
 
@@ -386,6 +394,8 @@ export function createWorldRenderingResources(gl) {
     quadRight: gl.getUniformLocation(spriteProgram, "uQuadRight"),
     quadUp: gl.getUniformLocation(spriteProgram, "uQuadUp"),
     uvRect: gl.getUniformLocation(spriteProgram, "uUvRect"),
+    spriteRotation: gl.getUniformLocation(spriteProgram, "uSpriteRotation"),
+    spriteAlpha: gl.getUniformLocation(spriteProgram, "uSpriteAlpha"),
     pixelSnap: gl.getUniformLocation(spriteProgram, "uPixelSnap"),
     spriteTexture: gl.getUniformLocation(spriteProgram, "uSpriteTexture")
   };
@@ -1002,117 +1012,6 @@ function createCharmanderPlaceholderCanvas() {
   return canvas;
 }
 
-function createPokedexCacheCanvas() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 192;
-  canvas.height = 160;
-
-  const context = canvas.getContext("2d");
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "rgba(0, 0, 0, 0)";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  context.strokeStyle = "#8a8f9b";
-  context.lineWidth = 8;
-  context.lineCap = "round";
-  context.beginPath();
-  context.moveTo(18, 112);
-  context.lineTo(62, 86);
-  context.lineTo(126, 86);
-  context.lineTo(168, 114);
-  context.moveTo(26, 112);
-  context.lineTo(8, 136);
-  context.moveTo(152, 114);
-  context.lineTo(182, 136);
-  context.stroke();
-
-  context.fillStyle = "#7c5039";
-  context.beginPath();
-  context.moveTo(34, 92);
-  context.lineTo(124, 92);
-  context.lineTo(142, 126);
-  context.lineTo(58, 126);
-  context.closePath();
-  context.fill();
-
-  context.fillStyle = "#cdd7e4";
-  context.fillRect(48, 96, 10, 28);
-  context.fillRect(118, 96, 10, 28);
-
-  context.fillStyle = "#ebe4d6";
-  context.fillRect(52, 48, 32, 40);
-  context.fillRect(62, 56, 24, 4);
-  context.fillRect(62, 66, 18, 3);
-  context.fillRect(62, 74, 14, 3);
-  context.strokeStyle = "#66738b";
-  context.lineWidth = 3;
-  context.strokeRect(52, 48, 32, 40);
-
-  context.fillStyle = "#f6d24d";
-  context.fillRect(96, 60, 22, 6);
-  context.fillStyle = "#d64f4f";
-  context.fillRect(90, 66, 28, 46);
-  context.fillStyle = "#ffb8b8";
-  context.fillRect(96, 74, 16, 20);
-
-  context.fillStyle = "#c13b2f";
-  context.beginPath();
-  context.ellipse(116, 40, 18, 18, 0, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = "#efe7e2";
-  context.beginPath();
-  context.ellipse(116, 48, 18, 18, 0, 0, Math.PI);
-  context.fill();
-  context.fillStyle = "#2a3342";
-  context.beginPath();
-  context.arc(116, 48, 5.5, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = "#eef4ff";
-  context.beginPath();
-  context.arc(116, 48, 2.4, 0, Math.PI * 2);
-  context.fill();
-
-  context.fillStyle = "#5e7c53";
-  context.beginPath();
-  context.ellipse(150, 54, 16, 20, -0.18, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = "#d8ef7b";
-  context.beginPath();
-  context.ellipse(148, 48, 8, 10, -0.18, 0, Math.PI * 2);
-  context.fill();
-
-  const stackColors = ["#4e7eb6", "#9d455b", "#758e56"];
-  stackColors.forEach((color, index) => {
-    context.fillStyle = color;
-    context.fillRect(118 + index * 6, 74 - index * 10, 24, 10);
-    context.fillStyle = "#efe7d6";
-    context.fillRect(120 + index * 6, 78 - index * 10, 20, 2);
-  });
-
-  context.fillStyle = "#9eb7c2";
-  context.beginPath();
-  context.moveTo(36, 92);
-  context.lineTo(70, 92);
-  context.lineTo(84, 124);
-  context.lineTo(54, 124);
-  context.closePath();
-  context.fill();
-
-  context.strokeStyle = "rgba(34, 18, 14, 0.26)";
-  context.lineWidth = 4;
-  context.beginPath();
-  context.moveTo(46, 126);
-  context.lineTo(138, 126);
-  context.stroke();
-
-  context.fillStyle = "rgba(255, 248, 172, 0.32)";
-  context.beginPath();
-  context.ellipse(116, 124, 56, 18, 0, 0, Math.PI * 2);
-  context.fill();
-
-  return canvas;
-}
-
 function createRepairPlantUnitCanvas({ fixed = false } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = 160;
@@ -1364,10 +1263,6 @@ export function createWorldTextureFactory(gl) {
 
     createCharmanderTexture() {
       return createTextureFromSource(gl, createCharmanderPlaceholderCanvas());
-    },
-
-    createPokedexCacheTexture() {
-      return createTextureFromSource(gl, createPokedexCacheCanvas());
     },
 
     createRepairPlantTexture(options) {

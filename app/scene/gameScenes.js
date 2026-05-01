@@ -110,11 +110,12 @@ export function createGameScenes({
       blocksGameplayInput: false,
       enter({ previousSceneId } = {}) {
         const session = getGameSession();
+        const shouldDelayGameplayHud = session && !session.playerCharacter;
 
         introRoomDebugPanel?.hide?.();
         session?.introRoomScene?.exit?.();
         gameplayDialogue?.close?.();
-        if (session && !session.playerCharacter) {
+        if (shouldDelayGameplayHud) {
           session.gameplayOpeningRequested = true;
         } else {
           session?.spawnActTwoPlayer?.({
@@ -123,7 +124,9 @@ export function createGameScenes({
         }
         setUiLayerMode(uiLayer, "game");
         gameplayUiVisibility?.hideAll?.();
-        gameplayUiVisibility?.showSections?.(GAMEPLAY_DEFAULT_UI_SECTIONS);
+        if (!shouldDelayGameplayHud) {
+          gameplayUiVisibility?.showSections?.(GAMEPLAY_DEFAULT_UI_SECTIONS);
+        }
       },
       handleKeydown(event) {
         return gameplayDialogue?.handleKeydown?.(event);

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createGameplayCameraDirector } from "../app/runtime/gameplayCameraDirector.js";
+import { GAMEPLAY_OPENING_SHIP_EVENTS } from "../app/session/gameplayOpeningShip.js";
 import {
   ACT_TWO_GAMEPLAY_OPENING_CAMERA_HOLD,
   ACT_TWO_GAMEPLAY_OPENING_CAMERA_POSE,
@@ -64,7 +65,10 @@ describe("createGameplayCameraDirector", () => {
     expect(spawnPlayer).not.toHaveBeenCalled();
 
     director.update({
-      now: 1000 + (ACT_TWO_GAMEPLAY_OPENING_SHIP_START * 1000) + 500,
+      now: 1000 + (
+        ACT_TWO_GAMEPLAY_OPENING_SHIP_START +
+        ((ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND - ACT_TWO_GAMEPLAY_OPENING_SHIP_START) * 0.5)
+      ) * 1000,
       gameplayActive: true,
       playerPosition: null,
       ship,
@@ -74,6 +78,9 @@ describe("createGameplayCameraDirector", () => {
     expect(ship.visible).toBe(true);
     expect(ship.position[1]).toBeGreaterThan(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION[1]);
     expect(ship.smoke.length).toBeGreaterThan(0);
+    expect(ship.events.map((event) => event.type)).toContain(
+      GAMEPLAY_OPENING_SHIP_EVENTS.FALL_STARTED
+    );
 
     director.update({
       now: 1000 + (ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND * 1000) + 1,
@@ -92,6 +99,9 @@ describe("createGameplayCameraDirector", () => {
       position: expect.any(Array),
       size: expect.any(Array)
     }));
+    expect(ship.events.map((event) => event.type)).toContain(
+      GAMEPLAY_OPENING_SHIP_EVENTS.IMPACT
+    );
     expect(camera.setPose.mock.calls.at(-1)[0].target).not.toEqual(
       ACT_TWO_GAMEPLAY_OPENING_CAMERA_POSE.target
     );
@@ -112,8 +122,18 @@ describe("createGameplayCameraDirector", () => {
     expect(spawnPlayer).toHaveBeenCalledTimes(1);
     expect(spawnPlayer).toHaveBeenLastCalledWith(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION);
     expect(movePlayer).toHaveBeenCalledTimes(1);
-    expect(movePlayer.mock.calls[0][0][2]).toBeLessThan(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION[2]);
-    expect(movePlayer.mock.calls[0][0][2]).toBeGreaterThan(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION[2]);
+    expect(movePlayer.mock.calls[0][0][2]).toBeGreaterThan(
+      Math.min(
+        ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION[2],
+        ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION[2]
+      )
+    );
+    expect(movePlayer.mock.calls[0][0][2]).toBeLessThan(
+      Math.max(
+        ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION[2],
+        ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION[2]
+      )
+    );
     expect(camera.follow).not.toHaveBeenCalled();
 
     director.update({
@@ -128,6 +148,9 @@ describe("createGameplayCameraDirector", () => {
 
     expect(movePlayer).toHaveBeenLastCalledWith(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION);
     expect(ship.smoke.length).toBeGreaterThan(0);
+    expect(ship.events.map((event) => event.type)).toContain(
+      GAMEPLAY_OPENING_SHIP_EVENTS.SETTLED
+    );
     expect(camera.setPose).toHaveBeenLastCalledWith({
       direction: ACT_TWO_PLAYER_CAMERA_DIRECTION,
       zoom: ACT_TWO_PLAYER_CAMERA_ZOOM,

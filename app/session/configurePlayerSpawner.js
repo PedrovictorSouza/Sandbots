@@ -14,6 +14,7 @@ import {
   createCollisionChecker,
   createKeyboardController
 } from "../../world/islandWorld.js";
+import { getGameplayOpeningShipDynamicBarrier } from "./gameplayOpeningShip.js";
 
 export function configurePlayerSpawner(
   session,
@@ -36,7 +37,10 @@ export function configurePlayerSpawner(
     houseModel,
     palmModel,
     session.palmInstances,
-    () => DYNAMIC_BARRIERS.filter((barrier) => barrier.activeWhen(storyState)),
+    () => [
+      ...DYNAMIC_BARRIERS.filter((barrier) => barrier.activeWhen(storyState)),
+      getGameplayOpeningShipDynamicBarrier(session.gameplayOpeningShip)
+    ].filter(Boolean),
     () => session.elevatedTerrainColliders
   );
 

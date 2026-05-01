@@ -1937,6 +1937,7 @@ export function createApplicationRuntime({
         syncInventoryUi: uiRuntime.syncInventoryUi,
         updateTransientNotice: uiRuntime.updateTransientNotice
       },
+      gameplayUiVisibility: uiRuntime.gameplayUiVisibility,
       rendering: {
         ...engine.rendering,
         debugColliders: runtimeFlags.debugColliders,
@@ -1958,6 +1959,7 @@ export function createApplicationRuntime({
         }
       }
       if (sceneFlowRuntime.sceneDirector.is(GAME_FLOW.GAMEPLAY)) {
+        const shouldDelayGameplayHud = !session.playerCharacter;
         if (!session.playerCharacter) {
           session.gameplayOpeningRequested = true;
         }
@@ -1966,7 +1968,11 @@ export function createApplicationRuntime({
         }
         uiRuntime.gameplayDialogue.close?.();
         uiRuntime.gameplayUiVisibility.hideAll?.();
-        uiRuntime.gameplayUiVisibility.showSections?.(GAMEPLAY_DEFAULT_UI_SECTIONS);
+        uiRuntime.gameplayUiVisibility.showSections?.(
+          shouldDelayGameplayHud ?
+            GAMEPLAY_DEFAULT_UI_SECTIONS.filter((sectionId) => sectionId !== "hud") :
+            GAMEPLAY_DEFAULT_UI_SECTIONS
+        );
         if (runtimeFlags.debugColliders) {
           uiRuntime.pushNotice("Collider gizmos enabled.");
         }

@@ -157,6 +157,8 @@ export function createWorldRenderer({
     gl.uniform3fv(spriteUniforms.quadRight, quadRight);
     gl.uniform3fv(spriteUniforms.quadUp, quadUp);
     gl.uniform1i(spriteUniforms.spriteTexture, 0);
+    gl.uniform1f(spriteUniforms.spriteRotation, 0);
+    gl.uniform1f(spriteUniforms.spriteAlpha, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, spriteQuadBuffer);
     gl.enableVertexAttribArray(spriteAttribs.corner);
@@ -167,12 +169,14 @@ export function createWorldRenderer({
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, spriteQuadIndices);
   }
 
-  function drawSpriteQuad(texture, position, size, uvRect) {
+  function drawSpriteQuad(texture, position, size, uvRect, { alpha = 1, rotation = 0 } = {}) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform3fv(spriteUniforms.worldPosition, position);
     gl.uniform2fv(spriteUniforms.spriteSize, size);
     gl.uniform4fv(spriteUniforms.uvRect, uvRect);
+    gl.uniform1f(spriteUniforms.spriteRotation, rotation || 0);
+    gl.uniform1f(spriteUniforms.spriteAlpha, alpha ?? 1);
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
   }
 
@@ -192,7 +196,11 @@ export function createWorldRenderer({
         billboard.texture,
         billboard.position,
         billboard.size,
-        billboard.uvRect || [0, 0, 1, 1]
+        billboard.uvRect || [0, 0, 1, 1],
+        {
+          alpha: billboard.alpha ?? billboard.opacity ?? 1,
+          rotation: billboard.rotation || 0
+        }
       );
     }
   }
@@ -390,13 +398,13 @@ export function createWorldRenderer({
       }
     },
 
-    drawBillboard(viewProjection, texture, position, size, uvRect = [0, 0, 1, 1]) {
+    drawBillboard(viewProjection, texture, position, size, uvRect = [0, 0, 1, 1], options = {}) {
       if (!texture) {
         return;
       }
 
       prepareSpritePass(viewProjection);
-      drawSpriteQuad(texture, position, size, uvRect);
+      drawSpriteQuad(texture, position, size, uvRect, options);
     },
 
     drawBillboards: drawSpriteBillboards

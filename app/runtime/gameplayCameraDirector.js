@@ -15,6 +15,11 @@ import {
   ACT_TWO_PLAYER_CAMERA_DISTANCE,
   ACT_TWO_PLAYER_CAMERA_ZOOM
 } from "../../actTwoSceneConfig.js";
+import {
+  clearGameplayOpeningShipImpactEffects,
+  updateGameplayOpeningShipFall,
+  updateGameplayOpeningShipPersistentSmoke
+} from "../session/gameplayOpeningShip.js";
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -38,72 +43,6 @@ function lerpVector(from, to, amount) {
   ];
 }
 
-function buildImpactDust(position, impactProgress) {
-  if (impactProgress <= 0) {
-    return [];
-  }
-
-  const dustProgress = clamp01(impactProgress);
-  const dustCount = Math.ceil(dustProgress * 7);
-  const dust = [];
-
-  for (let index = 0; index < dustCount; index += 1) {
-    const angle = index * 1.79;
-    const radius = (0.18 + index * 0.08) * dustProgress;
-    const lift = Math.sin(dustProgress * Math.PI) * (0.1 + index * 0.025);
-    const size = (0.18 + (index % 3) * 0.04) * (1 - dustProgress * 0.28);
-
-    dust.push({
-      position: [
-        position[0] + Math.cos(angle) * radius,
-        position[1] + 0.08 + lift,
-        position[2] + Math.sin(angle) * radius
-      ],
-      size: [size * 1.55, size]
-    });
-  }
-
-  return dust;
-}
-
-function buildSmokeTrail(position, elapsed, intensity = 1) {
-  const smoke = [];
-  const smokeCount = Math.max(3, Math.round(7 * intensity));
-
-  for (let index = 0; index < smokeCount; index += 1) {
-    const age = index / smokeCount;
-    const sway = Math.sin(elapsed * 5.7 + index * 1.31) * 0.12;
-    const rise = age * (0.4 + intensity * 0.22);
-    const drift = age * (0.22 + intensity * 0.12);
-    const size = (0.24 + age * 0.36) * (0.72 + intensity * 0.32);
-
-    smoke.push({
-      position: [
-        position[0] - 0.18 - drift + sway,
-        position[1] + 0.36 + rise,
-        position[2] + 0.1 + age * 0.16
-      ],
-      size: [size * 1.35, size]
-    });
-  }
-
-  return smoke;
-}
-
-function buildImpactFlash(position, impactProgress) {
-  if (impactProgress < 0.44 || impactProgress > 0.95) {
-    return null;
-  }
-
-  const flashProgress = (impactProgress - 0.44) / 0.51;
-  const size = 1.55 * (1 - flashProgress * 0.62);
-
-  return {
-    position: [position[0], position[1] + 0.34, position[2]],
-    size: [size * 1.4, size]
-  };
-}
-
 function getShakenOpeningPose(openingPose, elapsed, shipLandTime, shakeDuration) {
   const shakeProgress = clamp01((elapsed - shipLandTime) / shakeDuration);
 
@@ -111,7 +50,7 @@ function getShakenOpeningPose(openingPose, elapsed, shipLandTime, shakeDuration)
     return openingPose;
   }
 
-  const strength = (1 - shakeProgress) * 0.18;
+  const strength = (1 - shakeProgress) * 0.36;
   const shakeX = Math.sin(elapsed * 85) * strength;
   const shakeY = Math.cos(elapsed * 71) * strength * 0.38;
 
@@ -185,64 +124,21 @@ export function createGameplayCameraDirector({
   }
 
   function updateShip(ship, elapsed) {
-    if (!ship) {
-      return;
-    }
-
-    if (elapsed < shipStartTime) {
-      ship.visible = false;
-      ship.dust = [];
-      ship.flash = null;
-      ship.smoke = [];
-      return;
-    }
-
-    const fallDuration = Math.max(0.001, shipLandTime - shipStartTime);
-    const fallProgress = clamp01((elapsed - shipStartTime) / fallDuration);
-    const impactAge = elapsed - shipLandTime;
-    const impactProgress =
-      impactAge > 1.1 ?
-        0 :
-        clamp01((elapsed - (shipLandTime - 0.42)) / 0.78);
-    const position = lerpVector(
+    updateGameplayOpeningShipFall(ship, {
+      elapsed,
+      shipStartTime,
+      shipLandTime,
       shipStartPosition,
       shipLandPosition,
-      Math.pow(fallProgress, 2.35)
-    );
-    const landed = fallProgress >= 1;
-    const smokePosition = landed ? shipLandPosition : position;
-
-    ship.visible = true;
-    ship.position = landed ? [...shipLandPosition] : position;
-    ship.size = landed && impactAge >= 0 && impactAge < 0.28 ?
-      [shipSize[0] * 1.12, shipSize[1] * 0.86] :
-      [...shipSize];
-    ship.dust = buildImpactDust(shipLandPosition, impactProgress);
-    ship.flash = buildImpactFlash(shipLandPosition, impactProgress);
-    ship.smoke = buildSmokeTrail(
-      smokePosition,
-      elapsed,
-      landed ? 0.82 : 1.18
-    );
+      shipSize
+    });
   }
 
   function updatePersistentSmoke(ship, now) {
-    if (!ship?.visible || !Array.isArray(ship.position)) {
-      return;
-    }
-
-    if (typeof smokeUntil !== "number" || now > smokeUntil) {
-      ship.smoke = [];
-      ship.flash = null;
-      return;
-    }
-
-    ship.smoke = buildSmokeTrail(
-      ship.position,
-      now * 0.001,
-      0.66
-    );
-    ship.flash = null;
+    updateGameplayOpeningShipPersistentSmoke(ship, {
+      now,
+      smokeUntil
+    });
   }
 
   function getPlayerExitPosition(elapsed) {
@@ -352,9 +248,7 @@ export function createGameplayCameraDirector({
       updatePersistentSmoke(ship, now);
     }
 
-    if (openingPlayed && ship?.dust?.length) {
-      ship.dust = [];
-    }
+    clearGameplayOpeningShipImpactEffects(ship);
 
     if (gameplayActive && hasPlayer && canFollow) {
       camera.follow(playerPosition);

@@ -13,7 +13,12 @@ import { getColliderGizmoBillboards } from "../session/colliderGizmos.js";
 import { updateIntroRoomFrame } from "../scenes/introRoom/introRoomSequence.js";
 import { updateChopperNpcActor } from "../session/chopperNpcActor.js";
 import { createGameplayCameraDirector } from "./gameplayCameraDirector.js";
+import {
+  appendGameplayOpeningShipBillboards,
+  getGameplayOpeningShipSceneObjects
+} from "../session/gameplayOpeningShip.js";
 
+const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 1500;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
 const BULBASAUR_WORKBENCH_GUIDE_TARGET = [10.72, 0.02, 3.38];
@@ -97,11 +102,14 @@ export function startGameLoop({
   cameraZoomPresets = [],
   gameplay,
   hud,
+  gameplayUiVisibility = null,
   rendering
 }) {
   let previousTime = performance.now();
   let movementQuestReported = false;
   let movementQuestDistance = 0;
+  let gameplayOpeningHudHidden = false;
+  let gameplayOpeningHudRevealAt = null;
   const frameSnapshotController = createFrameSnapshotController({
     camera,
     mount,
@@ -807,6 +815,9 @@ export function startGameLoop({
     if (session.gameplayOpeningRequested) {
       gameplayCameraDirector.requestOpening();
       session.gameplayOpeningRequested = false;
+      gameplayOpeningHudHidden = true;
+      gameplayOpeningHudRevealAt = null;
+      gameplayUiVisibility?.hideSections?.(["hud"]);
     }
 
     const gameplayOpeningCameraActive =
@@ -1314,6 +1325,8 @@ export function startGameLoop({
       }
     }
 
+    let gameplayOpeningCameraFrame = null;
+
     if (!cinematicActive) {
       if (tutorialCameraFocus && session.playerCharacter) {
         camera.setPose({
@@ -1323,7 +1336,7 @@ export function startGameLoop({
           distance: 7.35
         });
       } else if (isGameFlow(gameFlowValues.GAMEPLAY)) {
-        gameplayCameraDirector.update({
+        gameplayOpeningCameraFrame = gameplayCameraDirector.update({
           now,
           gameplayActive: true,
           playerPosition: session.playerCharacter?.getPosition?.() || null,
@@ -1345,8 +1358,28 @@ export function startGameLoop({
       }
     }
 
+    if (gameplayOpeningCameraFrame?.released && gameplayOpeningHudHidden) {
+      gameplayOpeningHudRevealAt = now + GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS;
+    }
+
+    if (
+      gameplayOpeningHudHidden &&
+      gameplayOpeningHudRevealAt !== null &&
+      now >= gameplayOpeningHudRevealAt &&
+      isGameFlow(gameFlowValues.GAMEPLAY)
+    ) {
+      gameplayUiVisibility?.showSections?.(["hud"]);
+      gameplayOpeningHudHidden = false;
+      gameplayOpeningHudRevealAt = null;
+    }
+
     const nearbyHarvestTarget =
-      session.playerCharacter && !cinematicActive && !tutorialActive && !skillLearnActive && !scriptedInteractionActive ?
+      session.playerCharacter &&
+      !gameplayOpeningCameraActive &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !skillLearnActive &&
+      !scriptedInteractionActive ?
         gameplay.findNearbyActionTarget({
           playerPosition: session.playerCharacter.getPosition(),
           palmModel: session.palmModel,
@@ -1365,7 +1398,12 @@ export function startGameLoop({
         }) :
         null;
     const nearbyInteractable =
-      session.playerCharacter && !cinematicActive && !tutorialActive && !skillLearnActive && !scriptedInteractionActive ?
+      session.playerCharacter &&
+      !gameplayOpeningCameraActive &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !skillLearnActive &&
+      !scriptedInteractionActive ?
         gameplay.findNearbyInteractable(
           session.playerCharacter.getPosition(),
           session.npcActors,
@@ -1381,6 +1419,8 @@ export function startGameLoop({
     const activeQuest = gameplay.getActiveQuest(controls.storyState);
     const activeSystemQuest = gameplay.getActiveSystemQuest?.() || null;
     const pendingWaterGunGroundCells =
+      !gameplayOpeningCameraActive &&
+      !gameplayOpeningHudHidden &&
       !cinematicActive &&
       !tutorialActive &&
       !pokedexModalOpen &&
@@ -1388,7 +1428,12 @@ export function startGameLoop({
       !scriptedInteractionActive ?
         getPendingSquirtleWaterGunGroundCells() :
         [];
-    const promptCopy = cinematicActive || tutorialActive || skillLearnActive || scriptedInteractionActive ?
+    const promptCopy =
+      gameplayOpeningCameraActive ||
+      cinematicActive ||
+      tutorialActive ||
+      skillLearnActive ||
+      scriptedInteractionActive ?
       "" :
       gameplay.buildNearbyPrompt({
         harvestTarget: nearbyHarvestTarget,
@@ -1401,6 +1446,7 @@ export function startGameLoop({
         pendingWaterGunCount: pendingWaterGunGroundCells.length
       });
     const shouldShowGroundCellHighlight =
+      !gameplayOpeningCameraActive &&
       !cinematicActive &&
       !tutorialActive &&
       !pokedexModalOpen &&
@@ -1409,7 +1455,14 @@ export function startGameLoop({
       !gameplayDialogue.isActive() &&
       Boolean(nearbyHarvestTarget?.groundCell || nearbyHarvestTarget?.leafageGroundCell);
 
-    if (!cinematicActive && !tutorialActive && !pokedexModalOpen && !skillLearnActive) {
+    if (
+      !gameplayOpeningCameraActive &&
+      !gameplayOpeningHudHidden &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive
+    ) {
       nextFrame.hud.active = true;
       nextFrame.hud.storyState = controls.storyState;
       nextFrame.hud.inventory = controls.inventory;
@@ -1423,39 +1476,37 @@ export function startGameLoop({
       worldCanvas.height
     );
     nextFrame.render.viewProjection = followedViewProjection;
-    nextFrame.render.sceneObjects = session.sceneObjects;
+    nextFrame.render.sceneObjects = getGameplayOpeningShipSceneObjects(
+      session.sceneObjects,
+      session.gameplayOpeningShip
+    );
     nextFrame.render.skyTexture = session.skyTexture;
 
     const tangrowthActor = session.npcActors.find((npcActor) => npcActor.id === "tangrowth");
     const tangrowthPosition =
       tangrowthActor?.character?.getPosition?.() ||
       null;
-    const shouldShowTangrowthSpeech =
+    const canShowWorldSpaceUi =
+      !gameplayOpeningCameraActive &&
       !cinematicActive &&
       !tutorialActive &&
       !pokedexModalOpen &&
       !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      !gameplayDialogue.isActive();
+    const shouldShowTangrowthSpeech =
+      canShowWorldSpaceUi &&
       activeQuest?.id === "meetTangrowth" &&
       tangrowthPosition;
     const shouldShowTangrowthLogChairSpeech =
       !shouldShowTangrowthSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       controls.storyState.flags.tangrowthLogChairRequestAvailable &&
       !controls.storyState.flags.logChairReceived &&
       tangrowthPosition;
     const shouldShowTangrowthCampfireSpeech =
       !shouldShowTangrowthSpeech &&
       !shouldShowTangrowthLogChairSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       controls.storyState.flags.campfireCrafted &&
       !controls.storyState.flags.campfireSpatOut &&
       tangrowthPosition;
@@ -1463,11 +1514,7 @@ export function startGameLoop({
       !shouldShowTangrowthSpeech &&
       !shouldShowTangrowthLogChairSpeech &&
       !shouldShowTangrowthCampfireSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       controls.storyState.flags.pokemonCenterGuideStarted &&
       !controls.storyState.flags.ruinedPokemonCenterInspected &&
       tangrowthPosition;
@@ -1476,11 +1523,7 @@ export function startGameLoop({
       !shouldShowTangrowthLogChairSpeech &&
       !shouldShowTangrowthCampfireSpeech &&
       !shouldShowTangrowthPokemonCenterSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       controls.storyState.flags.tangrowthHouseTalkAvailable &&
       !controls.storyState.flags.tangrowthHouseTalkComplete &&
       tangrowthPosition;
@@ -1490,11 +1533,7 @@ export function startGameLoop({
       !shouldShowTangrowthCampfireSpeech &&
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       controls.storyState.flags.charmanderCelebrationSuggested &&
       !controls.storyState.flags.charmanderCelebrationComplete &&
       tangrowthPosition;
@@ -1505,11 +1544,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
       controls.storyState.flags.bulbasaurRevealed &&
@@ -1522,11 +1557,7 @@ export function startGameLoop({
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
       controls.storyState.flags.bulbasaurWorkbenchGuideAvailable &&
@@ -1540,11 +1571,7 @@ export function startGameLoop({
       !shouldShowTangrowthCelebrationSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
       controls.storyState.flags.bulbasaurRevealed &&
@@ -1578,11 +1605,7 @@ export function startGameLoop({
           )
         )
       ) &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       Boolean(session.charmanderEncounter?.visible) &&
       Boolean(session.charmanderEncounter?.position) &&
       controls.storyState.flags.charmanderRevealed &&
@@ -1597,11 +1620,7 @@ export function startGameLoop({
       !shouldShowBulbasaurMissionSpeech &&
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
       !shouldShowBulbasaurRequestReadySpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
       controls.storyState.flags.bulbasaurStrawBedChallengeComplete &&
@@ -1617,11 +1636,7 @@ export function startGameLoop({
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
       !shouldShowBulbasaurRequestReadySpeech &&
       !shouldShowBulbasaurStrawBedSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
       controls.storyState.flags.strawBedPlacedInBulbasaurHabitat &&
@@ -1639,11 +1654,7 @@ export function startGameLoop({
       !shouldShowCharmanderFollowSpeech &&
       !shouldShowBulbasaurStrawBedSpeech &&
       !shouldShowBulbasaurStrawBedCompleteSpeech &&
-      !cinematicActive &&
-      !tutorialActive &&
-      !pokedexModalOpen &&
-      !skillLearnActive &&
-      !gameplayDialogue.isActive() &&
+      canShowWorldSpaceUi &&
       Boolean(session.charmanderEncounter?.visible) &&
       Boolean(session.charmanderEncounter?.position) &&
       controls.storyState.flags.charmanderCelebrationRequestAvailable &&
@@ -1758,6 +1769,7 @@ export function startGameLoop({
     if (
       questCompletionPop?.text &&
       session.playerCharacter &&
+      !gameplayOpeningCameraActive &&
       !cinematicActive &&
       !tutorialActive &&
       !pokedexModalOpen
@@ -1854,7 +1866,7 @@ export function startGameLoop({
       });
     }
 
-    if (!cinematicActive && !tutorialActive) {
+    if (!gameplayOpeningCameraActive && !cinematicActive && !tutorialActive) {
       nextFrame.render.worldMarkers = {
         storyState: controls.storyState,
         resourceNodes: session.resourceNodes,
@@ -1889,38 +1901,15 @@ export function startGameLoop({
           uvRect: rendering.fullUvRect
         }))
     );
-    if (session.gameplayOpeningShip?.visible) {
-      nextFrame.render.genericBillboards.push({
-        texture: session.gameplayOpeningShipTexture,
-        position: session.gameplayOpeningShip.position,
-        size: session.gameplayOpeningShip.size,
-        uvRect: rendering.fullUvRect
-      });
-      nextFrame.render.genericBillboards.push(
-        ...(session.gameplayOpeningShip.dust || []).map((dustParticle) => ({
-          texture: session.playerDustTexture,
-          position: dustParticle.position,
-          size: dustParticle.size,
-          uvRect: rendering.fullUvRect
-        }))
-      );
-      nextFrame.render.genericBillboards.push(
-        ...(session.gameplayOpeningShip.smoke || []).map((smokeParticle) => ({
-          texture: session.gameplayOpeningShipSmokeTexture,
-          position: smokeParticle.position,
-          size: smokeParticle.size,
-          uvRect: rendering.fullUvRect
-        }))
-      );
-      if (session.gameplayOpeningShip.flash) {
-        nextFrame.render.genericBillboards.push({
-          texture: session.gameplayOpeningShipFlashTexture,
-          position: session.gameplayOpeningShip.flash.position,
-          size: session.gameplayOpeningShip.flash.size,
-          uvRect: rendering.fullUvRect
-        });
-      }
-    }
+    appendGameplayOpeningShipBillboards({
+      billboards: nextFrame.render.genericBillboards,
+      ship: session.gameplayOpeningShip,
+      fallbackTexture: session.gameplayOpeningShipTexture,
+      dustTexture: session.playerDustTexture,
+      smokeTexture: session.gameplayOpeningShipSmokeTexture,
+      flashTexture: session.gameplayOpeningShipFlashTexture,
+      fullUvRect: rendering.fullUvRect
+    });
     if (session.logChair && controls.storyState.flags.logChairPlaced) {
       nextFrame.render.genericBillboards.push({
         texture: session.logChairTexture,
@@ -1998,13 +1987,6 @@ export function startGameLoop({
         uvRect: rendering.fullUvRect
       });
     }
-    nextFrame.render.genericBillboards.push({
-      texture: session.actTwoPokedexCache?.texture || null,
-      position: session.actTwoPokedexCache?.position || null,
-      size: session.actTwoPokedexCache?.size || null,
-      uvRect: rendering.fullUvRect
-    });
-
     if (session.actTwoRepairPlant) {
       const repairPlantTexture = session.actTwoRepairPlant.fixed ?
         session.repairPlantFixedTexture :

@@ -265,13 +265,32 @@ function commitRender(worldRenderer, snapshot) {
   worldRenderer.drawWoodDrops(viewProjection, render.woodTexture, render.woodDrops || []);
 
   for (const billboard of render.genericBillboards) {
-    worldRenderer.drawBillboard(
-      viewProjection,
-      billboard.texture,
-      billboard.position,
-      billboard.size,
-      billboard.uvRect
-    );
+    const hasSpriteOptions =
+      billboard.alpha !== undefined ||
+      billboard.opacity !== undefined ||
+      billboard.rotation !== undefined;
+
+    if (hasSpriteOptions) {
+      worldRenderer.drawBillboard(
+        viewProjection,
+        billboard.texture,
+        billboard.position,
+        billboard.size,
+        billboard.uvRect,
+        {
+          alpha: billboard.alpha ?? billboard.opacity ?? 1,
+          rotation: billboard.rotation || 0
+        }
+      );
+    } else {
+      worldRenderer.drawBillboard(
+        viewProjection,
+        billboard.texture,
+        billboard.position,
+        billboard.size,
+        billboard.uvRect
+      );
+    }
   }
 
   if (render.characters) {
