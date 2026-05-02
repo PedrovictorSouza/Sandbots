@@ -11,10 +11,10 @@ import {
 import { QUEST_EVENT } from "../app/quest/questData.js";
 import { HABITAT_EVENT } from "../app/sandbox/habitatData.js";
 import {
+  collectLeppaBerryDrops,
   dropLeppaBerryFromTree,
   findNearbyLeafDen,
-  findNearbyLeppaTree,
-  reviveLeppaTree
+  reviveLeppaTreeFromWateredTiles
 } from "./islandWorld.js";
 
 const BULBASAUR_RUSTLING_GRASS_RESTORE_COUNT = 4;
@@ -88,6 +88,35 @@ export function createGameplayInteractions({
   habitatSystem = null
 }) {
   let nextWoodDropId = 1;
+  let missedInteractAttempts = 0;
+  let missedHarvestAttempts = 0;
+
+  function pushMissedInteractNotice() {
+    missedInteractAttempts += 1;
+
+    pushNotice(
+      missedInteractAttempts >= 2 ?
+        "Still nothing nearby. Look for a PRESS X bubble or move closer, then press A / E / X." :
+        "Nothing to talk to nearby. Move closer to a marker or character, then press E."
+    );
+  }
+
+  function pushMissedHarvestNotice({ canPurifyGround = false, canUseLeafage = false } = {}) {
+    missedHarvestAttempts += 1;
+
+    if (missedHarvestAttempts >= 2) {
+      pushNotice("Still no target. Move until a tile outline or PRESS X bubble appears, then press Enter / X.");
+      return;
+    }
+
+    pushNotice(
+      canPurifyGround ?
+        "No target in range. Move closer to dry ground, grass, a tree, or a marker, then press Enter." :
+        canUseLeafage ?
+          "No target in range. Move closer to clear ground, then press Enter to use Leafage." :
+        "No resource in range. Move closer to a tree or drop, then press Enter."
+    );
+  }
 
   function getRestoredPatchHabitat(revivedPatch, patches) {
     const habitatGroupId = revivedPatch?.habitatGroupId;
@@ -947,12 +976,6 @@ export function createGameplayInteractions({
       resourceNodes,
       storyState
     );
-    const leppaTreeHeadbuttAvailable = Boolean(
-      storyState?.flags?.leppaTreeRevived || leppaTree?.revived
-    );
-    const nearbyLeppaTree = (canPurifyGround || leppaTreeHeadbuttAvailable) ?
-      findNearbyLeppaTree(playerPosition, leppaTree, storyState) :
-      null;
     let nearestTarget = nearbyHarvestTarget;
 
     if (
@@ -1025,10 +1048,6 @@ export function createGameplayInteractions({
       }
     }
 
-    if (nearbyLeppaTree) {
-      return nearbyLeppaTree;
-    }
-
     const nearbyLeafageTarget = canUseLeafage ?
       findNearbyLeafageGroundCell({
         playerPosition,
@@ -1071,6 +1090,8 @@ export function createGameplayInteractions({
     groundGrassPatches = [],
     logChair = null,
     leafDen = null,
+    leppaTree = null,
+    leppaBerryDrops = [],
     timburrEncounter = null,
     charmanderEncounter = null,
     onNpcInteractionStart = () => {}
@@ -1132,13 +1153,15 @@ export function createGameplayInteractions({
       logChair,
       leafDen,
       timburrEncounter,
-      charmanderEncounter
+      charmanderEncounter,
+      leppaTree
     );
     if (!nearbyTarget?.target) {
-      pushNotice("Nothing to talk to nearby. Move closer to a marker or character, then press E.");
+      pushMissedInteractNotice();
       return false;
     }
 
+    missedInteractAttempts = 0;
     const { target } = nearbyTarget;
 
     if (target.kind === "npc") {
@@ -1211,6 +1234,30 @@ export function createGameplayInteractions({
     if (target.kind === "bulbasaurStrawBedComplete") {
       notifyInteractionStart(target);
       onBulbasaurStrawBedRequestCompleted();
+      return true;
+    }
+
+    if (target.kind === "leppaBerryTree") {
+      const drop = dropLeppaBerryFromTree(leppaTree, leppaBerryDrops, storyState);
+      if (!drop) {
+        pushNotice("The tree has already dropped its Leppa Berry.");
+        return false;
+      }
+
+      const collected = collectLeppaBerryDrops(
+        drop.position,
+        leppaBerryDrops,
+        inventory,
+        storyState
+      );
+
+      if (collected > 0) {
+        syncInventoryUi(inventory);
+        pushNotice(`+${collected} Leppa Berry`);
+      } else {
+        pushNotice("A Leppa Berry fell from the tree.");
+      }
+
       return true;
     }
 
@@ -1319,6 +1366,10 @@ export function createGameplayInteractions({
       canUseLeafage
     });
 
+    if (nearbyHarvestTarget) {
+      missedHarvestAttempts = 0;
+    }
+
     if (nearbyHarvestTarget?.logChairPlacement) {
       onLogChairPlacementRequested({
         playerPosition
@@ -1357,32 +1408,6 @@ export function createGameplayInteractions({
         placementTarget: nearbyHarvestTarget.dittoFlagPlacement
       });
       return true;
-    }
-
-    if (nearbyHarvestTarget?.leppaTree) {
-      if (nearbyHarvestTarget.action === "water") {
-        const revived = reviveLeppaTree(nearbyHarvestTarget.leppaTree, storyState);
-        if (revived) {
-          pushNotice("The dead tree perked back up.");
-          return true;
-        }
-      }
-
-      if (nearbyHarvestTarget.action === "headbutt") {
-        const drop = dropLeppaBerryFromTree(
-          nearbyHarvestTarget.leppaTree,
-          leppaBerryDrops,
-          storyState
-        );
-
-        if (drop) {
-          pushNotice("A Leppa Berry fell from the tree.");
-          return true;
-        }
-
-        pushNotice("The tree has already dropped its Leppa Berry.");
-        return false;
-      }
     }
 
     if (useWaterGun && nearbyHarvestTarget?.palm) {
@@ -1492,6 +1517,16 @@ export function createGameplayInteractions({
       );
 
       if (purified) {
+        if (
+          reviveLeppaTreeFromWateredTiles(
+            leppaTree,
+            storyState,
+            groundPurifiedInstances
+          )
+        ) {
+          pushNotice("The dead tree perked back up.");
+        }
+
         questSystem?.emit?.({
           type: QUEST_EVENT.BUILD,
           targetId: "revived-habitat"
@@ -1622,16 +1657,11 @@ export function createGameplayInteractions({
       nextWoodDropId
     );
     if (!palmStrike.hit) {
-      pushNotice(
-        canPurifyGround ?
-          "No target in range. Move closer to dry ground, grass, a tree, or a marker, then press Enter." :
-          canUseLeafage ?
-            "No target in range. Move closer to clear ground, then press Enter to use Leafage." :
-          "No resource in range. Move closer to a tree or drop, then press Enter."
-      );
+      pushMissedHarvestNotice({ canPurifyGround, canUseLeafage });
       return false;
     }
 
+    missedHarvestAttempts = 0;
     nextWoodDropId = palmStrike.nextWoodDropId;
     pushNotice(
       palmStrike.felled ?

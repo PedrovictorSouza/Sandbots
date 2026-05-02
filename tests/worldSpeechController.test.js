@@ -46,4 +46,13 @@ describe("createWorldSpeechController", () => {
     expect(layer?.hidden).toBe(true);
     expect(controller.isVisible()).toBe(false);
   });
+
+  it("keeps NPC communication bubbles behind the HUD layer", () => {
+    const mount = document.createElement("div");
+    createWorldSpeechController({ mount });
+
+    const layer = mount.querySelector("[data-world-speech-layer='true']");
+
+    expect(Number(layer?.style.zIndex)).toBeLessThan(2);
+  });
 });

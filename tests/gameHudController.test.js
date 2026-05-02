@@ -126,10 +126,18 @@ describe("createGameHudController", () => {
     inventoryPanelElement.append(inventoryTitleElement, inventoryGridElement);
     const skillsPanelElement = document.createElement("div");
     const skillsGridElement = document.createElement("div");
+    const hudInstructionsElement = document.createElement("span");
     const controller = createGameHudController({
+      hudInstructionsElement,
       inventoryGridElement,
       skillsPanelElement,
       skillsGridElement,
+      questSystem: {
+        getActiveQuest: () => ({
+          id: "makingHabitats",
+          guidance: "Restore one nearby patch."
+        })
+      },
       playerSkillOrder: ["waterGun", "leafage"],
       playerSkillDefs: {
         waterGun: {
@@ -146,8 +154,11 @@ describe("createGameHudController", () => {
         }
       }
     });
+    const unlockedSkills = { waterGun: true, leafage: true };
 
-    controller.syncSkillsUi({ waterGun: true, leafage: true }, "waterGun");
+    controller.syncSkillsUi(unlockedSkills, "waterGun", {
+      flags: {}
+    });
 
     const companionHudElement = inventoryPanelElement.querySelector(".active-companion-hud");
     expect(inventoryPanelElement.querySelector(".inventory-header strong")?.textContent).toBe("Supplies");
@@ -155,12 +166,25 @@ describe("createGameHudController", () => {
     expect(companionHudElement?.dataset.companionId).toBe("squirtle");
     expect(companionHudElement?.textContent).toContain("Water");
     expect(companionHudElement?.textContent).toContain("Squirtle");
+    expect(companionHudElement?.textContent).toContain("mark dry ground");
 
-    controller.syncSkillsUi({ waterGun: true, leafage: true }, "leafage");
+    controller.syncHudInstructions({
+      flags: {
+        firstGrassRestored: true
+      }
+    });
+
+    expect(companionHudElement?.textContent).not.toContain("Squirtle will move over and restore it");
+    expect(companionHudElement?.textContent).toContain("mark dry ground for Squirtle to restore");
+
+    controller.syncSkillsUi(unlockedSkills, "leafage", {
+      flags: {}
+    });
 
     expect(companionHudElement?.dataset.companionId).toBe("bulbasaur");
     expect(companionHudElement?.textContent).toContain("Leaf");
     expect(companionHudElement?.textContent).toContain("Bulbasaur");
+    expect(companionHudElement?.textContent).toContain("restored ground");
 
     controller.syncSkillsUi({ waterGun: true, leafage: false }, "leafage");
 
@@ -200,6 +224,7 @@ describe("createGameHudController", () => {
 
     expect(missionsStackElement.innerHTML).toContain('data-task-id="making-habitats"');
     expect(hudChecklistElement.innerHTML).toContain("Making habitats");
+    expect(controller.getNoticeMessage()).toBe("");
 
     storyState.flags.makingHabitatsComplete = true;
     nowSpy.mockReturnValue(1500);
@@ -209,6 +234,7 @@ describe("createGameHudController", () => {
     expect(missionsStackElement.innerHTML).toContain('data-task-flashing="true"');
     expect(hudChecklistElement.innerHTML).toContain('data-task-flashing="true"');
     expect(hudChecklistElement.innerHTML).toContain("Making habitats");
+    expect(controller.getNoticeMessage()).toBe("Task complete: Making habitats.");
 
     nowSpy.mockReturnValue(4601);
     controller.renderMissionCards(storyState, {}, "");
@@ -216,5 +242,6 @@ describe("createGameHudController", () => {
 
     expect(missionsStackElement.innerHTML).not.toContain('data-task-id="making-habitats"');
     expect(hudChecklistElement.innerHTML).not.toContain("Making habitats");
+    expect(controller.getNoticeMessage()).toBe("Task complete: Making habitats.");
   });
 });

@@ -48,6 +48,10 @@ const CINEMATIC_KEYFRAMES = [
 const TITLE_VISIBLE_FOR = 2.8;
 const REVEAL_DURATION = 1.15;
 const END_HOLD = 0.55;
+const SKIP_HOLD_DURATION = 0.65;
+const SKIP_PROMPT_VISIBLE_FOR = 1.6;
+const SKIP_KEY_CODES = new Set(["Enter", "KeyX", "Space", "Escape"]);
+const FEEDBACK_KEY_CODES = new Set(["Enter", "KeyX", "Space", "KeyE", "KeyM", "Escape"]);
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -126,6 +130,9 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
     active: false,
     elapsed: 0,
     totalDuration: getTotalDuration(),
+    skipHoldActive: false,
+    skipHoldElapsed: 0,
+    skipPromptUntil: 0,
   };
 
   let refs = null;
@@ -146,12 +153,18 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
           <span>${ACT_TWO_TITLE}</span>
           <strong>${ACT_TWO_SUBTITLE}</strong>
         </div>
+        <div class="cinematic-shell__skip-prompt" aria-hidden="true">
+          <span>Hold X / Enter to skip</span>
+          <i></i>
+        </div>
       </div>
     `;
 
     refs = {
       veil: root.querySelector(".cinematic-shell__veil"),
       title: root.querySelector(".cinematic-shell__title"),
+      skipPrompt: root.querySelector(".cinematic-shell__skip-prompt"),
+      skipProgress: root.querySelector(".cinematic-shell__skip-prompt i"),
     };
   }
 
@@ -168,10 +181,21 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
 
     refs.veil.style.opacity = `${getRevealOpacity(state.elapsed)}`;
     refs.title.style.opacity = `${getTitleOpacity(state.elapsed)}`;
+
+    if (refs.skipPrompt && refs.skipProgress) {
+      const promptVisible = state.skipHoldActive || state.elapsed < state.skipPromptUntil;
+      const skipProgress = clamp01(state.skipHoldElapsed / SKIP_HOLD_DURATION);
+      refs.skipPrompt.style.opacity = promptVisible ? "1" : "0";
+      refs.skipPrompt.style.transform = promptVisible ? "translate(-50%, 0)" : "translate(-50%, 8px)";
+      refs.skipProgress.style.transform = `scaleX(${skipProgress})`;
+    }
   }
 
   function finish() {
     state.active = false;
+    state.skipHoldActive = false;
+    state.skipHoldElapsed = 0;
+    state.skipPromptUntil = 0;
     syncUiMode();
     unmount();
     onComplete();
@@ -180,9 +204,17 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
   function start() {
     state.active = true;
     state.elapsed = 0;
+    state.skipHoldActive = false;
+    state.skipHoldElapsed = 0;
+    state.skipPromptUntil = 0;
     syncUiMode();
     mount();
     camera.setPose(CINEMATIC_KEYFRAMES[0]);
+    applyVisuals();
+  }
+
+  function showSkipPrompt() {
+    state.skipPromptUntil = Math.max(state.skipPromptUntil, state.elapsed + SKIP_PROMPT_VISIBLE_FOR);
     applyVisuals();
   }
 
@@ -192,6 +224,15 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
     }
 
     state.elapsed = Math.min(state.totalDuration, state.elapsed + deltaTime);
+
+    if (state.skipHoldActive) {
+      state.skipHoldElapsed = Math.min(SKIP_HOLD_DURATION, state.skipHoldElapsed + deltaTime);
+      if (state.skipHoldElapsed >= SKIP_HOLD_DURATION) {
+        finish();
+        return;
+      }
+    }
+
     camera.setPose(getPoseAtTime(state.elapsed));
     applyVisuals();
 
@@ -211,13 +252,19 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
         return false;
       }
 
+      const key = String(event.key || "").toLowerCase();
+
       if (
-        event.code === "Space" ||
-        event.code === "KeyE" ||
-        event.code === "KeyM" ||
-        event.code === "Escape" ||
-        ["w", "a", "s", "d"].includes(event.key.toLowerCase())
+        SKIP_KEY_CODES.has(event.code) ||
+        FEEDBACK_KEY_CODES.has(event.code) ||
+        ["w", "a", "s", "d"].includes(key)
       ) {
+        showSkipPrompt();
+        if (SKIP_KEY_CODES.has(event.code) && !event.repeat) {
+          state.skipHoldActive = true;
+          state.skipHoldElapsed = 0;
+          applyVisuals();
+        }
         event.preventDefault();
         return true;
       }
@@ -229,7 +276,17 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
         return false;
       }
 
-      if (["w", "a", "s", "d"].includes(event.key.toLowerCase())) {
+      const key = String(event.key || "").toLowerCase();
+
+      if (SKIP_KEY_CODES.has(event.code)) {
+        state.skipHoldActive = false;
+        state.skipHoldElapsed = 0;
+        showSkipPrompt();
+        event.preventDefault();
+        return true;
+      }
+
+      if (["w", "a", "s", "d"].includes(key)) {
         event.preventDefault();
         return true;
       }

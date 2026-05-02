@@ -108,7 +108,7 @@
 
       .scene-transition-veil.overlay-transition {
         opacity: 0;
-        transition: opacity 220ms ease;
+        transition: opacity 160ms ease;
       }
 
       .scene-transition-veil.overlay-transition--enter {
@@ -123,8 +123,8 @@
         opacity: 1;
         transform: scale(1);
         transition:
-          opacity 260ms ease,
-          transform 260ms ease;
+          opacity 180ms ease,
+          transform 180ms ease;
       }
 
       .start-overlay.overlay-transition--enter {
@@ -335,8 +335,8 @@
         opacity: 0;
         transform: scale(1.01);
         transition:
-          opacity 220ms ease,
-          transform 220ms ease;
+          opacity 170ms ease,
+          transform 170ms ease;
       }
 
       .intro-overlay.overlay-transition--enter {
@@ -934,6 +934,34 @@
         font-size: clamp(30px, 4vw, 52px);
         line-height: 1.02;
         font-weight: 700;
+      }
+
+      .cinematic-shell__skip-prompt {
+        position: absolute;
+        left: 50%;
+        bottom: clamp(22px, 5vh, 54px);
+        width: min(340px, calc(100% - 40px));
+        display: grid;
+        gap: 8px;
+        transform: translate(-50%, 8px);
+        opacity: 0;
+        color: #fff1d0;
+        font-family: var(--game-ui-font);
+        font-size: 16px;
+        line-height: 1;
+        text-align: center;
+        text-shadow: 0 3px 0 rgba(0, 0, 0, 0.42);
+        transition: opacity 110ms ease, transform 110ms ease;
+      }
+
+      .cinematic-shell__skip-prompt i {
+        display: block;
+        height: 4px;
+        width: 100%;
+        transform: scaleX(0);
+        transform-origin: left center;
+        background: #fff1d0;
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.42);
       }
 
       .tutorial-overlay {

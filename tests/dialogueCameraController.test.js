@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDialogueCameraController } from "../app/runtime/dialogueCameraController.js";
+import { ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS } from "../actTwoSceneConfig.js";
 
 describe("createDialogueCameraController", () => {
-  it("restores the original gameplay camera after chained scripted focuses", () => {
+  it("restores chained scripted focuses to the open gameplay zoom", () => {
+    const openGameplayPreset = ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS.find((preset) => {
+      return preset.id === "far";
+    });
     const gameplayPose = {
       target: [0, 0, 0],
       direction: [0, 0.5, 1],
-      zoom: 2,
-      distance: 8
+      zoom: 4.7,
+      distance: 6.2
     };
     let currentPose = gameplayPose;
     const camera = {
@@ -38,9 +42,17 @@ describe("createDialogueCameraController", () => {
     dialogueCamera.restoreGameplayCamera();
 
     expect(camera.startPoseTransition).toHaveBeenLastCalledWith(
-      gameplayPose,
+      {
+        ...gameplayPose,
+        zoom: openGameplayPreset.zoom,
+        distance: openGameplayPreset.distance
+      },
       expect.objectContaining({ duration: expect.any(Number) })
     );
+  });
+
+  it("keeps the close framing out of gameplay zoom presets", () => {
+    expect(ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS.some((preset) => preset.id === "close")).toBe(false);
   });
 
   it("can frame a conversation from an explicit dynamic target position", () => {

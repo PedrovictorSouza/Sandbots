@@ -160,10 +160,10 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       }
 
       if (flags.leppaTreeRevived) {
-        return "Headbutt the revived tree to drop a Leppa Berry.";
+        return "Press X by the revived tree to pick a Leppa Berry.";
       }
 
-      return "Use Water Gun at the dead tree to revive it.";
+      return "Use Water Gun on the four tiles around a dead tree to revive it.";
     },
     completeFlag: "leppaBerryGiftComplete"
   },

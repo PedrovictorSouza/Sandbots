@@ -43,8 +43,7 @@ function formatObjectiveLabel(objective) {
 }
 
 function formatQuestSummary(quest) {
-  const guidance = quest.guidance ? ` Next: ${quest.guidance}` : "";
-  return `${quest.title}. ${quest.description}${guidance}`;
+  return `${quest.title}. ${quest.description}`;
 }
 
 function renderQuestSummaryHtml(quest) {
@@ -58,7 +57,6 @@ function renderQuestSummaryHtml(quest) {
   return `
     <div class="hud-task-title">${escapeHtml(quest.title)}</div>
     <div class="hud-task-subtitle">${escapeHtml(quest.description)}</div>
-    ${quest.guidance ? `<div class="hud-task-guidance">Next: ${escapeHtml(quest.guidance)}</div>` : ""}
   `;
 }
 

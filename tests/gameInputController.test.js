@@ -98,30 +98,7 @@ describe("createGameInputController", () => {
     expect(requestPokedexOpen).toHaveBeenCalledTimes(2);
   });
 
-  it("requests contextual interaction once per A button press", () => {
-    const gamepad = createGamepad();
-    const windowRef = {
-      navigator: {
-        getGamepads: () => [gamepad]
-      }
-    };
-    const { controller, requestInteract } = createController({ windowRef });
-
-    gamepad.buttons[GAMEPAD_BUTTONS.A] = { pressed: true, value: 1 };
-    controller.updateGamepads(1 / 60);
-    controller.updateGamepads(1 / 60);
-
-    expect(requestInteract).toHaveBeenCalledTimes(1);
-
-    gamepad.buttons[GAMEPAD_BUTTONS.A] = { pressed: false, value: 0 };
-    controller.updateGamepads(1 / 60);
-    gamepad.buttons[GAMEPAD_BUTTONS.A] = { pressed: true, value: 1 };
-    controller.updateGamepads(1 / 60);
-
-    expect(requestInteract).toHaveBeenCalledTimes(2);
-  });
-
-  it("uses the gamepad A button for nearby field actions", () => {
+  it("keeps the gamepad A button as run-only input", () => {
     const gamepad = createGamepad();
     const windowRef = {
       navigator: {
@@ -138,8 +115,36 @@ describe("createGameInputController", () => {
     controller.updateGamepads(1 / 60);
     controller.updateGamepads(1 / 60);
 
-    expect(shouldGamepadButtonHarvest).toHaveBeenCalledTimes(1);
-    expect(requestHarvest).toHaveBeenCalledTimes(1);
+    expect(controller.isRunActive()).toBe(true);
+    expect(shouldGamepadButtonHarvest).not.toHaveBeenCalled();
+    expect(requestHarvest).not.toHaveBeenCalled();
+    expect(requestInteract).not.toHaveBeenCalled();
+
+    gamepad.buttons[GAMEPAD_BUTTONS.A] = { pressed: false, value: 0 };
+    controller.updateGamepads(1 / 60);
+
+    expect(controller.isRunActive()).toBe(false);
+  });
+
+  it("does not use the gamepad A button for nearby field actions", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const shouldGamepadButtonHarvest = vi.fn(() => true);
+    const { controller, requestHarvest, requestInteract } = createController({
+      windowRef,
+      shouldGamepadButtonHarvest
+    });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.A] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+
+    expect(shouldGamepadButtonHarvest).not.toHaveBeenCalled();
+    expect(requestHarvest).not.toHaveBeenCalled();
     expect(requestInteract).not.toHaveBeenCalled();
   });
 
@@ -256,6 +261,37 @@ describe("createGameInputController", () => {
     expect(inspectBag).not.toHaveBeenCalled();
   });
 
+  it("routes the gamepad X button to scenes that block gameplay input", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const handleKeydown = vi.fn(() => true);
+    const { controller, inspectBag, requestHarvest, requestInteract } = createController({
+      windowRef,
+      sceneDirector: {
+        blocksGameplayInput: () => true,
+        handleKeydown,
+        handleKeyup: vi.fn(() => false)
+      }
+    });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.X] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+
+    expect(handleKeydown).toHaveBeenCalledTimes(1);
+    expect(handleKeydown).toHaveBeenCalledWith(expect.objectContaining({
+      code: "KeyX",
+      key: "x"
+    }));
+    expect(requestHarvest).not.toHaveBeenCalled();
+    expect(requestInteract).not.toHaveBeenCalled();
+    expect(inspectBag).not.toHaveBeenCalled();
+  });
+
   it("routes the gamepad X button to the open Pokedesk instead of the bag", () => {
     const gamepad = createGamepad();
     const windowRef = {
@@ -285,7 +321,23 @@ describe("createGameInputController", () => {
     expect(inspectBag).not.toHaveBeenCalled();
   });
 
-  it("requests primary harvest from the right trigger", () => {
+  it("requests primary harvest from the left trigger", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const { controller, requestHarvest } = createController({ windowRef });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.LT] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+
+    expect(requestHarvest).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the right trigger for camera zoom instead of field moves", () => {
     const gamepad = createGamepad();
     const windowRef = {
       navigator: {
@@ -298,7 +350,9 @@ describe("createGameInputController", () => {
     controller.updateGamepads(1 / 60);
     controller.updateGamepads(1 / 60);
 
-    expect(requestHarvest).toHaveBeenCalledTimes(1);
+    expect(controller.consumeCameraZoomCycleRequest()).toBe(true);
+    expect(controller.consumeCameraZoomCycleRequest()).toBe(false);
+    expect(requestHarvest).not.toHaveBeenCalled();
   });
 
   it("requests follower call from D-pad Up and Arrow Up", () => {

@@ -5,6 +5,10 @@ import {
   getInventorySlotRoleLabel
 } from "./inventoryPresentation.js";
 import { getCompanionAbilityByAbilityId } from "../gameplay/content/companionAbilities.js";
+import {
+  formatActiveMoveGuidanceByAbilityId,
+  getSmallIslandMoveByAbilityId
+} from "../sandbox/moveData.js";
 
 export function createGameHudController({
   statusElement,
@@ -82,6 +86,10 @@ export function createGameHudController({
   const questLog = questSystem ? createQuestLog({ questSystem }) : null;
   const trackedTaskCompletionDeadlines = new Map();
   const hiddenCompletedTrackedTaskIds = new Set();
+  const noticedCompletedTrackedTaskIds = new Set();
+  let latestStoryState = { flags: {} };
+  let latestSkillsState = null;
+  let latestActiveSkillId = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -94,6 +102,32 @@ export function createGameHudController({
 
   function getInventoryPanelElement() {
     return inventoryGridElement?.closest?.(".inventory") || null;
+  }
+
+  function rememberStoryState(storyState) {
+    if (storyState && typeof storyState === "object") {
+      latestStoryState = storyState;
+    }
+
+    return latestStoryState;
+  }
+
+  function getActiveCompanionGuidance(activeSkillId) {
+    const move = getSmallIslandMoveByAbilityId(activeSkillId);
+
+    if (!move) {
+      return null;
+    }
+
+    return formatActiveMoveGuidanceByAbilityId(activeSkillId, {
+      storyFlags: latestStoryState?.flags || {}
+    });
+  }
+
+  function refreshActiveCompanionHudFromCache() {
+    if (latestSkillsState) {
+      syncActiveCompanionHud(latestSkillsState, latestActiveSkillId);
+    }
   }
 
   function getOrCreateActiveCompanionHudElement() {
@@ -149,7 +183,8 @@ export function createGameHudController({
     `;
   }
 
-  function syncActiveCompanionHud(skills, activeSkillId = null) {
+  function syncActiveCompanionHud(skills, activeSkillId = null, storyState = null) {
+    rememberStoryState(storyState);
     const companionHudElement = getOrCreateActiveCompanionHudElement();
 
     if (!companionHudElement) {
@@ -174,11 +209,13 @@ export function createGameHudController({
       return;
     }
 
+    const activeGuidance = getActiveCompanionGuidance(activeSkillId);
+
     companionHudElement.dataset.companionId = activeAbility.companionId;
     companionHudElement.dataset.element = activeAbility.element;
     companionHudElement.setAttribute(
       "aria-label",
-      `${activeAbility.companionName}: ${activeAbility.label} selecionado`
+      `${activeAbility.companionName}: ${activeAbility.label} selecionado${activeGuidance ? `. ${activeGuidance}` : ""}`
     );
 
     const nextHtml = `
@@ -186,6 +223,7 @@ export function createGameHudController({
       <span class="active-companion-hud__text">
         <span class="active-companion-hud__move">${escapeHtml(skill.shortLabel || activeAbility.label)}</span>
         <span class="active-companion-hud__name">${escapeHtml(activeAbility.companionName)}</span>
+        ${activeGuidance ? `<span class="active-companion-hud__hint">${escapeHtml(activeGuidance)}</span>` : ""}
       </span>
     `;
 
@@ -259,6 +297,7 @@ export function createGameHudController({
       if (!entry.done) {
         trackedTaskCompletionDeadlines.delete(entry.taskId);
         hiddenCompletedTrackedTaskIds.delete(entry.taskId);
+        noticedCompletedTrackedTaskIds.delete(entry.taskId);
         continue;
       }
 
@@ -267,6 +306,11 @@ export function createGameHudController({
         !trackedTaskCompletionDeadlines.has(entry.taskId)
       ) {
         trackedTaskCompletionDeadlines.set(entry.taskId, now + TRACKED_TASK_COMPLETION_FLASH_MS);
+      }
+
+      if (!noticedCompletedTrackedTaskIds.has(entry.taskId)) {
+        noticedCompletedTrackedTaskIds.add(entry.taskId);
+        pushNotice(`Task complete: ${entry.task.title}.`, 3.2);
       }
     }
 
@@ -448,7 +492,11 @@ export function createGameHudController({
     inventoryGridElement.innerHTML = nextHtml;
   }
 
-  function syncSkillsUi(skills, activeSkillId = null) {
+  function syncSkillsUi(skills, activeSkillId = null, storyState = null) {
+    rememberStoryState(storyState);
+    latestSkillsState = skills;
+    latestActiveSkillId = activeSkillId;
+
     if (!skillsGridElement || !skillsPanelElement) {
       syncActiveCompanionHud(skills, activeSkillId);
       return;
@@ -485,6 +533,9 @@ export function createGameHudController({
   }
 
   function renderMissionCards(storyState, inventory, nearbyPrompt = "") {
+    rememberStoryState(storyState);
+    refreshActiveCompanionHudFromCache();
+
     if (!missionsStackElement) {
       return;
     }
@@ -615,6 +666,9 @@ export function createGameHudController({
   }
 
   function syncQuestFocus(storyState) {
+    rememberStoryState(storyState);
+    refreshActiveCompanionHudFromCache();
+
     if (!hudContextElement && !hudChecklistElement) {
       return;
     }
@@ -706,6 +760,9 @@ export function createGameHudController({
   }
 
   function syncHudMeta(storyState, inventory, playerPosition = [0, 0, 0]) {
+    rememberStoryState(storyState);
+    refreshActiveCompanionHudFromCache();
+
     if (!hudMetaElement) {
       return;
     }
@@ -722,6 +779,9 @@ export function createGameHudController({
   }
 
   function syncHudInstructions(storyState, promptCopy = "") {
+    rememberStoryState(storyState);
+    refreshActiveCompanionHudFromCache();
+
     if (!hudInstructionsElement) {
       return;
     }

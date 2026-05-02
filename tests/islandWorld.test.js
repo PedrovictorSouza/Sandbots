@@ -11,7 +11,7 @@ import {
   findNearbyLeafDen,
   findNearbyLogChair,
   findNearbyLeppaTree,
-  reviveLeppaTree,
+  reviveLeppaTreeFromWateredTiles,
   updateBulbasaurStrawBedChallengeCompletion,
   waterNearbyPalm
 } from "../world/islandWorld.js";
@@ -218,7 +218,7 @@ describe("findNearbyInteractable", () => {
     });
   });
 
-  it("detects the Leppa Berry tree watering and headbutt steps", () => {
+  it("exposes the Leppa Berry tree only after the surrounding tiles are watered", () => {
     const storyState = {
       flags: {
         squirtleLeppaRequestAvailable: true,
@@ -233,13 +233,14 @@ describe("findNearbyInteractable", () => {
       aliveInstance: { active: false }
     };
 
-    expect(findNearbyLeppaTree([2.4, 0, 2.2], leppaTree, storyState)).toEqual({
-      leppaTree,
-      action: "water",
-      distance: expect.any(Number)
-    });
+    expect(findNearbyLeppaTree([2.4, 0, 2.2], leppaTree, storyState)).toBeNull();
 
-    expect(reviveLeppaTree(leppaTree, storyState)).toBe(true);
+    expect(reviveLeppaTreeFromWateredTiles(leppaTree, storyState, [
+      { id: "east", offset: [3.4, 0, 2], tileSpan: 1.425 },
+      { id: "west", offset: [0.6, 0, 2], tileSpan: 1.425 },
+      { id: "south", offset: [2, 0, 3.4], tileSpan: 1.425 },
+      { id: "north", offset: [2, 0, 0.6], tileSpan: 1.425 }
+    ])).toBe(true);
     expect(storyState.flags.leppaTreeRevived).toBe(true);
     expect(findNearbyLeppaTree([2.4, 0, 2.2], leppaTree, storyState)).toEqual({
       leppaTree,
@@ -447,6 +448,57 @@ describe("findNearbyInteractable", () => {
     });
   });
 
+  it("detects placed objects before the player has to stand on top of them", () => {
+    const logChair = buildLogChairPlacement([2, 0, 2]);
+    const storyState = {
+      flags: {
+        logChairPlaced: true,
+        logChairSat: false
+      }
+    };
+
+    expect(findNearbyInteractable(
+      [5.05, 0, 2.42],
+      [],
+      [],
+      storyState,
+      [],
+      logChair
+    )).toEqual({
+      target: {
+        kind: "logChairSeat",
+        id: "logChair",
+        label: "Sit on Log Chair"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
+  it("uses a forgiving reach for station and site object interactables", () => {
+    expect(findNearbyInteractable(
+      [2.45, 0, 0],
+      [],
+      [
+        {
+          id: "pokemonCenterPc",
+          label: "Pokemon Center PC",
+          type: "site",
+          position: [0, 0.02, 0],
+          interactDistance: 1.85,
+          activeWhen: () => true
+        }
+      ],
+      { flags: {} }
+    )).toEqual({
+      target: {
+        kind: "site",
+        id: "pokemonCenterPc",
+        label: "Pokemon Center PC"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
   it("describes the log chair placement action in the nearby prompt", () => {
     expect(buildNearbyPrompt({
       harvestTarget: {
@@ -518,7 +570,7 @@ describe("findNearbyInteractable", () => {
       storyState: {
         flags: {}
       }
-    })).toBe("[A / E] Leaf Den Kit • Start construction");
+    })).toBe("[A / E / X] Leaf Den Kit • Start construction");
   });
 
   it("detects the completed Leaf Den as an entrance", () => {
@@ -560,7 +612,7 @@ describe("findNearbyInteractable", () => {
         title: "Furnitures inside Leaf Den",
         actionLabel: "Enter"
       }
-    })).toBe("[A / E] Leaf Den • Enter");
+    })).toBe("[A / E / X] Leaf Den • Enter");
   });
 
   it("detects Timburr as the Leaf Den furniture request turn-in", () => {
@@ -689,7 +741,7 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Interact"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("[A / E] Workbench • Workbench");
+    })).toBe("[A / E / X] Workbench • Workbench");
   });
 
   it("describes the Leafage grow action in the nearby prompt", () => {

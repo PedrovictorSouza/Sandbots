@@ -32,10 +32,5 @@ export const ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS = Object.freeze([
     id: "far",
     zoom: 6.2,
     distance: 10.2
-  },
-  {
-    id: "close",
-    zoom: 4.7,
-    distance: 6.2
   }
 ]);

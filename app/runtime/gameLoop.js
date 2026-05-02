@@ -21,6 +21,11 @@ import {
   WORKBENCH_INTERACT_DISTANCE,
   WORKBENCH_POSITION
 } from "../../gameplayContent.js";
+import {
+  BULBASAUR_IDLE_PATROL_RADIUS,
+  SQUIRTLE_IDLE_PATROL_RADIUS
+} from "./robotPatrolConfig.js";
+import { resolveTransientNoticeRoute } from "./contextualPromptNotice.js";
 
 const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 1500;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
@@ -48,9 +53,6 @@ const BULBASAUR_ROBOT_MODEL_SCALE = ROBOT_MODEL_SCALE * 1.3;
 const ROBOT_IDLE_PATROL_SPEED = 0.82;
 const ROBOT_IDLE_PATROL_PAUSE_DURATION = 0.75;
 const ROBOT_IDLE_PATROL_ARRIVE_DISTANCE = 0.08;
-const ROBOT_IDLE_PATROL_RADIUS_MULTIPLIER = 3;
-const SQUIRTLE_IDLE_PATROL_RADIUS = 0.58 * ROBOT_IDLE_PATROL_RADIUS_MULTIPLIER;
-const BULBASAUR_IDLE_PATROL_RADIUS = 0.68 * ROBOT_IDLE_PATROL_RADIUS_MULTIPLIER;
 const BULBASAUR_LEAFAGE_SPEED = 2.25;
 const BULBASAUR_LEAFAGE_STAND_DISTANCE = 1.04;
 const BULBASAUR_LEAFAGE_ARRIVE_DISTANCE = 0.08;
@@ -1735,12 +1737,13 @@ export function startGameLoop({
             session.logChair,
             session.leafDen,
             session.timburrEncounter,
-            session.charmanderEncounter
+            session.charmanderEncounter,
+            session.leppaTree
           ) :
           null;
 
       if (primaryActionPlacementBlocked) {
-        // RT is reserved for the selected move. Placements use Enter or gamepad X.
+        // The trigger is reserved for the selected move. Placements use Enter or gamepad X.
       } else if (primaryActionIsPlacement) {
         performHarvestAction(playerPosition);
       } else if (primaryActionIsMove && !dialogueActive) {
@@ -1778,6 +1781,8 @@ export function startGameLoop({
           groundGrassPatches: session.groundGrassPatches,
           logChair: session.logChair,
           leafDen: session.leafDen,
+          leppaTree: session.leppaTree,
+          leppaBerryDrops: session.leppaBerryDrops,
           timburrEncounter: session.timburrEncounter,
           charmanderEncounter: session.charmanderEncounter,
           onNpcInteractionStart({
@@ -1883,6 +1888,8 @@ export function startGameLoop({
         groundGrassPatches: session.groundGrassPatches,
         logChair: session.logChair,
         leafDen: session.leafDen,
+        leppaTree: session.leppaTree,
+        leppaBerryDrops: session.leppaBerryDrops,
         timburrEncounter: session.timburrEncounter,
         charmanderEncounter: session.charmanderEncounter,
         onNpcInteractionStart({
@@ -2088,6 +2095,48 @@ export function startGameLoop({
           canUseLeafage: leafageEquipped
         }) :
         null;
+    const nearbyInvalidMoveTarget =
+      session.playerCharacter &&
+      !gameplayOpeningCameraActive &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
+      (
+        (leafageEquipped && !nearbyHarvestTarget?.leafageGroundCell) ||
+        (waterGunEquipped && !nearbyHarvestTarget?.groundCell)
+      ) ?
+        gameplay.findNearbyActionTarget({
+          playerPosition: session.playerCharacter.getPosition(),
+          palmModel: session.palmModel,
+          palmInstances: session.palmInstances,
+          resourceNodes: session.resourceNodes,
+          leppaTree: session.leppaTree,
+          leafDen: session.leafDen,
+          storyState: controls.storyState,
+          inventory: controls.inventory,
+          groundDeadInstances: session.groundDeadInstances,
+          groundPurifiedInstances: session.groundPurifiedInstances,
+          groundGrassPatches: session.groundGrassPatches,
+          groundFlowerPatches: session.groundFlowerPatches,
+          canPurifyGround: leafageEquipped,
+          canUseLeafage: waterGunEquipped
+        }) :
+        null;
+    const invalidMoveGroundCell = leafageEquipped ?
+      nearbyInvalidMoveTarget?.groundCell :
+      waterGunEquipped ?
+        nearbyInvalidMoveTarget?.leafageGroundCell :
+        null;
+    const highlightedGroundCell =
+      nearbyHarvestTarget?.groundCell ||
+      nearbyHarvestTarget?.leafageGroundCell ||
+      invalidMoveGroundCell ||
+      null;
+    const highlightedGroundCellTargetState =
+      highlightedGroundCell && highlightedGroundCell === invalidMoveGroundCell ?
+        "invalid" :
+        "valid";
     const nearbyInteractable =
       session.playerCharacter &&
       !gameplayOpeningCameraActive &&
@@ -2104,7 +2153,8 @@ export function startGameLoop({
           session.logChair,
           session.leafDen,
           session.timburrEncounter,
-          session.charmanderEncounter
+          session.charmanderEncounter,
+          session.leppaTree
         ) :
         null;
     const activeQuest = gameplay.getActiveQuest(controls.storyState);
@@ -2134,6 +2184,7 @@ export function startGameLoop({
       ...pendingWaterGunGroundCells,
       ...activeLeafageGroundCells
     ];
+    const transientNoticeRoute = resolveTransientNoticeRoute(hud.getNoticeMessage());
     const promptCopy =
       gameplayOpeningCameraActive ||
       cinematicActive ||
@@ -2145,7 +2196,7 @@ export function startGameLoop({
         harvestTarget: nearbyHarvestTarget,
         interactTarget: nearbyInteractable,
         quest: activeQuest,
-        transientMessage: hud.getNoticeMessage(),
+        transientMessage: transientNoticeRoute.hudMessage,
         getItemLabel: gameplay.getItemLabel,
         storyState: controls.storyState,
         activeMoveId,
@@ -2159,7 +2210,7 @@ export function startGameLoop({
       !skillLearnActive &&
       !scriptedInteractionActive &&
       !gameplayDialogue.isActive() &&
-      Boolean(nearbyHarvestTarget?.groundCell || nearbyHarvestTarget?.leafageGroundCell);
+      Boolean(highlightedGroundCell);
 
     if (
       !gameplayOpeningCameraActive &&
@@ -2374,6 +2425,10 @@ export function startGameLoop({
       session.playerCharacter &&
       nearbyInteractable?.target &&
       controls.shouldBagButtonInteract?.();
+    const shouldShowTransientWorldPrompt =
+      canShowWorldSpaceUi &&
+      session.playerCharacter &&
+      transientNoticeRoute.worldPromptMessage;
 
     if (shouldShowTangrowthSpeech) {
       nextFrame.worldSpeech.visible = true;
@@ -2457,7 +2512,11 @@ export function startGameLoop({
       nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
     }
 
-    if (shouldShowCharacterWorldPrompt) {
+    if (shouldShowTransientWorldPrompt) {
+      nextFrame.worldPrompt.visible = true;
+      nextFrame.worldPrompt.text = transientNoticeRoute.worldPromptMessage;
+      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+    } else if (shouldShowCharacterWorldPrompt) {
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = "Press X";
       nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
@@ -2465,8 +2524,10 @@ export function startGameLoop({
 
     if (shouldShowGroundCellHighlight) {
       nextFrame.groundCellHighlight.visible = true;
-      nextFrame.groundCellHighlight.groundCell =
-        nearbyHarvestTarget.groundCell || nearbyHarvestTarget.leafageGroundCell;
+      nextFrame.groundCellHighlight.groundCell = {
+        ...highlightedGroundCell,
+        highlightTargetState: highlightedGroundCellTargetState
+      };
     }
 
     if (markedActionGroundCells.length) {

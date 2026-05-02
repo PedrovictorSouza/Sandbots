@@ -14,7 +14,7 @@ export const GAMEPAD_BUTTONS = Object.freeze({
 export const GAME_INPUT_BINDINGS = Object.freeze({
   primaryAction: {
     keyboardCode: "Enter",
-    gamepadButton: GAMEPAD_BUTTONS.RT
+    gamepadButton: GAMEPAD_BUTTONS.LT
   },
   jump: {
     keyboardCode: "Space",
@@ -26,7 +26,7 @@ export const GAME_INPUT_BINDINGS = Object.freeze({
   },
   cameraZoomCycle: {
     keyboardCode: "KeyR",
-    gamepadButton: GAMEPAD_BUTTONS.LT
+    gamepadButton: GAMEPAD_BUTTONS.RT
   },
   pause: {
     keyboardCode: "KeyP",

@@ -34,6 +34,27 @@ describe("createQuestLog", () => {
     expect(summaryHtml).toContain("Talk to Chopper so he can explain");
   });
 
+  it("keeps field-action guidance out of the quest tracker summary", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+
+    const summaryHtml = questLog.renderActiveSummaryHtml();
+    const summaryText = questLog.renderActiveSummary();
+    const logHtml = questLog.renderLogHtml();
+
+    expect(summaryHtml).toContain("Water dry grass!");
+    expect(summaryHtml).toContain("Use Water Gun to revive 10 patches");
+    expect(summaryHtml).not.toContain("Next:");
+    expect(summaryHtml).not.toContain("Stand near dry grass");
+    expect(summaryText).not.toContain("Next:");
+    expect(logHtml).not.toContain("Stand near dry grass");
+  });
+
   it("does not render HUD-hidden objectives in the quest tracker", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "gather-first-supplies");
     const questLog = createQuestLog({
@@ -256,7 +277,7 @@ describe("createQuestLog", () => {
     const logHtml = questLog.renderLogHtml(storyState);
 
     expect(checklistHtml).toContain("Give Leppa Berry to Bulbasaur");
-    expect(checklistHtml).toContain("Headbutt the revived tree");
+    expect(checklistHtml).toContain("Press X by the revived tree");
     expect(logHtml).toContain('data-task-id="give-leppa-berry"');
   });
 

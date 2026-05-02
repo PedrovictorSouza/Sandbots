@@ -479,20 +479,6 @@ export function createGameInputController({
 
     gamepadNextMoveButtonPressed = nextMoveButtonPressed;
 
-    if (
-      runButtonPressed &&
-      !gamepadRunButtonPressed &&
-      !isPokedexOpen() &&
-      !sceneDirector.blocksGameplayInput() &&
-      !isBuilderPanelOpen()
-    ) {
-      if (shouldGamepadButtonHarvest({ source: "gamepadRun" })) {
-        requestHarvest({ source: "gamepadRun" });
-      } else {
-        requestInteract();
-      }
-    }
-
     gamepadRunButtonPressed = runButtonPressed;
     primaryActionPressed = actionButtonPressed;
 
@@ -532,6 +518,13 @@ export function createGameInputController({
     ) {
       clearGameFlowInput();
       pokedexEntry.handleKeydown(createBagButtonEvent());
+    } else if (
+      bagButtonPressed &&
+      !gamepadBagButtonPressed &&
+      sceneDirector.blocksGameplayInput()
+    ) {
+      clearGameFlowInput();
+      sceneDirector.handleKeydown(createBagButtonEvent());
     } else if (
       bagButtonPressed &&
       !gamepadBagButtonPressed &&

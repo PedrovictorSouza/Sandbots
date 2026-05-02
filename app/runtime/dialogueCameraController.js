@@ -1,3 +1,5 @@
+import { ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS } from "../../actTwoSceneConfig.js";
+
 const DIALOGUE_CAMERA_TRANSITION_DURATION = 0.45;
 const DIALOGUE_CAMERA_TARGET_HEIGHT = 1.25;
 const DIALOGUE_CAMERA_BASE_DISTANCE = 5.4;
@@ -19,6 +21,24 @@ function getNpcPosition(npcActors, interactables, targetId) {
   const npcActor = npcActors.find((actor) => actor.id === targetId);
   const interactable = interactables.find((item) => item.id === targetId);
   return npcActor?.character?.getPosition?.() || interactable?.position || null;
+}
+
+function getOpenGameplayPreset() {
+  return ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS.find((preset) => preset.id === "far") ||
+    ACT_TWO_PLAYER_CAMERA_ZOOM_PRESETS[0] ||
+    {};
+}
+
+function buildGameplayRestorePose(restorePose) {
+  const openGameplayPreset = getOpenGameplayPreset();
+
+  return {
+    ...restorePose,
+    zoom: typeof openGameplayPreset.zoom === "number" ? openGameplayPreset.zoom : restorePose.zoom,
+    distance: typeof openGameplayPreset.distance === "number" ?
+      openGameplayPreset.distance :
+      restorePose.distance
+  };
 }
 
 function buildDialogueCameraPose({ camera, playerPosition, npcPosition }) {
@@ -111,11 +131,12 @@ export function createDialogueCameraController({ camera, cameraOrbit }) {
     if (!restorePose) {
       return;
     }
+    const gameplayRestorePose = buildGameplayRestorePose(restorePose);
 
-    camera.startPoseTransition(restorePose, {
+    camera.startPoseTransition(gameplayRestorePose, {
       duration: DIALOGUE_CAMERA_TRANSITION_DURATION
     });
-    cameraOrbit.sync(restorePose.direction);
+    cameraOrbit.sync(gameplayRestorePose.direction);
     restorePose = null;
   }
 

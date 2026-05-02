@@ -86,6 +86,7 @@ import { startChopperNpcFlight } from "../session/chopperNpcActor.js";
 import { createEngineRuntime } from "../runtime/createEngineRuntime.js";
 import { createDialogueCameraController } from "../runtime/dialogueCameraController.js";
 import { createGameAppController } from "../runtime/gameAppController.js";
+import { shouldGamepadSourceHarvestTarget } from "../runtime/gamepadHarvestPolicy.js";
 import { startGameLoop } from "../runtime/gameLoop.js";
 import { createUiRuntime } from "../runtime/createUiRuntime.js";
 import { createSceneFlowRuntime } from "../scene/createSceneFlowRuntime.js";
@@ -655,10 +656,15 @@ export function createApplicationRuntime({
       gameSession.logChair,
       gameSession.leafDen,
       gameSession.timburrEncounter,
-      gameSession.charmanderEncounter
+      gameSession.charmanderEncounter,
+      gameSession.leppaTree
     );
 
     const target = nearbyInteractable?.target;
+    if (!target) {
+      return false;
+    }
+
     const characterInteractionKinds = new Set([
       "grassEncounter",
       "charmanderGrassEncounter",
@@ -668,15 +674,28 @@ export function createApplicationRuntime({
       "bulbasaurStrawBedRecipe",
       "bulbasaurStrawBedComplete",
       "leppaBerryGift",
+      "leppaBerryTree",
       "timburrLeafDenFurnitureComplete",
       "charmanderCelebrationRequest"
     ]);
 
-    if (target?.id === "squirtle" || characterInteractionKinds.has(target?.kind)) {
+    if (
+      target.id === "squirtle" ||
+      target.kind === "station" ||
+      target.kind === "site" ||
+      target.kind === "logChairSeat" ||
+      target.kind === "leafDenConstruction" ||
+      target.kind === "leafDenEntrance" ||
+      characterInteractionKinds.has(target.kind)
+    ) {
       return true;
     }
 
-    if (target?.id !== "tangrowth") {
+    if (target.kind === "npc" && target.id !== "tangrowth") {
+      return true;
+    }
+
+    if (target.id !== "tangrowth") {
       return false;
     }
 
@@ -738,11 +757,10 @@ export function createApplicationRuntime({
       canUseLeafage: playerSkills.leafage && activeFieldMoveId === "leafage"
     });
 
-    if (activeHarvestTarget?.logChairPlacement) {
-      return source === "gamepadBag";
-    }
-
-    return Boolean(activeHarvestTarget);
+    return shouldGamepadSourceHarvestTarget({
+      source,
+      activeHarvestTarget
+    });
   }
 
   function buildChopperApproachTarget(playerPosition, chopperPosition) {

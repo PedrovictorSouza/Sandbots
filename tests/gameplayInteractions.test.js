@@ -101,6 +101,32 @@ describe("createGameplayInteractions", () => {
     );
   });
 
+  it("escalates repeated empty interactions into a valid input hint", () => {
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      pushNotice
+    });
+    const action = {
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: { questIndex: 0, flags: {} },
+      inventory: {}
+    };
+
+    expect(interactions.performInteractAction(action)).toBe(false);
+    expect(interactions.performInteractAction(action)).toBe(false);
+
+    expect(pushNotice).toHaveBeenNthCalledWith(
+      1,
+      "Nothing to talk to nearby. Move closer to a marker or character, then press E."
+    );
+    expect(pushNotice).toHaveBeenNthCalledWith(
+      2,
+      "Still nothing nearby. Look for a PRESS X bubble or move closer, then press A / E / X."
+    );
+  });
+
   it("requests Professor Tangrowth's house-building talk when available", () => {
     const onTangrowthHouseTalkRequested = vi.fn();
     const interactions = createInteractions({
@@ -293,6 +319,37 @@ describe("createGameplayInteractions", () => {
     expect(findNearbyGroundCell).not.toHaveBeenCalled();
     expect(pushNotice).toHaveBeenCalledWith(
       "No resource in range. Move closer to a tree or drop, then press Enter."
+    );
+  });
+
+  it("escalates repeated empty field actions into a visible target hint", () => {
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      pushNotice
+    });
+    const action = {
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundDeadInstances: [],
+      groundPurifiedInstances: [],
+      canPurifyGround: true
+    };
+
+    expect(interactions.performHarvestAction(action)).toBe(false);
+    expect(interactions.performHarvestAction(action)).toBe(false);
+
+    expect(pushNotice).toHaveBeenNthCalledWith(
+      1,
+      "No target in range. Move closer to dry ground, grass, a tree, or a marker, then press Enter."
+    );
+    expect(pushNotice).toHaveBeenNthCalledWith(
+      2,
+      "Still no target. Move until a tile outline or PRESS X bubble appears, then press Enter / X."
     );
   });
 
@@ -1347,7 +1404,7 @@ describe("createGameplayInteractions", () => {
     expect(pushNotice).toHaveBeenCalledWith("First set of challenges complete. Talk to Bulbasaur.");
   });
 
-  it("revives the Leppa tree and drops a Leppa Berry after headbutting it", () => {
+  it("does not revive the Leppa tree by clicking the dead tree with Water Gun", () => {
     const pushNotice = vi.fn();
     const interactions = createInteractions({
       pushNotice
@@ -1366,7 +1423,6 @@ describe("createGameplayInteractions", () => {
       deadInstance: { active: false },
       aliveInstance: { active: false }
     };
-    const leppaBerryDrops = [];
 
     expect(interactions.performHarvestAction({
       playerPosition: [1.2, 0, 1.2],
@@ -1377,36 +1433,17 @@ describe("createGameplayInteractions", () => {
       storyState,
       woodDrops: [],
       leppaTree,
-      leppaBerryDrops,
       canPurifyGround: true
-    })).toBe(true);
+    })).toBe(false);
 
-    expect(storyState.flags.leppaTreeRevived).toBe(true);
-    expect(leppaTree.aliveInstance.active).toBe(true);
-    expect(pushNotice).toHaveBeenCalledWith("The dead tree perked back up.");
-
-    expect(interactions.performHarvestAction({
-      playerPosition: [1.2, 0, 1.2],
-      palmModel: null,
-      palmInstances: [],
-      resourceNodes: [],
-      inventory: {},
-      storyState,
-      woodDrops: [],
-      leppaTree,
-      leppaBerryDrops,
-      canPurifyGround: false
-    })).toBe(true);
-
-    expect(storyState.flags.leppaBerryDropped).toBe(true);
-    expect(leppaBerryDrops).toHaveLength(1);
-    expect(pushNotice).toHaveBeenCalledWith("A Leppa Berry fell from the tree.");
+    expect(storyState.flags.leppaTreeRevived).toBeUndefined();
+    expect(leppaTree.aliveInstance.active).toBe(false);
   });
 
-  it("prioritizes the Leppa tree over nearby dry ground while watering it", () => {
-    const groundCell = {
-      id: "ground-near-leppa",
-      offset: [1.21, 0, 1.2],
+  it("revives the Leppa tree after Squirtle waters the fourth surrounding tile", () => {
+    const finalGroundCell = {
+      id: "ground-near-leppa-north",
+      offset: [1, 0, -0.4],
       scale: 1,
       tileSpan: 1.425,
       yaw: 0
@@ -1424,18 +1461,28 @@ describe("createGameplayInteractions", () => {
       deadInstance: { active: false },
       aliveInstance: { active: false }
     };
+    const groundPurifiedInstances = [
+      { id: "ground-near-leppa-east", offset: [2.4, 0, 1], tileSpan: 1.425 },
+      { id: "ground-near-leppa-west", offset: [-0.4, 0, 1], tileSpan: 1.425 },
+      { id: "ground-near-leppa-south", offset: [1, 0, 2.4], tileSpan: 1.425 }
+    ];
     const findNearbyGroundCell = vi.fn(() => ({
-      groundCell,
+      groundCell: finalGroundCell,
       distance: 0.02
     }));
-    const purifyGroundCell = vi.fn(() => true);
+    const purifyGroundCell = vi.fn((groundCell, groundDeadInstances, purifiedInstances) => {
+      purifiedInstances.push(groundCell);
+      return true;
+    });
+    const pushNotice = vi.fn();
     const interactions = createInteractions({
       findNearbyGroundCell,
-      purifyGroundCell
+      purifyGroundCell,
+      pushNotice
     });
 
     const result = interactions.performHarvestAction({
-      playerPosition: [1.2, 0, 1.2],
+      playerPosition: [1, 0, -0.4],
       palmModel: null,
       palmInstances: [],
       resourceNodes: [],
@@ -1443,15 +1490,20 @@ describe("createGameplayInteractions", () => {
       storyState,
       woodDrops: [],
       leppaTree,
-      groundDeadInstances: [groundCell],
-      groundPurifiedInstances: [],
+      groundDeadInstances: [finalGroundCell],
+      groundPurifiedInstances,
       canPurifyGround: true
     });
 
     expect(result).toBe(true);
     expect(storyState.flags.leppaTreeRevived).toBe(true);
     expect(leppaTree.aliveInstance.active).toBe(true);
-    expect(purifyGroundCell).not.toHaveBeenCalled();
+    expect(purifyGroundCell).toHaveBeenCalledWith(
+      finalGroundCell,
+      [finalGroundCell],
+      groundPurifiedInstances
+    );
+    expect(pushNotice).toHaveBeenCalledWith("The dead tree perked back up.");
   });
 
   it("requests the Leppa Berry gift flow from Bulbasaur's Look at this interaction", () => {
@@ -1488,6 +1540,57 @@ describe("createGameplayInteractions", () => {
     expect(onLeppaBerryGiftRequested).toHaveBeenCalledWith({
       targetId: "bulbasaur"
     });
+  });
+
+  it("collects a Leppa Berry from a revived tree through the interact action", () => {
+    const pushNotice = vi.fn();
+    const syncInventoryUi = vi.fn();
+    const interactions = createInteractions({
+      pushNotice,
+      syncInventoryUi,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "leppaBerryTree",
+          id: "leppaTree",
+          label: "Pick Leppa Berry"
+        },
+        distance: 1.2
+      }))
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        squirtleLeppaRequestAvailable: true,
+        leppaTreeRevived: true,
+        leppaBerryGiftComplete: false
+      }
+    };
+    const inventory = {};
+    const leppaTree = {
+      position: [1, 0.02, 1],
+      revived: true,
+      berryDropped: false
+    };
+    const leppaBerryDrops = [];
+
+    const result = interactions.performInteractAction({
+      playerPosition: [1.2, 0, 1.2],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory,
+      leppaTree,
+      leppaBerryDrops
+    });
+
+    expect(result).toBe(true);
+    expect(inventory.leppaBerry).toBe(1);
+    expect(storyState.flags.leppaBerryDropped).toBe(true);
+    expect(storyState.flags.leppaBerryCollected).toBe(true);
+    expect(leppaBerryDrops).toHaveLength(1);
+    expect(leppaBerryDrops[0].collected).toBe(true);
+    expect(syncInventoryUi).toHaveBeenCalledWith(inventory);
+    expect(pushNotice).toHaveBeenCalledWith("+1 Leppa Berry");
   });
 
   it("starts Chopper's log chair gift dialogue when the request is available", () => {

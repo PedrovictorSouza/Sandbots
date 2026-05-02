@@ -4,14 +4,21 @@ import {
   RESOURCE_NODE_DEFS,
   WORLD_LIMIT
 } from "../gameplayContent.js";
+import {
+  formatActiveMoveGuidanceByAbilityId,
+  formatMoveTargetPromptByAbilityId
+} from "../app/sandbox/moveData.js";
 
 const WOOD_DROP_HEIGHT = 0.78;
 const WOOD_PICKUP_RADIUS = 0.64;
 const LEPPA_DROP_HEIGHT = 0.72;
 const LEPPA_PICKUP_RADIUS = 0.68;
 const LEPPA_TREE_INTERACT_DISTANCE = 2.35;
-const LOG_CHAIR_INTERACT_DISTANCE = 1.45;
-const LEAF_DEN_INTERACT_DISTANCE = 2.2;
+const LEPPA_TREE_WATERED_TILE_MIN_RADIUS_FACTOR = 0.35;
+const LEPPA_TREE_WATERED_TILE_MAX_RADIUS_FACTOR = 1.65;
+const LOG_CHAIR_INTERACT_DISTANCE = 2.35;
+const LEAF_DEN_INTERACT_DISTANCE = 2.85;
+const INTERACTABLE_OBJECT_REACH_MIN = 2.55;
 const PALM_SHAKE_DURATION = 0.42;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_STRAW_BED_TREE_TARGET_COUNT = 5;
@@ -365,11 +372,7 @@ export function findNearbyLeppaTree(playerPosition, leppaTree, storyState) {
   const berryDropped = Boolean(storyState?.flags?.leppaBerryDropped || leppaTree.berryDropped);
 
   if (!revived) {
-    return {
-      leppaTree,
-      action: "water",
-      distance
-    };
+    return null;
   }
 
   if (!berryDropped) {
@@ -392,6 +395,55 @@ export function reviveLeppaTree(leppaTree, storyState) {
   storyState.flags.leppaTreeRevived = true;
   syncLeppaTreeState(leppaTree, storyState);
   return true;
+}
+
+function getGroundCellOffset(groundCell) {
+  return groundCell?.offset || groundCell?.position || null;
+}
+
+export function hasWateredLeppaTreeSurroundings(leppaTree, groundPurifiedInstances = []) {
+  if (!leppaTree?.position) {
+    return false;
+  }
+
+  const wateredTileKeys = new Set();
+  for (const groundCell of groundPurifiedInstances) {
+    if (!groundCell || groundCell.active === false) {
+      continue;
+    }
+
+    const offset = getGroundCellOffset(groundCell);
+    if (!offset) {
+      continue;
+    }
+
+    const tileSpan = Number(groundCell.tileSpan || 1.425);
+    const dx = offset[0] - leppaTree.position[0];
+    const dz = offset[2] - leppaTree.position[2];
+    const distance = Math.hypot(dx, dz);
+    const minDistance = tileSpan * LEPPA_TREE_WATERED_TILE_MIN_RADIUS_FACTOR;
+    const maxDistance = tileSpan * LEPPA_TREE_WATERED_TILE_MAX_RADIUS_FACTOR;
+
+    if (distance < minDistance || distance > maxDistance) {
+      continue;
+    }
+
+    wateredTileKeys.add(groundCell.id || `${offset[0].toFixed(2)}:${offset[2].toFixed(2)}`);
+  }
+
+  return wateredTileKeys.size >= 4;
+}
+
+export function reviveLeppaTreeFromWateredTiles(
+  leppaTree,
+  storyState,
+  groundPurifiedInstances = []
+) {
+  if (!hasWateredLeppaTreeSurroundings(leppaTree, groundPurifiedInstances)) {
+    return false;
+  }
+
+  return reviveLeppaTree(leppaTree, storyState);
 }
 
 export function dropLeppaBerryFromTree(leppaTree, leppaBerryDrops = [], storyState = null) {
@@ -556,6 +608,13 @@ export function isInteractableActive(interactable, storyState) {
   return interactable.activeWhen(storyState);
 }
 
+function getInteractableObjectReach(interactable) {
+  return Math.max(
+    Number(interactable?.interactDistance) || 0,
+    INTERACTABLE_OBJECT_REACH_MIN
+  );
+}
+
 export function isResourceNodeActive(resourceNode, storyState) {
   return resourceNode.cooldown <= 0 && resourceNode.activeWhen(storyState);
 }
@@ -602,7 +661,8 @@ export function findNearbyInteractable(
   logChair = null,
   leafDen = null,
   timburrEncounter = null,
-  charmanderEncounter = null
+  charmanderEncounter = null,
+  leppaTree = null
 ) {
   let nearest = null;
   let nearestDistance = Infinity;
@@ -635,7 +695,7 @@ export function findNearbyInteractable(
       playerPosition[2] - interactable.position[2]
     );
 
-    if (distance <= interactable.interactDistance && distance < nearestDistance) {
+    if (distance <= getInteractableObjectReach(interactable) && distance < nearestDistance) {
       nearest = {
         kind: interactable.type,
         id: interactable.id,
@@ -809,6 +869,19 @@ export function findNearbyInteractable(
         nearestDistance = distance;
       }
     }
+  }
+
+  const nearbyLeppaTree = findNearbyLeppaTree(playerPosition, leppaTree, storyState);
+  if (
+    nearbyLeppaTree?.action === "headbutt" &&
+    nearbyLeppaTree.distance < nearestDistance
+  ) {
+    nearest = {
+      kind: "leppaBerryTree",
+      id: "leppaTree",
+      label: "Pick Leppa Berry"
+    };
+    nearestDistance = nearbyLeppaTree.distance;
   }
 
   const bulbasaurStrawBedRecipeReady =
@@ -1021,45 +1094,45 @@ export function buildNearbyPrompt({
     interactTarget?.target?.id === "tangrowth" &&
     quest?.id === "spit-out-campfire"
   ) {
-    return `[A / E] ${interactTarget.target.label} • Spit out Campfire`;
+    return `[A / E / X] ${interactTarget.target.label} • Spit out Campfire`;
   }
 
   if (interactTarget?.target?.id === "ruinedPokemonCenter") {
-    return `[A / E] ${interactTarget.target.label} • Inspect`;
+    return `[A / E / X] ${interactTarget.target.label} • Inspect`;
   }
 
   if (interactTarget?.target?.id === "pokemonCenterPc") {
-    return `[A / E] ${interactTarget.target.label} • Check PC`;
+    return `[A / E / X] ${interactTarget.target.label} • Check PC`;
   }
 
   if (interactTarget?.target?.kind === "leafDenConstruction") {
     return storyState?.flags?.leafDenConstructionStarted ?
-      `[A / E] ${interactTarget.target.label} • Check construction` :
-      `[A / E] ${interactTarget.target.label} • Start construction`;
+      `[A / E / X] ${interactTarget.target.label} • Check construction` :
+      `[A / E / X] ${interactTarget.target.label} • Start construction`;
   }
 
   if (interactTarget?.target?.kind === "leafDenEntrance") {
-    return `[A / E] ${interactTarget.target.label} • Enter`;
+    return `[A / E / X] ${interactTarget.target.label} • Enter`;
   }
 
   if (interactTarget?.target?.kind === "timburrLeafDenFurnitureComplete") {
-    return `[A / E] ${interactTarget.target.label} • Complete request`;
+    return `[A / E / X] ${interactTarget.target.label} • Complete request`;
   }
 
   if (interactTarget?.target?.kind === "charmanderCelebrationRequest") {
-    return `[A / E] ${interactTarget.target.label} • Celebration`;
+    return `[A / E / X] ${interactTarget.target.label} • Celebration`;
   }
 
   if (interactTarget?.target?.kind === "logChairSeat") {
-    return `[A / E] ${interactTarget.target.label} • ${quest.title}`;
+    return `[A / E / X] ${interactTarget.target.label} • ${quest.title}`;
   }
 
   if (interactTarget?.target?.kind === "station") {
-    return `[A / E] ${interactTarget.target.label} • ${quest.title}`;
+    return `[A / E / X] ${interactTarget.target.label} • ${quest.title}`;
   }
 
   if (interactTarget?.target) {
-    return `[A / E] ${interactTarget.target.label} • ${quest.title}`;
+    return `[A / E / X] ${interactTarget.target.label} • ${quest.title}`;
   }
 
   if (harvestTarget?.resourceNode) {
@@ -1089,23 +1162,21 @@ export function buildNearbyPrompt({
   }
 
   if (harvestTarget?.leafageGroundCell) {
-    return "[Enter] Use Leafage to grow tall grass";
+    return formatMoveTargetPromptByAbilityId("leafage", "ground");
   }
 
   if (harvestTarget?.groundCell) {
-    return pendingWaterGunCount > 0 ?
-      `[Enter] Mark dry ground for Squirtle • ${pendingWaterGunCount} queued` :
-      "[Enter] Mark dry ground for Squirtle";
+    return formatMoveTargetPromptByAbilityId("waterGun", "ground", {
+      pendingWaterGunCount
+    });
   }
 
-  if (activeMoveId === "leafage") {
-    return "Leafage: grow tall grass on restored ground.";
-  }
-
-  if (activeMoveId === "waterGun") {
-    return pendingWaterGunCount > 0 ?
-      `Water Gun: Squirtle has ${pendingWaterGunCount} tile${pendingWaterGunCount === 1 ? "" : "s"} queued.` :
-      "Water Gun: mark dry ground for Squirtle to restore.";
+  const activeMoveGuidance = formatActiveMoveGuidanceByAbilityId(activeMoveId, {
+    pendingWaterGunCount,
+    storyFlags: storyState?.flags || null
+  });
+  if (activeMoveGuidance) {
+    return activeMoveGuidance;
   }
 
   return `${quest.title} • ${quest.actionLabel}`;

@@ -1,7 +1,25 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
+const GROUND_CELL_TARGET_CUES = Object.freeze({
+  valid: {
+    haloFill: "rgba(127, 231, 255, 0.12)",
+    haloStroke: "rgba(12, 20, 34, 0.92)",
+    outlineFill: "rgba(124, 231, 255, 0.08)",
+    outlineStroke: "#9ef8ff"
+  },
+  invalid: {
+    haloFill: "rgba(255, 211, 122, 0.18)",
+    haloStroke: "rgba(84, 48, 0, 0.94)",
+    outlineFill: "rgba(255, 211, 122, 0.12)",
+    outlineStroke: "#ffd37a"
+  }
+});
 
 function createSvgElement(tagName) {
   return document.createElementNS(SVG_NS, tagName);
+}
+
+function normalizeTargetState(targetState) {
+  return targetState === "invalid" ? "invalid" : "valid";
 }
 
 export function createGroundCellHighlightController({ mount } = {}) {
@@ -28,14 +46,10 @@ export function createGroundCellHighlightController({ mount } = {}) {
   const markedGroup = createSvgElement("g");
 
   const halo = createSvgElement("polygon");
-  halo.setAttribute("fill", "rgba(127, 231, 255, 0.12)");
-  halo.setAttribute("stroke", "rgba(12, 20, 34, 0.92)");
   halo.setAttribute("stroke-width", "6");
   halo.setAttribute("stroke-linejoin", "round");
 
   const outline = createSvgElement("polygon");
-  outline.setAttribute("fill", "rgba(124, 231, 255, 0.08)");
-  outline.setAttribute("stroke", "#9ef8ff");
   outline.setAttribute("stroke-width", "3");
   outline.setAttribute("stroke-linejoin", "round");
   outline.setAttribute("vector-effect", "non-scaling-stroke");
@@ -49,13 +63,28 @@ export function createGroundCellHighlightController({ mount } = {}) {
     elevation: 0.06,
     groundCell: null,
     markedGroundCells: [],
-    pulsePhase: 0
+    pulsePhase: 0,
+    targetState: "valid"
   };
+
+  function applyTargetCue(targetState) {
+    const normalizedTargetState = normalizeTargetState(targetState);
+    const cue = GROUND_CELL_TARGET_CUES[normalizedTargetState];
+
+    layer.dataset.groundCellTargetState = normalizedTargetState;
+    halo.setAttribute("fill", cue.haloFill);
+    halo.setAttribute("stroke", cue.haloStroke);
+    outline.setAttribute("fill", cue.outlineFill);
+    outline.setAttribute("stroke", cue.outlineStroke);
+  }
+
+  applyTargetCue(state.targetState);
 
   function hide() {
     state.active = false;
     state.groundCell = null;
     state.markedGroundCells = [];
+    delete layer.dataset.groundCellTargetState;
     layer.hidden = true;
   }
 
@@ -63,7 +92,8 @@ export function createGroundCellHighlightController({ mount } = {}) {
     groundCell = null,
     markedGroundCells = [],
     elevation = 0.06,
-    pulsePhase = 0
+    pulsePhase = 0,
+    targetState = "valid"
   } = {}) {
     const filteredMarkedGroundCells = (markedGroundCells || []).filter(Boolean);
 
@@ -77,15 +107,24 @@ export function createGroundCellHighlightController({ mount } = {}) {
     state.markedGroundCells = filteredMarkedGroundCells;
     state.elevation = elevation;
     state.pulsePhase = pulsePhase;
+    state.targetState = normalizeTargetState(groundCell?.highlightTargetState || targetState);
+    applyTargetCue(state.targetState);
     layer.hidden = false;
   }
 
-  function show({ groundCell = null, markedGroundCells = [], elevation = 0.06, pulsePhase = 0 } = {}) {
+  function show({
+    groundCell = null,
+    markedGroundCells = [],
+    elevation = 0.06,
+    pulsePhase = 0,
+    targetState = "valid"
+  } = {}) {
     setHighlightState({
       groundCell,
       markedGroundCells,
       elevation,
-      pulsePhase
+      pulsePhase,
+      targetState
     });
   }
 
@@ -96,6 +135,8 @@ export function createGroundCellHighlightController({ mount } = {}) {
     }
 
     state.groundCell = groundCell;
+    state.targetState = normalizeTargetState(groundCell?.highlightTargetState || state.targetState);
+    applyTargetCue(state.targetState);
   }
 
   function getProjectedGroundCellPoints(camera, groundCell, viewportWidth, viewportHeight) {

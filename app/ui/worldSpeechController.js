@@ -11,7 +11,7 @@ export function createWorldSpeechController({ mount } = {}) {
     inset: "0",
     overflow: "hidden",
     pointerEvents: "none",
-    zIndex: "18"
+    zIndex: "1"
   });
 
   function createSpeechElement(variant) {
