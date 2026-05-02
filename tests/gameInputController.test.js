@@ -121,6 +121,28 @@ describe("createGameInputController", () => {
     expect(requestInteract).toHaveBeenCalledTimes(2);
   });
 
+  it("uses the gamepad A button for nearby field actions", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const shouldGamepadButtonHarvest = vi.fn(() => true);
+    const { controller, requestHarvest, requestInteract } = createController({
+      windowRef,
+      shouldGamepadButtonHarvest
+    });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.A] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+
+    expect(shouldGamepadButtonHarvest).toHaveBeenCalledTimes(1);
+    expect(requestHarvest).toHaveBeenCalledTimes(1);
+    expect(requestInteract).not.toHaveBeenCalled();
+  });
+
   it("opens the bag once per X button press", () => {
     const gamepad = createGamepad();
     const windowRef = {
@@ -179,6 +201,29 @@ describe("createGameInputController", () => {
 
     expect(shouldBagButtonInteract).toHaveBeenCalledTimes(1);
     expect(requestInteract).toHaveBeenCalledTimes(1);
+    expect(inspectBag).not.toHaveBeenCalled();
+  });
+
+  it("uses the gamepad X button for nearby field actions before opening the bag", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const shouldGamepadButtonHarvest = vi.fn(() => true);
+    const { controller, inspectBag, requestHarvest, requestInteract } = createController({
+      windowRef,
+      shouldGamepadButtonHarvest
+    });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.X] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+
+    expect(shouldGamepadButtonHarvest).toHaveBeenCalledTimes(1);
+    expect(requestHarvest).toHaveBeenCalledTimes(1);
+    expect(requestInteract).not.toHaveBeenCalled();
     expect(inspectBag).not.toHaveBeenCalled();
   });
 

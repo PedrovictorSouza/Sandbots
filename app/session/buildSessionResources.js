@@ -7,9 +7,7 @@ import {
 import {
   ACT_TWO_SQUIRTLE_POSITION,
   ACT_TWO_BULBASAUR_SIZE,
-  ACT_TWO_CHARMANDER_SIZE,
-  ACT_TWO_REPAIR_PLANT_POSITION,
-  ACT_TWO_REPAIR_PLANT_SIZE
+  ACT_TWO_CHARMANDER_SIZE
 } from "../../rendering/worldAssets.js";
 import { createPlayerDustState } from "./playerDustParticles.js";
 import { createNatureRevivalEffectState } from "./natureRevivalEffects.js";
@@ -642,11 +640,6 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     revived: true
   });
 
-  session.repairPlantBrokenTexture = worldTextureFactory.createRepairPlantTexture();
-  session.repairPlantFixedTexture = worldTextureFactory.createRepairPlantTexture({
-    fixed: true
-  });
-
   session.actTwoSquirtle = {
     position: [...ACT_TWO_SQUIRTLE_POSITION],
     recovered: false,
@@ -693,12 +686,6 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     size: [0.96, 0.96],
     visible: false,
     position: null
-  };
-
-  session.actTwoRepairPlant = {
-    position: [...ACT_TWO_REPAIR_PLANT_POSITION],
-    size: ACT_TWO_REPAIR_PLANT_SIZE,
-    fixed: false
   };
 
   session.pokemonCenterPc = {

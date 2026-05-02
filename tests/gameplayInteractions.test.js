@@ -1395,12 +1395,63 @@ describe("createGameplayInteractions", () => {
       woodDrops: [],
       leppaTree,
       leppaBerryDrops,
-      canPurifyGround: true
+      canPurifyGround: false
     })).toBe(true);
 
     expect(storyState.flags.leppaBerryDropped).toBe(true);
     expect(leppaBerryDrops).toHaveLength(1);
     expect(pushNotice).toHaveBeenCalledWith("A Leppa Berry fell from the tree.");
+  });
+
+  it("prioritizes the Leppa tree over nearby dry ground while watering it", () => {
+    const groundCell = {
+      id: "ground-near-leppa",
+      offset: [1.21, 0, 1.2],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0
+    };
+    const storyState = {
+      flags: {
+        squirtleLeppaRequestAvailable: true,
+        leppaBerryGiftComplete: false
+      }
+    };
+    const leppaTree = {
+      position: [1, 0.02, 1],
+      revived: false,
+      berryDropped: false,
+      deadInstance: { active: false },
+      aliveInstance: { active: false }
+    };
+    const findNearbyGroundCell = vi.fn(() => ({
+      groundCell,
+      distance: 0.02
+    }));
+    const purifyGroundCell = vi.fn(() => true);
+    const interactions = createInteractions({
+      findNearbyGroundCell,
+      purifyGroundCell
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [1.2, 0, 1.2],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState,
+      woodDrops: [],
+      leppaTree,
+      groundDeadInstances: [groundCell],
+      groundPurifiedInstances: [],
+      canPurifyGround: true
+    });
+
+    expect(result).toBe(true);
+    expect(storyState.flags.leppaTreeRevived).toBe(true);
+    expect(leppaTree.aliveInstance.active).toBe(true);
+    expect(purifyGroundCell).not.toHaveBeenCalled();
   });
 
   it("requests the Leppa Berry gift flow from Bulbasaur's Look at this interaction", () => {

@@ -17,11 +17,15 @@ import {
   appendGameplayOpeningShipBillboards,
   getGameplayOpeningShipSceneObjects
 } from "../session/gameplayOpeningShip.js";
+import {
+  WORKBENCH_INTERACT_DISTANCE,
+  WORKBENCH_POSITION
+} from "../../gameplayContent.js";
 
 const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 1500;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
-const BULBASAUR_WORKBENCH_GUIDE_TARGET = [10.72, 0.02, 3.38];
+const BULBASAUR_WORKBENCH_GUIDE_TARGET = WORKBENCH_POSITION;
 const BULBASAUR_WORKBENCH_GUIDE_SPEED = 2.4;
 const CHARMANDER_FOLLOW_SPEED = 2.65;
 const CHARMANDER_FOLLOW_DISTANCE = 1.28;
@@ -54,6 +58,9 @@ const BULBASAUR_LEAFAGE_CAST_DURATION = 0.58;
 const BULBASAUR_LEAFAGE_IMPACT_TIME = 0.22;
 const PLAYER_MODEL_SCALE = 0.75;
 const PLAYER_MODEL_TURN_SPEED = 14;
+const GRASS_PLAYER_BEND_RADIUS = 0.92;
+const GRASS_PLAYER_BEND_OFFSET = 0.14;
+const GRASS_PLAYER_BEND_SWAY = 0.18;
 const CAMERA_DEBUG_ENABLED = (() => {
   try {
     return new URLSearchParams(globalThis.location?.search || "").get("cameraDebug") === "1";
@@ -97,6 +104,45 @@ function getTallGrassSway(groundGrassPatch, shouldRustle, now) {
   const ambient = Math.sin(now * 0.0018 + position[0] * 0.63 + position[2] * 0.41) * 0.018;
   const rustle = shouldRustle ? Math.sin(now * 0.024) * 0.09 : 0;
   return ambient + rustle;
+}
+
+function getGrassPlayerBend(groundGrassPatch, playerPosition) {
+  if (!Array.isArray(groundGrassPatch?.position) || !Array.isArray(playerPosition)) {
+    return {
+      offsetX: 0,
+      offsetZ: 0,
+      swayStrength: 0
+    };
+  }
+
+  let deltaX = groundGrassPatch.position[0] - playerPosition[0];
+  let deltaZ = groundGrassPatch.position[2] - playerPosition[2];
+  let distance = Math.hypot(deltaX, deltaZ);
+
+  if (distance >= GRASS_PLAYER_BEND_RADIUS) {
+    return {
+      offsetX: 0,
+      offsetZ: 0,
+      swayStrength: 0
+    };
+  }
+
+  if (distance < 0.001) {
+    deltaX = 1;
+    deltaZ = 0;
+    distance = 0.001;
+  }
+
+  const proximity = 1 - distance / GRASS_PLAYER_BEND_RADIUS;
+  const strength = proximity * proximity;
+  const directionX = deltaX / distance;
+  const directionZ = deltaZ / distance;
+
+  return {
+    offsetX: directionX * GRASS_PLAYER_BEND_OFFSET * strength,
+    offsetZ: directionZ * GRASS_PLAYER_BEND_OFFSET * strength,
+    swayStrength: directionX * GRASS_PLAYER_BEND_SWAY * strength
+  };
 }
 
 function clamp01(value) {
@@ -301,6 +347,14 @@ export function startGameLoop({
     const interactable = session.interactables.find((entry) => entry.id === interactableId);
     if (interactable) {
       interactable.position = [...position];
+    }
+  }
+
+  function syncWorkbenchInteractable() {
+    syncInteractablePosition("workbench", WORKBENCH_POSITION);
+    const workbench = session.interactables?.find((entry) => entry.id === "workbench");
+    if (workbench) {
+      workbench.interactDistance = WORKBENCH_INTERACT_DISTANCE;
     }
   }
 
@@ -1376,6 +1430,7 @@ export function startGameLoop({
 
     camera.resizeCanvases();
     camera.update(deltaTime);
+    syncWorkbenchInteractable();
     if (session.gameplayOpeningRequested) {
       gameplayCameraDirector.requestOpening();
       session.gameplayOpeningRequested = false;
@@ -1622,7 +1677,12 @@ export function startGameLoop({
       });
     }
 
-    const harvestRequested = controls.consumeHarvestRequest();
+    const harvestRequest = controls.consumeHarvestRequest();
+    const harvestRequested = Boolean(harvestRequest);
+    const harvestRequestSource = typeof harvestRequest === "object" && harvestRequest !== null ?
+      harvestRequest.source :
+      null;
+    const gamepadPrimaryMoveRequested = harvestRequestSource === "gamepadPrimary";
 
     if (
       harvestRequested &&
@@ -1649,13 +1709,15 @@ export function startGameLoop({
         canPurifyGround: waterGunEquipped,
         canUseLeafage: leafageEquipped
       });
-      const primaryActionIsPlacement = Boolean(
+      const primaryActionPlacementTarget = Boolean(
         primaryActionTarget?.logChairPlacement ||
         primaryActionTarget?.strawBedPlacement ||
         primaryActionTarget?.leafDenKitPlacement ||
         primaryActionTarget?.leafDenFurniturePlacement ||
         primaryActionTarget?.dittoFlagPlacement
       );
+      const primaryActionIsPlacement = primaryActionPlacementTarget && !gamepadPrimaryMoveRequested;
+      const primaryActionPlacementBlocked = primaryActionPlacementTarget && gamepadPrimaryMoveRequested;
       const primaryActionIsMove = Boolean(
         (waterGunEquipped && primaryActionTarget?.groundCell) ||
         (leafageEquipped && primaryActionTarget?.leafageGroundCell)
@@ -1677,7 +1739,9 @@ export function startGameLoop({
           ) :
           null;
 
-      if (primaryActionIsPlacement) {
+      if (primaryActionPlacementBlocked) {
+        // RT is reserved for the selected move. Placements use Enter or gamepad X.
+      } else if (primaryActionIsPlacement) {
         performHarvestAction(playerPosition);
       } else if (primaryActionIsMove && !dialogueActive) {
         if (waterGunEquipped && primaryActionTarget?.groundCell) {
@@ -1787,6 +1851,7 @@ export function startGameLoop({
         }
       } else if (
         waterGunTarget?.leppaTree?.action === "water" ||
+        waterGunTarget?.leppaTree?.action === "headbutt" ||
         (
           waterGunTarget?.palm &&
           controls.storyState.flags.bulbasaurStrawBedChallengeAvailable &&
@@ -2054,6 +2119,21 @@ export function startGameLoop({
       !scriptedInteractionActive ?
         getPendingSquirtleWaterGunGroundCells() :
         [];
+    const activeLeafageGroundCells =
+      !gameplayOpeningCameraActive &&
+      !gameplayOpeningHudHidden &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
+      session.bulbasaurLeafageAction?.groundCell ?
+        [session.bulbasaurLeafageAction.groundCell] :
+        [];
+    const markedActionGroundCells = [
+      ...pendingWaterGunGroundCells,
+      ...activeLeafageGroundCells
+    ];
     const promptCopy =
       gameplayOpeningCameraActive ||
       cinematicActive ||
@@ -2289,6 +2369,11 @@ export function startGameLoop({
       controls.storyState.flags.charmanderCelebrationRequestAvailable &&
       !controls.storyState.flags.charmanderCelebrationSuggested &&
       !controls.storyState.flags.charmanderCelebrationComplete;
+    const shouldShowCharacterWorldPrompt =
+      canShowWorldSpaceUi &&
+      session.playerCharacter &&
+      nearbyInteractable?.target &&
+      controls.shouldBagButtonInteract?.();
 
     if (shouldShowTangrowthSpeech) {
       nextFrame.worldSpeech.visible = true;
@@ -2372,11 +2457,7 @@ export function startGameLoop({
       nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
     }
 
-    if (
-      shouldShowTangrowthSpeech &&
-      nearbyInteractable?.target?.id === "tangrowth" &&
-      session.playerCharacter
-    ) {
+    if (shouldShowCharacterWorldPrompt) {
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = "Press X";
       nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
@@ -2388,9 +2469,9 @@ export function startGameLoop({
         nearbyHarvestTarget.groundCell || nearbyHarvestTarget.leafageGroundCell;
     }
 
-    if (pendingWaterGunGroundCells.length) {
+    if (markedActionGroundCells.length) {
       nextFrame.groundCellHighlight.visible = true;
-      nextFrame.groundCellHighlight.markedGroundCells.push(...pendingWaterGunGroundCells);
+      nextFrame.groundCellHighlight.markedGroundCells.push(...markedActionGroundCells);
       nextFrame.groundCellHighlight.pulsePhase = (Math.sin(now * 0.012) + 1) * 0.5;
     }
 
@@ -2415,6 +2496,11 @@ export function startGameLoop({
       session.deadGrassInstances.length = 0;
     }
 
+    const grassBendPlayerPosition =
+      session.playerCharacter && !cinematicActive ?
+        session.playerCharacter.getPosition() :
+        null;
+
     for (const groundGrassPatch of session.groundGrassPatches) {
       const shouldRustle =
         groundGrassPatch.state === "alive" &&
@@ -2433,6 +2519,7 @@ export function startGameLoop({
           )
         );
       const rustleOffset = shouldRustle ? Math.sin(now * 0.024) * 0.11 : 0;
+      const playerBend = getGrassPlayerBend(groundGrassPatch, grassBendPlayerPosition);
       const grassRevivalScale = getNatureRevivalScale(
         session.natureRevivalEffects,
         groundGrassPatch.id
@@ -2453,9 +2540,9 @@ export function startGameLoop({
         session.tallGrassInstances.push({
           id: `tall-grass-${groundGrassPatch.id}`,
           offset: [
-            groundGrassPatch.position[0] + rustleOffset,
+            groundGrassPatch.position[0] + rustleOffset + playerBend.offsetX,
             groundGrassPatch.position[1],
-            groundGrassPatch.position[2]
+            groundGrassPatch.position[2] + playerBend.offsetZ
           ],
           scale: getTallGrassInstanceScale(
             session.tallGrassModel,
@@ -2463,15 +2550,15 @@ export function startGameLoop({
             grassRevivalScale
           ),
           yaw: getTallGrassYaw(groundGrassPatch),
-          swayStrength: getTallGrassSway(groundGrassPatch, shouldRustle, now)
+          swayStrength: getTallGrassSway(groundGrassPatch, shouldRustle, now) + playerBend.swayStrength
         });
       } else if (deadGrassModelAvailable) {
         session.deadGrassInstances.push({
           id: `dead-grass-${groundGrassPatch.id}`,
           offset: [
-            groundGrassPatch.position[0] + rustleOffset,
+            groundGrassPatch.position[0] + rustleOffset + playerBend.offsetX,
             groundGrassPatch.position[1],
-            groundGrassPatch.position[2]
+            groundGrassPatch.position[2] + playerBend.offsetZ
           ],
           scale: getTallGrassInstanceScale(
             session.deadGrassModel,
@@ -2479,7 +2566,7 @@ export function startGameLoop({
             grassRevivalScale
           ),
           yaw: getTallGrassYaw(groundGrassPatch),
-          swayStrength: 0
+          swayStrength: playerBend.swayStrength
         });
       } else {
         nextFrame.render.grassBillboards.push({
@@ -2487,9 +2574,9 @@ export function startGameLoop({
             session.greenGrassTexture :
             session.deadGrassTexture,
           position: [
-            groundGrassPatch.position[0] + rustleOffset,
+            groundGrassPatch.position[0] + rustleOffset + playerBend.offsetX,
             groundGrassPatch.position[1],
-            groundGrassPatch.position[2]
+            groundGrassPatch.position[2] + playerBend.offsetZ
           ],
           size: groundGrassPatch.size.map((value) => value * grassRevivalScale)
         });

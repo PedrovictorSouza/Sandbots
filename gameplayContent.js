@@ -357,7 +357,8 @@ export const GROUND_FLOWER_LAYOUT = [
 
 export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
 export const LEPPA_TREE_DROP_OFFSET = [0.82, 0.02, 0.48];
-export const WORKBENCH_POSITION = [9.2, 0.02, 4.8];
+export const WORKBENCH_POSITION = [15.2, 0.02, -1.6];
+export const WORKBENCH_INTERACT_DISTANCE = 2.8;
 export const RUINED_POKEMON_CENTER_POSITION = [25.4, 0, 12.6];
 export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [22.7, 0.02, 10.8];
 export const POKEMON_CENTER_PC_POSITION = [26.25, 0.02, 13.65];
@@ -976,7 +977,7 @@ export const INTERACTABLE_DEFS = [
     type: "station",
     position: [...WORKBENCH_POSITION],
     markerKey: "workbench",
-    interactDistance: 1.8,
+    interactDistance: WORKBENCH_INTERACT_DISTANCE,
     activeWhen: () => true,
   },
   {

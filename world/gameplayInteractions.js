@@ -947,14 +947,13 @@ export function createGameplayInteractions({
       resourceNodes,
       storyState
     );
-    const nearbyLeppaTree = canPurifyGround ?
+    const leppaTreeHeadbuttAvailable = Boolean(
+      storyState?.flags?.leppaTreeRevived || leppaTree?.revived
+    );
+    const nearbyLeppaTree = (canPurifyGround || leppaTreeHeadbuttAvailable) ?
       findNearbyLeppaTree(playerPosition, leppaTree, storyState) :
       null;
     let nearestTarget = nearbyHarvestTarget;
-
-    if (nearbyLeppaTree && (!nearestTarget || nearbyLeppaTree.distance < nearestTarget.distance)) {
-      nearestTarget = nearbyLeppaTree;
-    }
 
     if (
       storyState?.flags?.logChairReceived &&
@@ -1024,6 +1023,10 @@ export function createGameplayInteractions({
           distance: nearbyLeafDen.distance
         };
       }
+    }
+
+    if (nearbyLeppaTree) {
+      return nearbyLeppaTree;
     }
 
     const nearbyLeafageTarget = canUseLeafage ?

@@ -81,17 +81,18 @@ describe("createQuestSystem", () => {
 
     questSystem.emit({ type: QUEST_EVENT.COLLECT, targetId: "wood", amount: 3 });
     questSystem.emit({ type: QUEST_EVENT.TALK, targetId: "tangrowth" });
+    questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
 
     expect(questSystem.getActiveQuest().id).toBe("learn-to-move");
     expect(questSystem.getQuest("wake-guide").status).toBe("locked");
-    expect(questSystem.getQuest("gather-first-supplies").objectives[0].current).toBe(0);
+    expect(questSystem.getQuest("open-the-water-route").objectives[0].current).toBe(0);
 
     questSystem.emit({ type: QUEST_EVENT.MOVE, targetId: "player" });
     expect(questSystem.getActiveQuest().id).toBe("wake-guide");
 
     questSystem.emit({ type: QUEST_EVENT.TALK, targetId: "tangrowth" });
-    expect(questSystem.getActiveQuest().id).toBe("gather-first-supplies");
-    expect(questSystem.getQuest("gather-first-supplies").objectives[0].current).toBe(0);
+    expect(questSystem.getActiveQuest().id).toBe("open-the-water-route");
+    expect(questSystem.getQuest("open-the-water-route").objectives[0].current).toBe(0);
   });
 
   it("rejects persisted progress that tries to skip the immutable first movement task", () => {
@@ -205,17 +206,6 @@ describe("createQuestSystem", () => {
     questSystem.emit({ type: QUEST_EVENT.MOVE, targetId: "player" });
     expect(questSystem.getActiveQuest().id).toBe("wake-guide");
     questSystem.emit({ type: QUEST_EVENT.TALK, targetId: "tangrowth" });
-    expect(questSystem.getActiveQuest().id).toBe("gather-first-supplies");
-
-    questSystem.emit({ type: QUEST_EVENT.COLLECT, targetId: "wood", amount: 2 });
-    expect(questSystem.getActiveQuest().id).toBe("gather-first-supplies");
-    questSystem.emit({ type: QUEST_EVENT.COLLECT, targetId: "wood", amount: 1 });
-    expect(questSystem.getActiveQuest().id).toBe("shape-a-living-patch");
-
-    questSystem.emit({ type: QUEST_EVENT.BUILD, targetId: "revived-habitat" });
-    expect(questSystem.getActiveQuest().id).toBe("record-a-memory");
-
-    questSystem.emit({ type: QUEST_EVENT.PHOTO, targetId: "first-memory" });
     expect(questSystem.getActiveQuest().id).toBe("open-the-water-route");
 
     questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });

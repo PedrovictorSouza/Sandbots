@@ -49,6 +49,7 @@ export function createGameInputController({
   requestFollowerCall = () => {},
   requestMoveCycle = () => {},
   shouldBagButtonInteract = () => false,
+  shouldGamepadButtonHarvest = () => false,
   inspectBag = () => {},
   windowRef = null
 }) {
@@ -264,7 +265,7 @@ export function createGameInputController({
     if (event.code === GAME_INPUT_BINDINGS.primaryAction.keyboardCode) {
       primaryActionPressed = true;
       if (!event.repeat) {
-        requestHarvest();
+        requestHarvest({ source: "keyboardPrimary" });
       }
       event.preventDefault();
       return;
@@ -485,7 +486,11 @@ export function createGameInputController({
       !sceneDirector.blocksGameplayInput() &&
       !isBuilderPanelOpen()
     ) {
-      requestInteract();
+      if (shouldGamepadButtonHarvest({ source: "gamepadRun" })) {
+        requestHarvest({ source: "gamepadRun" });
+      } else {
+        requestInteract();
+      }
     }
 
     gamepadRunButtonPressed = runButtonPressed;
@@ -536,6 +541,8 @@ export function createGameInputController({
       const bagEvent = createBagButtonEvent();
       if (sceneDirector.handleKeydown(bagEvent)) {
         // The active gameplay scene consumed X, usually to advance dialogue.
+      } else if (shouldGamepadButtonHarvest({ source: "gamepadBag" })) {
+        requestHarvest({ source: "gamepadBag" });
       } else if (shouldBagButtonInteract()) {
         requestInteract();
       } else {
@@ -564,7 +571,7 @@ export function createGameInputController({
         clearGameFlowInput();
         pokedexEntry.handleKeydown(primaryEvent);
       } else if (!sceneDirector.handleKeydown(primaryEvent) && !isBuilderPanelOpen()) {
-        requestHarvest();
+        requestHarvest({ source: "gamepadPrimary" });
       }
     }
 

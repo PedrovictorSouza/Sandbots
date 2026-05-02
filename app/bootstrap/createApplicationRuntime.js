@@ -154,7 +154,6 @@ const QUEST_COMPLETION_POP_DURATION_MS = 2400;
 const QUEST_COMPLETION_POP_MESSAGES = Object.freeze({
   "learn-to-move": "YOU TOOK YOUR FIRST STEPS!",
   "wake-guide": "YOU MET CHOPPER!",
-  "gather-first-supplies": "YOU GATHERED SUPPLIES!",
   "shape-a-living-patch": "YOU RESTORED A PATCH!",
   "record-a-memory": "YOU RECORDED A MEMORY!",
   "open-the-water-route": "YOU LEARNED WATER GUN!",
@@ -165,6 +164,7 @@ const QUEST_COMPLETION_POP_MESSAGES = Object.freeze({
 });
 const CHOPPER_SECOND_TALK_APPROACH_DURATION = 1.05;
 const CHOPPER_SECOND_TALK_STOP_DISTANCE = 1.45;
+const SQUIRTLE_DIALOGUE_MIN_PLAYER_DISTANCE = 1.55;
 const TALL_GRASS_MEMORY_APPROACH_DURATION = 1.05;
 const POKEMON_CENTER_GUIDE_FLIGHT_DURATION = 2.8;
 const LEAF_DEN_KIT_LIFE_COIN_COST = 10;
@@ -265,6 +265,7 @@ export function createApplicationRuntime({
     leafage: false
   };
   let harvestRequested = false;
+  let harvestRequestSource = null;
   let interactRequested = false;
   let gamePaused = false;
   let builderPanelOpen = false;
@@ -435,6 +436,41 @@ export function createApplicationRuntime({
     return true;
   }
 
+  function movePlayerAwayFromSquirtleForDialogue() {
+    const squirtlePosition = gameSession?.actTwoSquirtle?.position;
+    const playerCharacter = gameSession?.playerCharacter;
+    const playerPosition = playerCharacter?.getPosition?.();
+
+    if (!Array.isArray(squirtlePosition) || !Array.isArray(playerPosition)) {
+      return false;
+    }
+
+    let deltaX = playerPosition[0] - squirtlePosition[0];
+    let deltaZ = playerPosition[2] - squirtlePosition[2];
+    let distance = Math.hypot(deltaX, deltaZ);
+
+    if (distance >= SQUIRTLE_DIALOGUE_MIN_PLAYER_DISTANCE) {
+      playerCharacter.faceToward?.(squirtlePosition);
+      return false;
+    }
+
+    if (distance < 0.001) {
+      deltaX = 0;
+      deltaZ = 1;
+      distance = 1;
+    }
+
+    const nextPosition = [
+      squirtlePosition[0] + (deltaX / distance) * SQUIRTLE_DIALOGUE_MIN_PLAYER_DISTANCE,
+      playerPosition[1],
+      squirtlePosition[2] + (deltaZ / distance) * SQUIRTLE_DIALOGUE_MIN_PLAYER_DISTANCE
+    ];
+
+    playerCharacter.setPosition?.(nextPosition);
+    playerCharacter.faceToward?.(squirtlePosition);
+    return true;
+  }
+
   function startSquirtleReassemblyBeforeDialogue(onComplete) {
     const squirtle = gameSession?.actTwoSquirtle;
 
@@ -462,6 +498,7 @@ export function createApplicationRuntime({
         scriptedInteractionActive = false;
         squirtle.visible = true;
         squirtle.assemblyState = "assembled";
+        movePlayerAwayFromSquirtleForDialogue();
         focusActTwoSquirtleConversation();
         onComplete?.();
       }
@@ -664,6 +701,48 @@ export function createApplicationRuntime({
         !storyState.flags.charmanderCelebrationComplete
       )
     );
+  }
+
+  function shouldGamepadButtonHarvestNearbyFieldAction({ source = null } = {}) {
+    if (
+      !gameSession?.playerCharacter ||
+      !sceneFlowRuntime?.sceneDirector?.is?.(GAME_FLOW.GAMEPLAY) ||
+      uiRuntime?.pokedexUiState?.open ||
+      uiRuntime?.skillLearnOverlay?.isActive?.() ||
+      scriptedInteractionActive ||
+      builderPanelOpen ||
+      gamePaused
+    ) {
+      return false;
+    }
+
+    if (shouldBagButtonInteractWithNearbyCharacter()) {
+      return false;
+    }
+
+    const playerPosition = gameSession.playerCharacter.getPosition();
+    const activeHarvestTarget = findNearbyActionTarget({
+      playerPosition,
+      palmModel: gameSession.palmModel,
+      palmInstances: gameSession.palmInstances,
+      resourceNodes: gameSession.resourceNodes,
+      leppaTree: gameSession.leppaTree,
+      leafDen: gameSession.leafDen,
+      storyState,
+      inventory,
+      groundDeadInstances: gameSession.groundDeadInstances,
+      groundPurifiedInstances: gameSession.groundPurifiedInstances,
+      groundGrassPatches: gameSession.groundGrassPatches,
+      groundFlowerPatches: gameSession.groundFlowerPatches,
+      canPurifyGround: playerSkills.waterGun && activeFieldMoveId === "waterGun",
+      canUseLeafage: playerSkills.leafage && activeFieldMoveId === "leafage"
+    });
+
+    if (activeHarvestTarget?.logChairPlacement) {
+      return source === "gamepadBag";
+    }
+
+    return Boolean(activeHarvestTarget);
   }
 
   function buildChopperApproachTarget(playerPosition, chopperPosition) {
@@ -1917,8 +1996,9 @@ export function createApplicationRuntime({
     sceneDirector: sceneFlowRuntime.sceneDirector,
     isBuilderPanelOpen: () => builderPanelOpen,
     setBuilderPanelOpen,
-    requestHarvest: () => {
+    requestHarvest: ({ source = null } = {}) => {
       harvestRequested = true;
+      harvestRequestSource = source;
     },
     requestInteract: () => {
       interactRequested = true;
@@ -1932,6 +2012,7 @@ export function createApplicationRuntime({
     },
     requestMoveCycle: cycleActiveFieldMove,
     shouldBagButtonInteract: shouldBagButtonInteractWithNearbyCharacter,
+    shouldGamepadButtonHarvest: shouldGamepadButtonHarvestNearbyFieldAction,
     inspectBag,
     windowRef
   });
@@ -1990,6 +2071,7 @@ export function createApplicationRuntime({
         isSkillLearnActive: () => uiRuntime.skillLearnOverlay.isActive(),
         isScriptedInteractionActive: () => scriptedInteractionActive,
         isPrimaryActionActive: gameInput.isPrimaryActionActive,
+        shouldBagButtonInteract: shouldBagButtonInteractWithNearbyCharacter,
         getActiveMoveId: () => activeFieldMoveId,
         inventory,
         playerSkills,
@@ -1997,6 +2079,7 @@ export function createApplicationRuntime({
         isBuilderPanelOpen: () => builderPanelOpen,
         clearPendingActions() {
           harvestRequested = false;
+          harvestRequestSource = null;
           interactRequested = false;
           followerCallRequested = false;
         },
@@ -2011,7 +2094,9 @@ export function createApplicationRuntime({
           }
 
           harvestRequested = false;
-          return true;
+          const source = harvestRequestSource;
+          harvestRequestSource = null;
+          return { source };
         },
         consumeInteractRequest() {
           if (!interactRequested) {

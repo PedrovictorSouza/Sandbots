@@ -46,7 +46,7 @@ export const SMALL_ISLAND_QUESTS = Object.freeze([
       unlocks: ["ash-trail"],
       items: []
     },
-    nextQuestId: "gather-first-supplies"
+    nextQuestId: "open-the-water-route"
   },
   {
     id: "gather-first-supplies",
