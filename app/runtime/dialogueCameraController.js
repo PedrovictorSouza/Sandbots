@@ -61,8 +61,14 @@ export function createDialogueCameraController({ camera, cameraOrbit }) {
     }
   }
 
-  function focusNpcConversation({ playerPosition, npcActors = [], interactables = [], targetId }) {
-    const npcPosition = getNpcPosition(npcActors, interactables, targetId);
+  function focusNpcConversation({
+    playerPosition,
+    npcActors = [],
+    interactables = [],
+    targetId,
+    targetPosition = null
+  }) {
+    const npcPosition = targetPosition || getNpcPosition(npcActors, interactables, targetId);
 
     if (!npcPosition) {
       return;

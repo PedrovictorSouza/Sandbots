@@ -56,7 +56,7 @@ export const SMALL_ISLAND_QUESTS = Object.freeze([
     giverId: "chopper",
     status: QUEST_STATUS.LOCKED,
     objectives: [
-      { type: QUEST_EVENT.COLLECT, targetId: "wood", required: 3, current: 0 }
+      { type: QUEST_EVENT.COLLECT, targetId: "wood", required: 3, current: 0, hiddenFromHud: true }
     ],
     rewards: {
       unlocks: ["basic-crafting-note"],

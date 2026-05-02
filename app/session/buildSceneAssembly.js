@@ -14,9 +14,12 @@ export function buildSceneAssembly(session, assets) {
     houseModel,
     palmModel,
     tallGrassModel,
+    deadGrassModel,
     chopperBodyModel,
     chopperPropellerModel,
+    playerModel,
     robot1Model,
+    robot2Model,
     characterFactory
   } = assets;
 
@@ -33,11 +36,22 @@ export function buildSceneAssembly(session, assets) {
     }
   ];
 
+  session.deadGrassModel = deadGrassModel;
+  session.deadGrassInstances = session.deadGrassInstances || [];
+
   if (tallGrassModel) {
     session.sceneObjects.push({
       model: tallGrassModel,
       instances: session.tallGrassInstances,
       brightness: 1.06
+    });
+  }
+
+  if (deadGrassModel) {
+    session.sceneObjects.push({
+      model: deadGrassModel,
+      instances: session.deadGrassInstances,
+      brightness: 0.92
     });
   }
 
@@ -111,6 +125,29 @@ export function buildSceneAssembly(session, assets) {
     session.sceneObjects.push({
       model: robot1Model,
       instances: [session.actTwoSquirtle.modelInstance],
+      brightness: 1
+    });
+  }
+
+  if (robot2Model && session.bulbasaurEncounter) {
+    session.bulbasaurEncounter.model = robot2Model;
+    session.bulbasaurEncounter.modelInstance = {
+      offset: session.bulbasaurEncounter.position || [0, 0.04, 0],
+      scale: 0.5,
+      yaw: 0,
+      active: false
+    };
+    session.sceneObjects.push({
+      model: robot2Model,
+      instances: [session.bulbasaurEncounter.modelInstance],
+      brightness: 1
+    });
+  }
+
+  if (playerModel && session.playerModelInstance) {
+    session.sceneObjects.push({
+      model: playerModel,
+      instances: [session.playerModelInstance],
       brightness: 1
     });
   }

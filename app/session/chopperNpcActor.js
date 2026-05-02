@@ -1,19 +1,29 @@
 const CHOPPER_NPC_BASE_Y = 1.35;
 const CHOPPER_NPC_SCALE = 0.575;
 const CHOPPER_NPC_YAW = 0.65;
+const CHOPPER_NPC_MODEL_FACE_YAW_OFFSET = Math.PI;
 const CHOPPER_NPC_PROPELLER_SPEED = 26;
 const CHOPPER_NPC_PROPELLER_PIVOT = [0.125, 2, 0];
 const CHOPPER_NPC_FLIGHT_LIFT = 0.78;
 const CHOPPER_PATROL_SPEED = 1.85;
 const CHOPPER_PATROL_PAUSE_DURATION = 1.35;
 const CHOPPER_PATROL_ARRIVE_DISTANCE = 0.22;
-const CHOPPER_PATROL_POINTS = Object.freeze([
+const CHOPPER_PATROL_RADIUS_MULTIPLIER = 3;
+const CHOPPER_PATROL_CENTER = [12.84, 0.02, -8.14];
+const CHOPPER_PATROL_BASE_POINTS = Object.freeze([
   [10.4, 0.02, -7.2],
   [13.4, 0.02, -5.9],
   [16.8, 0.02, -8.1],
   [14.2, 0.02, -10.4],
   [9.4, 0.02, -9.1]
 ]);
+const CHOPPER_PATROL_POINTS = Object.freeze(
+  CHOPPER_PATROL_BASE_POINTS.map((point) => [
+    CHOPPER_PATROL_CENTER[0] + (point[0] - CHOPPER_PATROL_CENTER[0]) * CHOPPER_PATROL_RADIUS_MULTIPLIER,
+    point[1],
+    CHOPPER_PATROL_CENTER[2] + (point[2] - CHOPPER_PATROL_CENTER[2]) * CHOPPER_PATROL_RADIUS_MULTIPLIER
+  ])
+);
 
 function getNpcPosition(npcActor) {
   return npcActor?.character?.getPosition?.() || npcActor?.position || [0, 0, 0];
@@ -38,6 +48,10 @@ function getYawToward(fromPosition, toPosition) {
   const deltaX = toPosition[0] - fromPosition[0];
   const deltaZ = toPosition[2] - fromPosition[2];
   return Math.atan2(deltaX, deltaZ);
+}
+
+function getChopperModelYaw(faceYaw) {
+  return faceYaw + CHOPPER_NPC_MODEL_FACE_YAW_OFFSET;
 }
 
 function getNearestPatrolPointIndex(position) {
@@ -69,7 +83,7 @@ function syncChopperNpcInstances(actor, {
 } = {}) {
   const position = getNpcPosition(actor.npcActor);
   const baseYaw = Number.isFinite(actor.npcActor?.faceYaw) ?
-    actor.npcActor.faceYaw :
+    getChopperModelYaw(actor.npcActor.faceYaw) :
     CHOPPER_NPC_YAW;
   const offset = [
     position[0] + idleX,

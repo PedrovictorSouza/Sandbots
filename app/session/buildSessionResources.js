@@ -570,7 +570,14 @@ function createDittoFlagCanvas() {
 }
 
 export function buildSessionResources(session, assets, { worldTextureFactory }) {
-  const { characterFactory, woodImage, skyImage, gameplayOpeningShipModel } = assets;
+  const {
+    characterFactory,
+    woodImage,
+    skyImage,
+    gameplayOpeningShipModel,
+    robot1Model,
+    billImage
+  } = assets;
   const characterAssets = characterFactory.getSharedAssets();
 
   session.characterTextures = {
@@ -594,11 +601,23 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.pokemonCenterPcTexture = worldTextureFactory.fromCanvas(createPokemonCenterPcCanvas());
   session.challengeBoulderTexture = worldTextureFactory.fromCanvas(createChallengeBoulderCanvas());
   session.timburrTexture = worldTextureFactory.fromCanvas(createTimburrCanvas());
+  session.billCameo = {
+    texture: billImage ? worldTextureFactory.fromImage(billImage) : null,
+    position: [21.35, 0.05, -15.1],
+    size: [1.65, 1.65],
+    visible: false
+  };
   session.skyTexture = skyImage ?
     worldTextureFactory.fromImage(skyImage, { filter: worldTextureFactory.LINEAR }) :
     null;
   session.playerDustTexture = worldTextureFactory.fromCanvas(createPlayerDustCanvas());
   session.playerDust = createPlayerDustState();
+  session.playerModelInstance = {
+    offset: [0, 0, 0],
+    scale: 0.75,
+    yaw: -Math.PI * 0.5,
+    active: false
+  };
   session.gameplayOpeningShipTexture = worldTextureFactory.createOpeningShipTexture();
   session.gameplayOpeningShipSmokeTexture = worldTextureFactory.fromCanvas(createShipSmokeCanvas());
   session.gameplayOpeningShipFlashTexture = worldTextureFactory.fromCanvas(createShipImpactFlashCanvas());
@@ -631,6 +650,16 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.actTwoSquirtle = {
     position: [...ACT_TWO_SQUIRTLE_POSITION],
     recovered: false,
+    visible: false,
+    assemblyState: "hidden",
+    model: robot1Model,
+    reassembly: {
+      active: false,
+      elapsed: 0,
+      duration: 1.25,
+      progress: 0,
+      onComplete: null
+    },
     modelInstance: {
       offset: [...ACT_TWO_SQUIRTLE_POSITION],
       scale: 0.5,

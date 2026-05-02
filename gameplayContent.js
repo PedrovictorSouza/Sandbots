@@ -993,7 +993,7 @@ export const INTERACTABLE_DEFS = [
     label: "Stranded Pokemon",
     type: "site",
     position: [...ACT_TWO_SQUIRTLE_POSITION],
-    markerKey: "squirtle",
+    markerKey: null,
     interactDistance: 1.85,
     activeWhen: (state) => {
       return (

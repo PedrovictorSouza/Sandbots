@@ -192,4 +192,80 @@ describe("createFrameSnapshotController", () => {
     expect(groundCellHighlight.hide).toHaveBeenCalledTimes(1);
     expect(colliderGizmos.hide).toHaveBeenCalledTimes(1);
   });
+
+  it("uses the world renderer for ground cell highlights when available", () => {
+    const hud = {
+      syncQuestFocus: vi.fn(),
+      syncHudMeta: vi.fn(),
+      syncHudInstructions: vi.fn(),
+      renderMissionCards: vi.fn(),
+      setStatus: vi.fn()
+    };
+    const worldRenderer = {
+      drawScene: vi.fn(),
+      drawGroundCellHighlight: vi.fn(),
+      drawBillboards: vi.fn(),
+      drawWorldMarkers: vi.fn(),
+      drawWoodDrops: vi.fn(),
+      drawBillboard: vi.fn(),
+      drawCharacters: vi.fn()
+    };
+    const worldSpeech = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      update: vi.fn(),
+      setWorldPosition: vi.fn()
+    };
+    const groundCellHighlight = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      update: vi.fn(),
+      setGroundCell: vi.fn()
+    };
+    const colliderGizmos = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      update: vi.fn()
+    };
+    const actTwoTutorial = {
+      update: vi.fn()
+    };
+    const camera = {};
+    const mount = {
+      clientWidth: 1280,
+      clientHeight: 720
+    };
+    const viewProjection = new Float32Array(16);
+    const groundCell = { id: "cell-1", offset: [2, -1, 3], surfaceY: 0, tileSpan: 1.425 };
+    const markedGroundCell = { id: "cell-2", offset: [4, -1, 3], surfaceY: 0, tileSpan: 1.425 };
+
+    const controller = createFrameSnapshotController({
+      camera,
+      mount,
+      worldRenderer,
+      worldSpeech,
+      colliderGizmos,
+      groundCellHighlight,
+      actTwoTutorial,
+      hud
+    });
+
+    const frame = controller.beginFrame();
+    frame.render.viewProjection = viewProjection;
+    frame.render.sceneObjects = [];
+    frame.groundCellHighlight.visible = true;
+    frame.groundCellHighlight.groundCell = groundCell;
+    frame.groundCellHighlight.markedGroundCells.push(markedGroundCell);
+    frame.groundCellHighlight.pulsePhase = 0.5;
+
+    controller.commitFrame();
+
+    expect(worldRenderer.drawGroundCellHighlight).toHaveBeenCalledWith(
+      viewProjection,
+      frame.groundCellHighlight
+    );
+    expect(groundCellHighlight.hide).toHaveBeenCalledTimes(1);
+    expect(groundCellHighlight.show).not.toHaveBeenCalled();
+    expect(groundCellHighlight.update).not.toHaveBeenCalled();
+  });
 });

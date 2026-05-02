@@ -18,10 +18,94 @@ export function createWorldRenderer({
   jitterState
 }) {
   const pixelSnap = new Float32Array(2);
+  const GROUND_HIGHLIGHT_ELEVATION = 0.065;
+  const GROUND_HIGHLIGHT_TEXTURE_SIZE = 32;
+  const GROUND_HIGHLIGHT_SELECTED_SCALE = 1.05;
+  const GROUND_HIGHLIGHT_MARKED_SCALE = 0.98;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
+
+  function createGroundQuadPrimitive() {
+    const interleaved = new Float32Array([
+      -0.5, 0, -0.5, 0, 0, 0, 1, 0,
+      0.5, 0, -0.5, 1, 0, 0, 1, 0,
+      -0.5, 0, 0.5, 0, 1, 0, 1, 0,
+      0.5, 0, 0.5, 1, 1, 0, 1, 0
+    ]);
+    const indices = new Uint16Array([0, 2, 1, 1, 2, 3]);
+    const vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, interleaved, gl.STATIC_DRAW);
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+    return {
+      vertexBuffer,
+      indexBuffer,
+      indexCount: indices.length,
+      indexType: gl.UNSIGNED_SHORT
+    };
+  }
+
+  function createGroundHighlightTexture({ fill, border, outerBorder }) {
+    const size = GROUND_HIGHLIGHT_TEXTURE_SIZE;
+    const pixels = new Uint8Array(size * size * 4);
+
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const edgeDistance = Math.min(x, y, size - 1 - x, size - 1 - y);
+        const color = edgeDistance < 2 ? outerBorder : edgeDistance < 4 ? border : fill;
+        const offset = (y * size + x) * 4;
+        pixels[offset + 0] = color[0];
+        pixels[offset + 1] = color[1];
+        pixels[offset + 2] = color[2];
+        pixels[offset + 3] = color[3];
+      }
+    }
+
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei?.(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      size,
+      size,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      pixels
+    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    return texture;
+  }
+
+  const groundHighlightPrimitive = createGroundQuadPrimitive();
+  const groundHighlightModel = {
+    offset: [0, 0, 0],
+    scale: 1,
+    size: [1, 0.01, 1],
+    texture: null,
+    primitives: [groundHighlightPrimitive]
+  };
+  const selectedGroundHighlightTexture = createGroundHighlightTexture({
+    fill: [124, 231, 255, 28],
+    border: [158, 248, 255, 220],
+    outerBorder: [7, 23, 36, 210]
+  });
+  const markedGroundHighlightTexture = createGroundHighlightTexture({
+    fill: [255, 212, 71, 72],
+    border: [255, 240, 161, 230],
+    outerBorder: [80, 52, 0, 198]
+  });
 
   function syncPixelSnap() {
     pixelSnap[0] = worldCanvas.width * 0.5;
@@ -144,6 +228,46 @@ export function createWorldRenderer({
     }
   }
 
+  function createGroundHighlightInstance(groundCell, scaleMultiplier) {
+    if (!Array.isArray(groundCell?.offset)) {
+      return null;
+    }
+
+    const tileSpan = groundCell.tileSpan || groundCell.size?.[0] || 1;
+    const surfaceY = Number.isFinite(groundCell.surfaceY) ? groundCell.surfaceY : 0;
+
+    return {
+      offset: [
+        groundCell.offset[0],
+        surfaceY + GROUND_HIGHLIGHT_ELEVATION,
+        groundCell.offset[2]
+      ],
+      scale: tileSpan * scaleMultiplier,
+      yaw: 0,
+      pitch: 0,
+      roll: 0
+    };
+  }
+
+  function drawGroundHighlightCells(texture, groundCells, scaleMultiplier) {
+    const instances = groundCells
+      .map((groundCell) => createGroundHighlightInstance(groundCell, scaleMultiplier))
+      .filter(Boolean);
+
+    if (!instances.length) {
+      return;
+    }
+
+    drawSceneObject({
+      brightness: 1,
+      model: {
+        ...groundHighlightModel,
+        texture
+      },
+      instances
+    });
+  }
+
   function prepareSpritePass(viewProjection) {
     const { right: quadRight, up: quadUp } = camera.getBillboardAxes();
 
@@ -218,6 +342,34 @@ export function createWorldRenderer({
       for (const sceneObject of sceneObjects) {
         drawSceneObject(sceneObject);
       }
+    },
+
+    drawGroundCellHighlight(viewProjection, {
+      visible = false,
+      groundCell = null,
+      markedGroundCells = []
+    } = {}) {
+      const markedCells = (markedGroundCells || []).filter(Boolean);
+      const selectedCells = visible && groundCell ? [groundCell] : [];
+
+      if (!viewProjection || (!markedCells.length && !selectedCells.length)) {
+        return;
+      }
+
+      configureScenePass(viewProjection);
+      gl.uniform1f(uniforms.jitterAmount, 0);
+      gl.depthMask?.(false);
+      drawGroundHighlightCells(
+        markedGroundHighlightTexture,
+        markedCells,
+        GROUND_HIGHLIGHT_MARKED_SCALE
+      );
+      drawGroundHighlightCells(
+        selectedGroundHighlightTexture,
+        selectedCells,
+        GROUND_HIGHLIGHT_SELECTED_SCALE
+      );
+      gl.depthMask?.(true);
     },
 
     drawWoodDrops(viewProjection, woodTexture, woodDrops) {
@@ -368,7 +520,7 @@ export function createWorldRenderer({
     }) {
       const visibleCharacters = [];
 
-      if (playerCharacter) {
+      if (playerCharacter && playerCharacter.renderCharacter !== false) {
         visibleCharacters.push(playerCharacter);
       }
 

@@ -1041,6 +1041,7 @@ describe("createGameplayInteractions", () => {
 
   it("accepts Bulbasaur's dry grass mission from the Bulbasaur interaction", () => {
     const onBulbasaurDryGrassMissionAccepted = vi.fn();
+    const onNpcInteractionStart = vi.fn();
     const interactions = createInteractions({
       onBulbasaurDryGrassMissionAccepted,
       findNearbyInteractable: vi.fn(() => ({
@@ -1068,12 +1069,25 @@ describe("createGameplayInteractions", () => {
       interactables: [],
       storyState,
       inventory: {},
-      groundGrassPatches: []
+      groundGrassPatches: [
+        {
+          cellId: "ground-2-3",
+          position: [2, 0.02, 3]
+        }
+      ],
+      onNpcInteractionStart
     });
 
     expect(result).toBe(true);
     expect(storyState.flags.bulbasaurDryGrassMissionAccepted).toBe(true);
     expect(onBulbasaurDryGrassMissionAccepted).toHaveBeenCalledTimes(1);
+    expect(onNpcInteractionStart).toHaveBeenCalledWith({
+      targetId: "bulbasaurDryGrassMission",
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      targetPosition: [2, 0.02, 3]
+    });
   });
 
   it("accepts Bulbasaur's dry grass mission as complete if 10 patches were already restored", () => {

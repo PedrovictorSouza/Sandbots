@@ -67,6 +67,14 @@ export function configurePlayerSpawner(
       controller: keyboardController,
       collisionTest
     });
+    session.playerCharacter.renderCharacter = false;
+
+    if (session.playerModelInstance) {
+      session.playerModelInstance.offset = [...position];
+      session.playerModelInstance.scale = 0.75;
+      session.playerModelInstance.yaw = -Math.PI * 0.5;
+      session.playerModelInstance.active = true;
+    }
 
     if (!configureCamera) {
       syncHudMeta(storyState, inventory, session.playerCharacter.getPosition());

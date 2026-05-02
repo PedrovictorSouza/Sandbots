@@ -34,6 +34,19 @@ describe("createQuestLog", () => {
     expect(summaryHtml).toContain("Talk to Chopper so he can explain");
   });
 
+  it("does not render HUD-hidden objectives in the quest tracker", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "gather-first-supplies");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+
+    expect(questLog.renderChecklistHtml()).not.toContain("Collect: Wood");
+    expect(questLog.renderLogHtml()).not.toContain("Collect: Wood");
+  });
+
   it("renders tracked long-running tasks alongside the active quest", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
@@ -76,6 +89,34 @@ describe("createQuestLog", () => {
 
     expect(checklistHtml).toContain('data-done="true"');
     expect(checklistHtml).toContain("Making habitats");
+  });
+
+  it("keeps completed tracked tasks visible only while they are flashing", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        makingHabitatsComplete: true,
+        trackedTaskIds: ["making-habitats"]
+      }
+    };
+    const hiddenOptions = {
+      hideCompletedTrackedTasks: true
+    };
+    const flashingOptions = {
+      hideCompletedTrackedTasks: true,
+      flashingTaskIds: new Set(["making-habitats"])
+    };
+
+    expect(questLog.renderChecklistHtml(storyState, hiddenOptions)).not.toContain("Making habitats");
+    expect(questLog.renderLogHtml(storyState, hiddenOptions)).not.toContain('data-task-id="making-habitats"');
+    expect(questLog.renderChecklistHtml(storyState, flashingOptions)).toContain('data-task-flashing="true"');
+    expect(questLog.renderLogHtml(storyState, flashingOptions)).toContain('data-task-flashing="true"');
   });
 
   it("renders Bulbasaur's dry grass task with progress from story state", () => {

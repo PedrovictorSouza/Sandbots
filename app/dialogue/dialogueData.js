@@ -4,15 +4,39 @@ export const SMALL_ISLAND_DIALOGUES = Object.freeze({
     speakerId: "chopper",
     lines: [
       {
-        text: "Easy there. The island has been quiet for too long, and quiet places forget how to breathe.",
+        text: "Hey, rookie. Welcome to your first day on the job.",
         givesQuest: "wake-guide"
       },
       {
-        text: "I heard a weak cry beyond the ash. If someone is still out there, we move now."
+        text: "Tiny scheduling note: your first day was 2,000 years ago.",
+        givesQuest: "wake-guide"
+      },
+      {
+        text: "So, technically, you're not late. You're historically late.",
+        givesQuest: "wake-guide"
+      },
+      {
+        text: "Our human, Bill, waited as long as he could. Very patient man. Very limited warranty.",
+        givesQuest: "wake-guide"
+      },
+      {
+        text: "In his final years, he mentioned you a lot. Usually to complain about your delivery time, your build quality, and your complete lack of punctuality.",
+        givesQuest: "wake-guide"
+      },
+      {
+        text: "His last recorded message was: 'If that walking toaster ever wakes up, tell him he's fired.'",
+        givesQuest: "wake-guide"
+      },
+      {
+        text: "Anyway, you're promoted. Mostly because everyone else is dust.",
+        givesQuest: "wake-guide"
+      },
+      {
+        text: "Well, there's a lot to do, so let's get going."
       },
       {
         id: "notice-squirtle-sound",
-        text: "Huum, what's that sound? Follow it with me. Stay close, and watch the dead ground."
+        text: "First things firts. See that pile of metal. That's our friend faucet. Let's wake him up."
       }
     ]
   },

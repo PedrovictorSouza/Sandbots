@@ -4,11 +4,13 @@ import { createResourceNodes } from "../../world/islandWorld.js";
 export function createEmptySession() {
   return {
     bulbasaurEncounter: null,
+    bulbasaurLeafageAction: null,
     bulbasaurTexture: null,
     charmanderEncounter: null,
     charmanderTexture: null,
     actTwoRepairPlant: null,
     actTwoSquirtle: null,
+    billCameo: null,
     characterTextures: {},
     chopperNpcActor: null,
     challengeBoulder: null,
@@ -50,6 +52,7 @@ export function createEmptySession() {
     palmInstances: [],
     palmModel: null,
     playerCharacter: null,
+    playerModelInstance: null,
     playerDust: null,
     playerDustTexture: null,
     pokemonCenterPc: null,

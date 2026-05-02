@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGameHudController } from "../app/ui/gameHudController.js";
 
 function createController() {
@@ -28,6 +28,10 @@ function createController() {
 }
 
 describe("createGameHudController", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("shows immediate prompts as the current action instead of repeating quest copy", () => {
     const {
       controller,
@@ -111,5 +115,106 @@ describe("createGameHudController", () => {
       "Gift",
       "Key"
     ]);
+  });
+
+  it("shows the companion robot for the selected field move beside supplies", () => {
+    const inventoryPanelElement = document.createElement("div");
+    inventoryPanelElement.className = "inventory";
+    const inventoryTitleElement = document.createElement("strong");
+    inventoryTitleElement.textContent = "Supplies";
+    const inventoryGridElement = document.createElement("div");
+    inventoryPanelElement.append(inventoryTitleElement, inventoryGridElement);
+    const skillsPanelElement = document.createElement("div");
+    const skillsGridElement = document.createElement("div");
+    const controller = createGameHudController({
+      inventoryGridElement,
+      skillsPanelElement,
+      skillsGridElement,
+      playerSkillOrder: ["waterGun", "leafage"],
+      playerSkillDefs: {
+        waterGun: {
+          shortLabel: "Water",
+          glyph: "W",
+          color: "#65c7ff",
+          ink: "#081f33"
+        },
+        leafage: {
+          shortLabel: "Leaf",
+          glyph: "L",
+          color: "#7ed36d",
+          ink: "#0b2610"
+        }
+      }
+    });
+
+    controller.syncSkillsUi({ waterGun: true, leafage: true }, "waterGun");
+
+    const companionHudElement = inventoryPanelElement.querySelector(".active-companion-hud");
+    expect(inventoryPanelElement.querySelector(".inventory-header strong")?.textContent).toBe("Supplies");
+    expect(companionHudElement?.hidden).toBe(false);
+    expect(companionHudElement?.dataset.companionId).toBe("squirtle");
+    expect(companionHudElement?.textContent).toContain("Water");
+    expect(companionHudElement?.textContent).toContain("Squirtle");
+
+    controller.syncSkillsUi({ waterGun: true, leafage: true }, "leafage");
+
+    expect(companionHudElement?.dataset.companionId).toBe("bulbasaur");
+    expect(companionHudElement?.textContent).toContain("Leaf");
+    expect(companionHudElement?.textContent).toContain("Bulbasaur");
+
+    controller.syncSkillsUi({ waterGun: true, leafage: false }, "leafage");
+
+    expect(companionHudElement?.hidden).toBe(true);
+  });
+
+  it("flashes completed tracked tasks for 3 seconds before removing them from the HUD stack", () => {
+    const missionsStackElement = document.createElement("div");
+    const hudChecklistElement = document.createElement("div");
+    const hudContextElement = document.createElement("div");
+    const activeQuest = {
+      id: "water-dry-grass",
+      status: "active",
+      title: "Gather first supplies",
+      description: "Collect simple wood so Chopper can test your field rhythm.",
+      guidance: "Water dry tall grass.",
+      objectives: []
+    };
+    const nowSpy = vi.spyOn(performance, "now").mockReturnValue(1000);
+    const controller = createGameHudController({
+      missionsStackElement,
+      hudChecklistElement,
+      hudContextElement,
+      questSystem: {
+        getActiveQuest: () => activeQuest,
+        getQuestLog: () => [activeQuest]
+      }
+    });
+    const storyState = {
+      flags: {
+        trackedTaskIds: ["making-habitats"]
+      }
+    };
+
+    controller.renderMissionCards(storyState, {}, "");
+    controller.syncQuestFocus(storyState);
+
+    expect(missionsStackElement.innerHTML).toContain('data-task-id="making-habitats"');
+    expect(hudChecklistElement.innerHTML).toContain("Making habitats");
+
+    storyState.flags.makingHabitatsComplete = true;
+    nowSpy.mockReturnValue(1500);
+    controller.renderMissionCards(storyState, {}, "");
+    controller.syncQuestFocus(storyState);
+
+    expect(missionsStackElement.innerHTML).toContain('data-task-flashing="true"');
+    expect(hudChecklistElement.innerHTML).toContain('data-task-flashing="true"');
+    expect(hudChecklistElement.innerHTML).toContain("Making habitats");
+
+    nowSpy.mockReturnValue(4601);
+    controller.renderMissionCards(storyState, {}, "");
+    controller.syncQuestFocus(storyState);
+
+    expect(missionsStackElement.innerHTML).not.toContain('data-task-id="making-habitats"');
+    expect(hudChecklistElement.innerHTML).not.toContain("Making habitats");
   });
 });

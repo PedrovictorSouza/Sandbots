@@ -15,7 +15,8 @@ function isMovementKey(key) {
 
 export function createGameplayDialogueController({
   uiLayer,
-  clearGameFlowInput = () => {}
+  clearGameFlowInput = () => {},
+  onBeforeComplete = () => {}
 } = {}) {
   if (!(uiLayer instanceof HTMLElement)) {
     throw new Error("Gameplay dialogue controller requires a valid uiLayer.");
@@ -37,6 +38,7 @@ export function createGameplayDialogueController({
     lines: [],
     lineIndex: 0,
     onComplete: () => {},
+    onBeforeComplete,
     onLineChange: () => {},
     visibleText: ""
   };
@@ -98,6 +100,7 @@ export function createGameplayDialogueController({
     render();
 
     if (completed) {
+      state.onBeforeComplete();
       onComplete();
     }
   }
@@ -205,6 +208,9 @@ export function createGameplayDialogueController({
     handleKeyup,
     isActive() {
       return state.active;
+    },
+    setBeforeComplete(handler = () => {}) {
+      state.onBeforeComplete = typeof handler === "function" ? handler : () => {};
     },
     openConversation
   };

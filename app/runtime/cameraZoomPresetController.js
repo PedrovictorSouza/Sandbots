@@ -25,6 +25,10 @@ export function createCameraZoomPresetController({
   }
 
   return {
+    applyCurrent() {
+      applyPreset(presetIndex);
+      return getPreset(presetIndex);
+    },
     cycle() {
       if (!presets.length) {
         return 0;
@@ -36,6 +40,9 @@ export function createCameraZoomPresetController({
     },
     getIndex() {
       return presetIndex;
+    },
+    getCurrentPreset() {
+      return getPreset(presetIndex);
     },
     reset() {
       presetIndex = 0;

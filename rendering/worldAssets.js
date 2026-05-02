@@ -102,8 +102,8 @@ const SCENE_VERTEX_SOURCE = `
     ));
     vec4 clip = uViewProjection * vec4(world, 1.0);
 
-    float phase = uTime * 8.0 + world.x * 1.7 + world.y * 2.3 + world.z * 1.1;
-    vec2 jitter = vec2(sin(phase), cos(phase * 0.83)) * (0.028 * uJitterAmount);
+    float phase = uTime * 3.5 + world.x * 1.7 + world.y * 2.3 + world.z * 1.1;
+    vec2 jitter = vec2(sin(phase), cos(phase * 0.83)) * (0.008 * uJitterAmount);
 
     clip.xy += jitter * clip.w;
     vec2 snapped = floor((clip.xy / clip.w) * uPixelSnap + 0.5) / uPixelSnap;
@@ -124,7 +124,7 @@ const SCENE_FRAGMENT_SOURCE = `
 
   void main() {
     vec4 texel = texture2D(uTexture, vTexCoord);
-    if (texel.a < 0.5) {
+    if (texel.a < 0.02) {
       discard;
     }
 
@@ -223,10 +223,10 @@ const SKY_FRAGMENT_SOURCE = `
   const float PI = 3.14159265359;
 
   void main() {
-    float horizontalSpan = 0.40;
-    float u = fract((uSkyYaw / (PI * 2.0)) + (vScreenUv.x - 0.5) * horizontalSpan);
-    float pitchOffset = clamp(uSkyPitch, -0.9, 0.9) * 0.18;
-    float v = clamp(0.86 - vScreenUv.y * 0.78 + pitchOffset, 0.001, 0.999);
+    float horizontalSpan = 1.0;
+    float u = fract(0.5 + (uSkyYaw / (PI * 2.0)) + (vScreenUv.x - 0.5) * horizontalSpan);
+    float pitchOffset = clamp(uSkyPitch, -0.9, 0.9) * 0.12;
+    float v = clamp(1.0 - vScreenUv.y + pitchOffset, 0.001, 0.999);
 
     gl_FragColor = texture2D(uSkyTexture, vec2(u, v));
   }

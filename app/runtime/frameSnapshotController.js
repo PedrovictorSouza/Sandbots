@@ -191,6 +191,10 @@ function commitTaskPop(worldSpeechController, snapshot, previousSnapshot) {
 }
 
 function commitGroundCellHighlight(highlightController, snapshot, previousSnapshot) {
+  if (!highlightController) {
+    return;
+  }
+
   const hasMarkedGroundCells = snapshot.groundCellHighlight.markedGroundCells.length > 0;
   const wasVisible =
     previousSnapshot.groundCellHighlight.visible ||
@@ -255,6 +259,9 @@ function commitRender(worldRenderer, snapshot) {
   } else {
     worldRenderer.drawScene(viewProjection, render.sceneObjects || []);
   }
+
+  worldRenderer.drawGroundCellHighlight?.(viewProjection, snapshot.groundCellHighlight);
+
   worldRenderer.drawBillboards(viewProjection, render.grassBillboards);
   worldRenderer.drawBillboards(viewProjection, render.flowerBillboards);
 
@@ -319,7 +326,7 @@ function commitProjectedOverlays({
     worldSpeechController.updateTaskPop?.(camera, mount.clientWidth, mount.clientHeight);
   }
 
-  if (snapshot.groundCellHighlight.visible) {
+  if (highlightController && snapshot.groundCellHighlight.visible) {
     highlightController.update(camera, mount.clientWidth, mount.clientHeight);
   }
 
@@ -365,14 +372,18 @@ export function createFrameSnapshotController({
       commitWorldSpeech(worldSpeech, frontBuffer, previousSnapshot);
       commitWorldPrompt(worldSpeech, frontBuffer, previousSnapshot);
       commitTaskPop(worldSpeech, frontBuffer, previousSnapshot);
-      commitGroundCellHighlight(groundCellHighlight, frontBuffer, previousSnapshot);
+      if (worldRenderer.drawGroundCellHighlight) {
+        groundCellHighlight?.hide?.();
+      } else {
+        commitGroundCellHighlight(groundCellHighlight, frontBuffer, previousSnapshot);
+      }
       commitColliderGizmos(colliderGizmos, frontBuffer, previousSnapshot);
       commitRender(worldRenderer, frontBuffer);
       commitProjectedOverlays({
         camera,
         mount,
         worldSpeechController: worldSpeech,
-        highlightController: groundCellHighlight,
+        highlightController: worldRenderer.drawGroundCellHighlight ? null : groundCellHighlight,
         colliderGizmos,
         actTwoTutorial,
         snapshot: frontBuffer

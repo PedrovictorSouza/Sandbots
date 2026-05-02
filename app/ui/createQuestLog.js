@@ -78,6 +78,10 @@ function renderObjectiveHintHtml(objective) {
   `;
 }
 
+function getHudObjectives(quest) {
+  return (quest?.objectives || []).filter((objective) => !objective.hiddenFromHud);
+}
+
 function getDerivedTrackedTaskIds(storyState = {}) {
   const flags = storyState.flags || {};
   const derivedTaskIds = [];
@@ -132,6 +136,7 @@ function getTrackedTaskEntries(storyState = {}) {
   return trackedTaskIds
     .map((taskId, index) => ({
       index,
+      taskId,
       task: SMALL_ISLAND_FIELD_TASKS[taskId]
     }))
     .filter((entry) => Boolean(entry.task));
@@ -141,7 +146,19 @@ function isTrackedTaskDone(storyState = {}, task) {
   return Boolean(task?.completeFlag && storyState.flags?.[task.completeFlag]);
 }
 
-function getTrackedTasks(storyState = {}) {
+function getTaskIdSet(taskIds) {
+  if (taskIds instanceof Set) {
+    return taskIds;
+  }
+
+  if (Array.isArray(taskIds)) {
+    return new Set(taskIds);
+  }
+
+  return new Set();
+}
+
+function getSortedTrackedTaskEntries(storyState = {}) {
   return getTrackedTaskEntries(storyState)
     .sort((left, right) => {
       const leftDone = isTrackedTaskDone(storyState, left.task);
@@ -159,8 +176,27 @@ function getTrackedTasks(storyState = {}) {
       }
 
       return right.index - left.index;
-    })
-    .map((entry) => entry.task);
+    });
+}
+
+function getTrackedTaskStates(storyState = {}) {
+  return getSortedTrackedTaskEntries(storyState)
+    .map((entry) => ({
+      ...entry,
+      done: isTrackedTaskDone(storyState, entry.task)
+    }));
+}
+
+function getTrackedTaskRenderEntries(storyState = {}, options = {}) {
+  const flashingTaskIds = getTaskIdSet(options.flashingTaskIds);
+  const hideCompletedTrackedTasks = Boolean(options.hideCompletedTrackedTasks);
+
+  return getTrackedTaskStates(storyState)
+    .map((entry) => ({
+      ...entry,
+      flashing: entry.done && flashingTaskIds.has(entry.taskId)
+    }))
+    .filter((entry) => !entry.done || !hideCompletedTrackedTasks || entry.flashing);
 }
 
 function getTrackedTaskDescription(storyState = {}, task) {
@@ -171,20 +207,20 @@ function getTrackedTaskDescription(storyState = {}, task) {
   return task?.description || "";
 }
 
-function renderTrackedTaskChecklistHtml(storyState = {}) {
-  return getTrackedTasks(storyState).map((task) => {
-    const done = isTrackedTaskDone(storyState, task);
-    const description = getTrackedTaskDescription(storyState, task);
+function renderTrackedTaskChecklistHtml(storyState = {}, options = {}) {
+  return getTrackedTaskRenderEntries(storyState, options).map((entry) => {
+    const description = getTrackedTaskDescription(storyState, entry.task);
 
     return `
       <div
         class="hud-checklist__item hud-checklist__item--tracked"
-        data-done="${done ? "true" : "false"}"
+        data-done="${entry.done ? "true" : "false"}"
         data-objective-type="TRACKED_TASK"
+        data-task-flashing="${entry.flashing ? "true" : "false"}"
       >
         <span class="hud-checklist__box" aria-hidden="true"></span>
         <span class="hud-checklist__content">
-          <strong class="hud-checklist__task-title">${escapeHtml(task.title)}</strong>
+          <strong class="hud-checklist__task-title">${escapeHtml(entry.task.title)}</strong>
           <span class="hud-checklist__task-copy">${escapeHtml(description)}</span>
         </span>
       </div>
@@ -192,11 +228,12 @@ function renderTrackedTaskChecklistHtml(storyState = {}) {
   }).join("");
 }
 
-function renderMissionCardHtml({ eyebrow, title, copy, metaHtml = "", done = false, taskId = "" }) {
+function renderMissionCardHtml({ eyebrow, title, copy, metaHtml = "", done = false, taskId = "", flashing = false }) {
   return `
     <article
       class="mission-card"
       data-task-done="${done ? "true" : "false"}"
+      data-task-flashing="${flashing ? "true" : "false"}"
       ${taskId ? `data-task-id="${escapeHtml(taskId)}"` : ""}
     >
       <div class="mission-card__eyebrow">${escapeHtml(eyebrow)}</div>
@@ -219,19 +256,20 @@ function renderQuestMissionCardHtml(quest) {
     copy: formatQuestSummary(quest),
     done,
     taskId: quest.id,
-    metaHtml: quest.objectives.map((objective) => `
+    metaHtml: getHudObjectives(quest).map((objective) => `
       <span>${escapeHtml(formatObjectiveLabel(objective))} ${escapeHtml(formatQuestObjective(objective))}</span>
     `).join("")
   });
 }
 
-function renderTrackedTaskCardHtml(storyState = {}, task) {
+function renderTrackedTaskCardHtml(storyState = {}, entry) {
   return renderMissionCardHtml({
-    eyebrow: task.eyebrow || (task.background ? "field note" : "tracked"),
-    title: task.title,
-    copy: getTrackedTaskDescription(storyState, task),
-    done: isTrackedTaskDone(storyState, task),
-    taskId: task.id
+    eyebrow: entry.task.eyebrow || (entry.task.background ? "field note" : "tracked"),
+    title: entry.task.title,
+    copy: getTrackedTaskDescription(storyState, entry.task),
+    done: entry.done,
+    flashing: entry.flashing,
+    taskId: entry.task.id
   });
 }
 
@@ -255,9 +293,9 @@ export function createQuestLog({
     return renderQuestSummaryHtml(getActiveQuest());
   }
 
-  function renderChecklistHtml(storyState = {}) {
+  function renderChecklistHtml(storyState = {}, options = {}) {
     const quest = getActiveQuest();
-    const activeQuestHtml = quest ? quest.objectives.map((objective) => {
+    const activeQuestHtml = quest ? getHudObjectives(quest).map((objective) => {
       const done = (objective.current || 0) >= objective.required;
       return `
         <div
@@ -274,10 +312,10 @@ export function createQuestLog({
       `;
     }).join("") : "";
 
-    return `${activeQuestHtml}${renderTrackedTaskChecklistHtml(storyState)}`;
+    return `${activeQuestHtml}${renderTrackedTaskChecklistHtml(storyState, options)}`;
   }
 
-  function renderLogHtml(storyState = {}) {
+  function renderLogHtml(storyState = {}, options = {}) {
     if (!questSystem?.getQuestLog) {
       return "";
     }
@@ -289,8 +327,8 @@ export function createQuestLog({
       .filter((quest) => quest.id !== activeQuest?.id)
       .map(renderQuestMissionCardHtml)
       .join("");
-    const trackedCardsHtml = getTrackedTasks(storyState)
-      .map((task) => renderTrackedTaskCardHtml(storyState, task))
+    const trackedCardsHtml = getTrackedTaskRenderEntries(storyState, options)
+      .map((entry) => renderTrackedTaskCardHtml(storyState, entry))
       .join("");
 
     return `${activeQuestCardsHtml}${trackedCardsHtml}${remainingQuestCardsHtml}`;
@@ -300,6 +338,7 @@ export function createQuestLog({
     renderActiveSummary,
     renderActiveSummaryHtml,
     renderChecklistHtml,
-    renderLogHtml
+    renderLogHtml,
+    getTrackedTaskStates
   };
 }

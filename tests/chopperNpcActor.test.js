@@ -23,6 +23,16 @@ function createNpcActor(position = [0, 0, 0]) {
 }
 
 describe("chopperNpcActor", () => {
+  it("applies the Chopper model forward offset to logical face yaw", () => {
+    const npcActor = createNpcActor([0, 0, 0]);
+    npcActor.faceYaw = Math.PI * 0.5;
+
+    const chopperActor = createChopperNpcActor({ npcActor });
+
+    expect(chopperActor.bodyInstance.yaw).toBeCloseTo(Math.PI * 1.5);
+    expect(chopperActor.propellerInstance.yaw).toBeCloseTo(Math.PI * 1.5);
+  });
+
   it("flies the Chopper NPC to a target before completing the scripted approach", () => {
     const npcActor = createNpcActor([0, 0, 0]);
     const chopperActor = createChopperNpcActor({ npcActor });
@@ -75,10 +85,10 @@ describe("chopperNpcActor", () => {
       });
       const position = npcActor.character.getPosition();
 
-      expect(position[0]).toBeGreaterThanOrEqual(8.9);
-      expect(position[0]).toBeLessThanOrEqual(17.1);
-      expect(position[2]).toBeGreaterThanOrEqual(-10.7);
-      expect(position[2]).toBeLessThanOrEqual(-5.6);
+      expect(position[0]).toBeGreaterThanOrEqual(2.2);
+      expect(position[0]).toBeLessThanOrEqual(25);
+      expect(position[2]).toBeGreaterThanOrEqual(-15.2);
+      expect(position[2]).toBeLessThanOrEqual(-1.1);
     }
 
     expect(npcActor.character.getPosition()).not.toEqual([12.4, 0.02, -8.4]);

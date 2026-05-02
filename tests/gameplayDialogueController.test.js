@@ -50,4 +50,47 @@ describe("createGameplayDialogueController", () => {
     const event = new KeyboardEvent("keydown", { code: "KeyW", key: "w" });
     expect(controller.handleKeydown(event)).toBe(true);
   });
+
+  it("runs the default completion hook before a conversation-specific completion", () => {
+    const uiLayer = document.createElement("div");
+    const order = [];
+    const controller = createGameplayDialogueController({
+      uiLayer,
+      onBeforeComplete: () => {
+        order.push("restore-camera");
+      }
+    });
+
+    controller.openConversation({
+      lines: [{ speaker: "Bulbasaur", text: "Water... please." }],
+      onComplete: () => {
+        order.push("quest-effects");
+      }
+    });
+
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
+
+    expect(order).toEqual(["restore-camera", "quest-effects"]);
+
+    controller.setBeforeComplete(() => {
+      order.push("restore-camera-again");
+    });
+    controller.openConversation({
+      lines: [{ speaker: "Squirtle", text: "Ready." }],
+      onComplete: () => {
+        order.push("next-effects");
+      }
+    });
+
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
+
+    expect(order).toEqual([
+      "restore-camera",
+      "quest-effects",
+      "restore-camera-again",
+      "next-effects"
+    ]);
+  });
 });

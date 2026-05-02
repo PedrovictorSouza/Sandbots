@@ -36,6 +36,24 @@ const SQUIRTLE_WATER_GUN_SPRAY_DURATION = 0.82;
 const SQUIRTLE_WATER_GUN_IMPACT_TIME = 0.34;
 const SQUIRTLE_WATER_GUN_ARC_HEIGHT = 0.86;
 const SQUIRTLE_WATER_GUN_PARTICLE_COUNT = 9;
+const SQUIRTLE_REASSEMBLY_PART_SCALE = 0.5;
+const SQUIRTLE_MODEL_FACE_YAW_OFFSET = Math.PI;
+const BULBASAUR_MODEL_FACE_YAW_OFFSET = Math.PI;
+const ROBOT_MODEL_SCALE = 0.5;
+const BULBASAUR_ROBOT_MODEL_SCALE = ROBOT_MODEL_SCALE * 1.3;
+const ROBOT_IDLE_PATROL_SPEED = 0.82;
+const ROBOT_IDLE_PATROL_PAUSE_DURATION = 0.75;
+const ROBOT_IDLE_PATROL_ARRIVE_DISTANCE = 0.08;
+const ROBOT_IDLE_PATROL_RADIUS_MULTIPLIER = 3;
+const SQUIRTLE_IDLE_PATROL_RADIUS = 0.58 * ROBOT_IDLE_PATROL_RADIUS_MULTIPLIER;
+const BULBASAUR_IDLE_PATROL_RADIUS = 0.68 * ROBOT_IDLE_PATROL_RADIUS_MULTIPLIER;
+const BULBASAUR_LEAFAGE_SPEED = 2.25;
+const BULBASAUR_LEAFAGE_STAND_DISTANCE = 1.04;
+const BULBASAUR_LEAFAGE_ARRIVE_DISTANCE = 0.08;
+const BULBASAUR_LEAFAGE_CAST_DURATION = 0.58;
+const BULBASAUR_LEAFAGE_IMPACT_TIME = 0.22;
+const PLAYER_MODEL_SCALE = 0.75;
+const PLAYER_MODEL_TURN_SPEED = 14;
 const CAMERA_DEBUG_ENABLED = (() => {
   try {
     return new URLSearchParams(globalThis.location?.search || "").get("cameraDebug") === "1";
@@ -79,6 +97,33 @@ function getTallGrassSway(groundGrassPatch, shouldRustle, now) {
   const ambient = Math.sin(now * 0.0018 + position[0] * 0.63 + position[2] * 0.41) * 0.018;
   const rustle = shouldRustle ? Math.sin(now * 0.024) * 0.09 : 0;
   return ambient + rustle;
+}
+
+function clamp01(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function easeOutCubic(value) {
+  const progress = clamp01(value);
+  return 1 - Math.pow(1 - progress, 3);
+}
+
+function lerp(start, end, progress) {
+  return start + (end - start) * progress;
+}
+
+function getShortestAngleDelta(fromAngle, toAngle) {
+  return Math.atan2(Math.sin(toAngle - fromAngle), Math.cos(toAngle - fromAngle));
+}
+
+function rotateAngleToward(fromAngle, toAngle, maxStep) {
+  const delta = getShortestAngleDelta(fromAngle, toAngle);
+
+  if (Math.abs(delta) <= maxStep) {
+    return toAngle;
+  }
+
+  return fromAngle + Math.sign(delta) * maxStep;
 }
 
 export function startGameLoop({
@@ -130,6 +175,24 @@ export function startGameLoop({
   });
   let cameraDebugElement = null;
   const cameraDebugErrors = [];
+
+  function restoreActiveZoomPresetOnMovement(playerPosition) {
+    if (!Array.isArray(playerPosition) || !camera.isTargetTransitionActive()) {
+      return;
+    }
+
+    const currentPose = camera.getPose?.() || {};
+    const activePreset = cameraZoomPresetController.getCurrentPreset?.() || {};
+
+    camera.setPose({
+      target: currentPose.target || playerPosition,
+      direction: cameraOrbit.getDirection?.() || currentPose.direction,
+      zoom: activePreset.zoom,
+      distance: activePreset.distance
+    });
+    cameraZoomPresetController.applyCurrent?.();
+    camera.follow(playerPosition);
+  }
 
   function pushCameraDebugError(message) {
     cameraDebugErrors.push({
@@ -184,6 +247,18 @@ export function startGameLoop({
     return Math.atan2(deltaX, deltaZ);
   }
 
+  function getSquirtleModelYawToward(fromPosition, toPosition) {
+    return getYawToward(fromPosition, toPosition) + SQUIRTLE_MODEL_FACE_YAW_OFFSET;
+  }
+
+  function getRobotModelYawToward(fromPosition, toPosition, modelFaceYawOffset) {
+    return getYawToward(fromPosition, toPosition) + modelFaceYawOffset;
+  }
+
+  function getSquirtleLogicalFacingYaw() {
+    return (session.actTwoSquirtle?.modelInstance?.yaw || 0) - SQUIRTLE_MODEL_FACE_YAW_OFFSET;
+  }
+
   function getGroundCellCenterPosition(groundCell) {
     const offset = groundCell?.offset || [0, 0, 0];
     return [
@@ -199,6 +274,277 @@ export function startGameLoop({
     }
 
     session.actTwoSquirtle.modelInstance.offset = [...session.actTwoSquirtle.position];
+    session.actTwoSquirtle.modelInstance.scale = ROBOT_MODEL_SCALE;
+    syncInteractablePosition("squirtle", session.actTwoSquirtle.position);
+  }
+
+  function syncBulbasaurModelInstance() {
+    const encounter = session.bulbasaurEncounter;
+
+    if (!encounter?.modelInstance) {
+      return;
+    }
+
+    encounter.modelInstance.active = Boolean(encounter.visible && Array.isArray(encounter.position));
+    encounter.modelInstance.scale = BULBASAUR_ROBOT_MODEL_SCALE;
+
+    if (Array.isArray(encounter.position)) {
+      encounter.modelInstance.offset = [...encounter.position];
+    }
+  }
+
+  function syncInteractablePosition(interactableId, position) {
+    if (!Array.isArray(position) || !Array.isArray(session.interactables)) {
+      return;
+    }
+
+    const interactable = session.interactables.find((entry) => entry.id === interactableId);
+    if (interactable) {
+      interactable.position = [...position];
+    }
+  }
+
+  function getPlayerModelYawFromMovement(deltaX, deltaZ) {
+    return Math.atan2(deltaZ, deltaX);
+  }
+
+  function syncPlayerModelInstance(deltaTime, movementDelta = null) {
+    if (!session.playerModelInstance || !session.playerCharacter) {
+      return;
+    }
+
+    session.playerModelInstance.offset = session.playerCharacter.getPosition();
+    session.playerModelInstance.scale = PLAYER_MODEL_SCALE;
+
+    if (movementDelta) {
+      const [deltaX, deltaZ] = movementDelta;
+      if (Math.hypot(deltaX, deltaZ) > 0.0005) {
+        const targetYaw = getPlayerModelYawFromMovement(deltaX, deltaZ);
+        session.playerModelInstance.yaw = rotateAngleToward(
+          session.playerModelInstance.yaw || 0,
+          targetYaw,
+          PLAYER_MODEL_TURN_SPEED * deltaTime
+        );
+      }
+    }
+
+    session.playerModelInstance.active = true;
+  }
+
+  function createPrimitiveModel(model, primitive) {
+    return {
+      ...model,
+      primitives: [primitive]
+    };
+  }
+
+  function getSquirtleAssemblyPartPose(index, progress) {
+    const scatterProgress = easeOutCubic(progress);
+    const angle = index * 1.78;
+    const radius = 0.42 + (index % 4) * 0.14;
+    const lifted = 0.04 + (index % 3) * 0.035;
+    const startX = Math.cos(angle) * radius;
+    const startZ = Math.sin(angle) * radius;
+
+    return {
+      offset: [
+        lerp(startX, 0, scatterProgress),
+        lerp(lifted, 0, scatterProgress),
+        lerp(startZ, 0, scatterProgress)
+      ],
+      yaw: lerp(((index % 5) - 2) * 0.62, 0, scatterProgress),
+      pitch: lerp(((index % 3) - 1) * 0.42, 0, scatterProgress),
+      roll: lerp(((index % 4) - 1.5) * 0.54, 0, scatterProgress)
+    };
+  }
+
+  function updateSquirtleReassembly(deltaTime) {
+    const squirtle = session.actTwoSquirtle;
+    const reassembly = squirtle?.reassembly;
+
+    if (!reassembly?.active) {
+      return;
+    }
+
+    const duration = Math.max(0.01, reassembly.duration || 1.25);
+    reassembly.elapsed = Math.min(duration, (reassembly.elapsed || 0) + deltaTime);
+    reassembly.progress = clamp01(reassembly.elapsed / duration);
+
+    if (reassembly.progress < 1) {
+      return;
+    }
+
+    const onComplete = reassembly.onComplete;
+    reassembly.active = false;
+    reassembly.onComplete = null;
+    squirtle.visible = true;
+    squirtle.assemblyState = "assembled";
+    syncSquirtleModelInstance();
+
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }
+
+  function createRobotPatrolState(origin, radius) {
+    return {
+      origin: [...origin],
+      waypointIndex: 0,
+      pauseTimer: ROBOT_IDLE_PATROL_PAUSE_DURATION,
+      points: [
+        [origin[0] - radius * 0.72, origin[1], origin[2] - radius * 0.34],
+        [origin[0] + radius * 0.66, origin[1], origin[2] - radius * 0.48],
+        [origin[0] + radius * 0.58, origin[1], origin[2] + radius * 0.42],
+        [origin[0] - radius * 0.64, origin[1], origin[2] + radius * 0.52]
+      ]
+    };
+  }
+
+  function updateRobotIdlePatrol(robot, {
+    deltaTime,
+    radius,
+    modelFaceYawOffset
+  }) {
+    if (!robot?.modelInstance || !Array.isArray(robot.position)) {
+      return;
+    }
+
+    if (
+      !robot.patrol ||
+      Math.hypot(
+        robot.position[0] - robot.patrol.origin[0],
+        robot.position[2] - robot.patrol.origin[2]
+      ) > radius * 1.8
+    ) {
+      robot.patrol = createRobotPatrolState(robot.position, radius);
+    }
+
+    if (robot.patrol.pauseTimer > 0) {
+      robot.patrol.pauseTimer = Math.max(0, robot.patrol.pauseTimer - deltaTime);
+      return;
+    }
+
+    const targetPosition = robot.patrol.points[robot.patrol.waypointIndex];
+    const deltaX = targetPosition[0] - robot.position[0];
+    const deltaZ = targetPosition[2] - robot.position[2];
+    const distance = Math.hypot(deltaX, deltaZ);
+
+    if (distance <= ROBOT_IDLE_PATROL_ARRIVE_DISTANCE) {
+      robot.patrol.waypointIndex = (robot.patrol.waypointIndex + 1) % robot.patrol.points.length;
+      robot.patrol.pauseTimer = ROBOT_IDLE_PATROL_PAUSE_DURATION;
+      return;
+    }
+
+    const step = Math.min(distance, ROBOT_IDLE_PATROL_SPEED * deltaTime);
+    robot.position = [
+      robot.position[0] + (deltaX / distance) * step,
+      targetPosition[1],
+      robot.position[2] + (deltaZ / distance) * step
+    ];
+    robot.modelInstance.yaw = getRobotModelYawToward(
+      robot.position,
+      targetPosition,
+      modelFaceYawOffset
+    );
+  }
+
+  function updateSquirtleIdlePatrol(deltaTime, { active }) {
+    const squirtle = session.actTwoSquirtle;
+    const canPatrol = Boolean(
+      active &&
+      squirtle?.recovered &&
+      squirtle.assemblyState === "assembled" &&
+      !session.squirtleWaterGunAction &&
+      getSquirtleWaterGunQueue().length === 0
+    );
+
+    if (!canPatrol) {
+      if (squirtle) {
+        squirtle.patrol = null;
+      }
+      syncSquirtleModelInstance();
+      return;
+    }
+
+    updateRobotIdlePatrol(squirtle, {
+      deltaTime,
+      radius: SQUIRTLE_IDLE_PATROL_RADIUS,
+      modelFaceYawOffset: SQUIRTLE_MODEL_FACE_YAW_OFFSET
+    });
+    syncSquirtleModelInstance();
+  }
+
+  function updateBulbasaurIdlePatrol(deltaTime, { active }) {
+    const encounter = session.bulbasaurEncounter;
+    const flags = controls.storyState?.flags || {};
+    const workbenchGuideActive =
+      flags.bulbasaurWorkbenchGuideAvailable &&
+      !flags.workbenchDiyRecipesReceived;
+    const jumpActive = Boolean(
+      encounter?.jumpTimer > 0 &&
+      encounter.originPosition &&
+      encounter.landingPosition
+    );
+    const canPatrol = Boolean(
+      active &&
+      encounter?.visible &&
+      Array.isArray(encounter.position) &&
+      !session.bulbasaurLeafageAction &&
+      !workbenchGuideActive &&
+      !jumpActive
+    );
+
+    if (!canPatrol) {
+      if (encounter) {
+        encounter.patrol = null;
+      }
+      syncBulbasaurModelInstance();
+      return;
+    }
+
+    updateRobotIdlePatrol(encounter, {
+      deltaTime,
+      radius: BULBASAUR_IDLE_PATROL_RADIUS,
+      modelFaceYawOffset: BULBASAUR_MODEL_FACE_YAW_OFFSET
+    });
+    syncBulbasaurModelInstance();
+  }
+
+  function getSquirtleAssemblySceneObjects(sceneObjects, squirtle) {
+    if (
+      !squirtle?.visible ||
+      squirtle.assemblyState === "hidden" ||
+      squirtle.assemblyState === "assembled" ||
+      !squirtle.model?.primitives?.length
+    ) {
+      return sceneObjects;
+    }
+
+    const progress = squirtle.reassembly?.active ?
+      clamp01(squirtle.reassembly.progress || 0) :
+      0;
+    const origin = squirtle.position || squirtle.modelInstance?.offset || [0, 0, 0];
+    const partObjects = squirtle.model.primitives.map((primitive, index) => {
+      const pose = getSquirtleAssemblyPartPose(index, progress);
+      return {
+        model: createPrimitiveModel(squirtle.model, primitive),
+        brightness: 1,
+        instances: [{
+          offset: [
+            origin[0] + pose.offset[0],
+            (origin[1] || 0) + pose.offset[1],
+            origin[2] + pose.offset[2]
+          ],
+          scale: SQUIRTLE_REASSEMBLY_PART_SCALE,
+          yaw: pose.yaw,
+          pitch: pose.pitch,
+          roll: pose.roll,
+          active: true
+        }]
+      };
+    });
+
+    return [...sceneObjects, ...partObjects];
   }
 
   function getSquirtleWaterGunApproachPosition(targetPosition, playerPosition = null) {
@@ -228,6 +574,165 @@ export function startGameLoop({
       0.04,
       targetPosition[2] + (deltaZ / distance) * SQUIRTLE_WATER_GUN_STAND_DISTANCE
     ];
+  }
+
+  function getBulbasaurLeafageApproachPosition(targetPosition, playerPosition = null) {
+    const bulbasaurPosition =
+      session.bulbasaurEncounter?.position ||
+      session.bulbasaurEncounter?.modelInstance?.offset ||
+      playerPosition ||
+      [0, 0.04, 0];
+    let deltaX = bulbasaurPosition[0] - targetPosition[0];
+    let deltaZ = bulbasaurPosition[2] - targetPosition[2];
+    let distance = Math.hypot(deltaX, deltaZ);
+
+    if (distance < 0.001 && playerPosition) {
+      deltaX = playerPosition[0] - targetPosition[0];
+      deltaZ = playerPosition[2] - targetPosition[2];
+      distance = Math.hypot(deltaX, deltaZ);
+    }
+
+    if (distance < 0.001) {
+      deltaX = 0;
+      deltaZ = 1;
+      distance = 1;
+    }
+
+    return [
+      targetPosition[0] + (deltaX / distance) * BULBASAUR_LEAFAGE_STAND_DISTANCE,
+      0.04,
+      targetPosition[2] + (deltaZ / distance) * BULBASAUR_LEAFAGE_STAND_DISTANCE
+    ];
+  }
+
+  function startBulbasaurLeafageAction({ groundCell, playerPosition }) {
+    const bulbasaur = session.bulbasaurEncounter;
+    if (!groundCell) {
+      return "unavailable";
+    }
+
+    if (session.bulbasaurLeafageAction) {
+      return "busy";
+    }
+
+    if (
+      !bulbasaur?.modelInstance ||
+      !bulbasaur.visible ||
+      !Array.isArray(bulbasaur.position)
+    ) {
+      return "unavailable";
+    }
+
+    const targetPosition = getGroundCellCenterPosition(groundCell);
+    const approachPosition = getBulbasaurLeafageApproachPosition(
+      targetPosition,
+      playerPosition
+    );
+
+    session.bulbasaurLeafageAction = {
+      phase: "approach",
+      groundCell,
+      targetPosition,
+      approachPosition,
+      castElapsed: 0,
+      impactApplied: false
+    };
+    bulbasaur.modelInstance.active = true;
+    bulbasaur.modelInstance.yaw = getRobotModelYawToward(
+      bulbasaur.position,
+      targetPosition,
+      BULBASAUR_MODEL_FACE_YAW_OFFSET
+    );
+    syncBulbasaurModelInstance();
+
+    return "started";
+  }
+
+  function applyBulbasaurLeafageImpact(action) {
+    return gameplay.performHarvestAction({
+      playerPosition: action.approachPosition,
+      palmModel: session.palmModel,
+      palmInstances: session.palmInstances,
+      resourceNodes: session.resourceNodes,
+      leppaTree: session.leppaTree,
+      inventory: controls.inventory,
+      canPurifyGround: false,
+      groundDeadInstances: session.groundDeadInstances,
+      groundFlowerPatches: session.groundFlowerPatches,
+      groundGrassPatches: session.groundGrassPatches,
+      groundPurifiedInstances: session.groundPurifiedInstances,
+      storyState: controls.storyState,
+      leafDen: session.leafDen,
+      woodDrops: session.woodDrops,
+      leppaBerryDrops: session.leppaBerryDrops,
+      canUseLeafage: true,
+      forcedHarvestTarget: {
+        leafageGroundCell: action.groundCell,
+        distance: 0
+      }
+    });
+  }
+
+  function updateBulbasaurLeafageAction(deltaTime) {
+    const action = session.bulbasaurLeafageAction;
+    const bulbasaur = session.bulbasaurEncounter;
+
+    if (!action || !bulbasaur?.modelInstance) {
+      return;
+    }
+
+    if (!Array.isArray(bulbasaur.position)) {
+      bulbasaur.position = [...(bulbasaur.modelInstance.offset || action.approachPosition)];
+    }
+
+    if (action.phase === "approach") {
+      const deltaX = action.approachPosition[0] - bulbasaur.position[0];
+      const deltaZ = action.approachPosition[2] - bulbasaur.position[2];
+      const distance = Math.hypot(deltaX, deltaZ);
+      const travel = Math.min(BULBASAUR_LEAFAGE_SPEED * deltaTime, distance);
+
+      if (distance > BULBASAUR_LEAFAGE_ARRIVE_DISTANCE && travel > 0) {
+        bulbasaur.position = [
+          bulbasaur.position[0] + (deltaX / distance) * travel,
+          0.04,
+          bulbasaur.position[2] + (deltaZ / distance) * travel
+        ];
+      } else {
+        bulbasaur.position = [...action.approachPosition];
+        action.phase = "cast";
+        action.castElapsed = 0;
+      }
+
+      bulbasaur.modelInstance.yaw = getRobotModelYawToward(
+        bulbasaur.position,
+        action.targetPosition,
+        BULBASAUR_MODEL_FACE_YAW_OFFSET
+      );
+      syncBulbasaurModelInstance();
+      return;
+    }
+
+    if (action.phase !== "cast") {
+      session.bulbasaurLeafageAction = null;
+      return;
+    }
+
+    action.castElapsed += deltaTime;
+    bulbasaur.modelInstance.yaw = getRobotModelYawToward(
+      bulbasaur.position,
+      action.targetPosition,
+      BULBASAUR_MODEL_FACE_YAW_OFFSET
+    );
+    syncBulbasaurModelInstance();
+
+    if (!action.impactApplied && action.castElapsed >= BULBASAUR_LEAFAGE_IMPACT_TIME) {
+      action.impactApplied = true;
+      applyBulbasaurLeafageImpact(action);
+    }
+
+    if (action.castElapsed >= BULBASAUR_LEAFAGE_CAST_DURATION) {
+      session.bulbasaurLeafageAction = null;
+    }
   }
 
   function getSquirtleWaterGunQueue() {
@@ -307,7 +812,7 @@ export function startGameLoop({
       impactApplied: false
     };
     squirtle.modelInstance.active = true;
-    squirtle.modelInstance.yaw = getYawToward(squirtle.position, targetPosition);
+    squirtle.modelInstance.yaw = getSquirtleModelYawToward(squirtle.position, targetPosition);
     syncSquirtleModelInstance();
 
     return "started";
@@ -415,7 +920,10 @@ export function startGameLoop({
         action.sprayElapsed = 0;
       }
 
-      squirtle.modelInstance.yaw = getYawToward(squirtle.position, action.targetPosition);
+      squirtle.modelInstance.yaw = getSquirtleModelYawToward(
+        squirtle.position,
+        action.targetPosition
+      );
       syncSquirtleModelInstance();
       return;
     }
@@ -426,7 +934,10 @@ export function startGameLoop({
     }
 
     action.sprayElapsed += deltaTime;
-    squirtle.modelInstance.yaw = getYawToward(squirtle.position, action.targetPosition);
+    squirtle.modelInstance.yaw = getSquirtleModelYawToward(
+      squirtle.position,
+      action.targetPosition
+    );
     syncSquirtleModelInstance();
 
     if (!action.impactApplied && action.sprayElapsed >= SQUIRTLE_WATER_GUN_IMPACT_TIME) {
@@ -443,7 +954,7 @@ export function startGameLoop({
   function getSquirtleMouthPosition() {
     const squirtle = session.actTwoSquirtle;
     const position = squirtle?.position || squirtle?.modelInstance?.offset || [0, 0, 0];
-    const yaw = squirtle?.modelInstance?.yaw || 0;
+    const yaw = getSquirtleLogicalFacingYaw();
 
     return [
       position[0] + Math.sin(yaw) * 0.34,
@@ -512,10 +1023,41 @@ export function startGameLoop({
       session.actTwoSquirtle?.modelInstance &&
       playerPosition
     ) {
-      session.actTwoSquirtle.modelInstance.yaw = getYawToward(
+      session.actTwoSquirtle.modelInstance.yaw = getSquirtleModelYawToward(
         session.actTwoSquirtle.position,
         playerPosition
       );
+    }
+  }
+
+  function focusNpcConversationWhenDialogueOpens({
+    targetId,
+    playerPosition,
+    npcActors,
+    interactables,
+    targetPosition
+  }) {
+    const focusIfDialogueOpened = () => {
+      if (
+        !gameplayDialogue.isActive?.() ||
+        controls.isScriptedInteractionActive?.()
+      ) {
+        return;
+      }
+
+      dialogueCamera?.focusNpcConversation({
+        targetId,
+        playerPosition,
+        npcActors,
+        interactables,
+        targetPosition
+      });
+    };
+
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(focusIfDialogueOpened);
+    } else {
+      Promise.resolve().then(focusIfDialogueOpened);
     }
   }
 
@@ -606,16 +1148,30 @@ export function startGameLoop({
           BULBASAUR_WORKBENCH_GUIDE_TARGET[1],
           currentPosition[2] + (deltaZ / distance) * step
         ];
+      if (encounter.modelInstance) {
+        encounter.modelInstance.yaw = getRobotModelYawToward(
+          currentPosition,
+          BULBASAUR_WORKBENCH_GUIDE_TARGET,
+          BULBASAUR_MODEL_FACE_YAW_OFFSET
+        );
+      }
+      syncBulbasaurModelInstance();
       return;
     }
 
     if (!encounter?.visible || !encounter.position) {
+      syncBulbasaurModelInstance();
       return;
     }
 
     if (encounter.jumpTimer <= 0 || !encounter.originPosition || !encounter.landingPosition) {
       encounter.jumpTimer = 0;
-      encounter.position = encounter.landingPosition ? [...encounter.landingPosition] : encounter.position;
+      if (encounter.originPosition && encounter.landingPosition) {
+        encounter.position = [...encounter.landingPosition];
+        encounter.originPosition = null;
+        encounter.landingPosition = null;
+      }
+      syncBulbasaurModelInstance();
       return;
     }
 
@@ -633,6 +1189,14 @@ export function startGameLoop({
       encounter.originPosition[2] +
         (encounter.landingPosition[2] - encounter.originPosition[2]) * easedProgress
     ];
+    if (encounter.modelInstance) {
+      encounter.modelInstance.yaw = getRobotModelYawToward(
+        encounter.position,
+        encounter.landingPosition,
+        BULBASAUR_MODEL_FACE_YAW_OFFSET
+      );
+    }
+    syncBulbasaurModelInstance();
   }
 
   function updateCharmanderEncounter(deltaTime) {
@@ -978,6 +1542,18 @@ export function startGameLoop({
         nextPlayerPosition[0] - previousPlayerPosition[0],
         nextPlayerPosition[2] - previousPlayerPosition[2]
       );
+      syncPlayerModelInstance(deltaTime, [
+        nextPlayerPosition[0] - previousPlayerPosition[0],
+        nextPlayerPosition[2] - previousPlayerPosition[2]
+      ]);
+
+      if (
+        movedDistance > 0.0005 &&
+        !tutorialActive &&
+        !gameplayOpeningCameraActive
+      ) {
+        restoreActiveZoomPresetOnMovement(nextPlayerPosition);
+      }
 
       if (
         !movementQuestReported &&
@@ -996,6 +1572,8 @@ export function startGameLoop({
           );
         }
       }
+    } else {
+      syncPlayerModelInstance(deltaTime);
     }
 
     updatePlayerDustParticles(session.playerDust, {
@@ -1078,9 +1656,14 @@ export function startGameLoop({
         primaryActionTarget?.leafDenFurniturePlacement ||
         primaryActionTarget?.dittoFlagPlacement
       );
+      const primaryActionIsMove = Boolean(
+        (waterGunEquipped && primaryActionTarget?.groundCell) ||
+        (leafageEquipped && primaryActionTarget?.leafageGroundCell)
+      );
       const primaryInteractTarget =
         !dialogueActive &&
-        !primaryActionIsPlacement ?
+        !primaryActionIsPlacement &&
+        !primaryActionIsMove ?
           gameplay.findNearbyInteractable(
             playerPosition,
             session.npcActors,
@@ -1096,37 +1679,7 @@ export function startGameLoop({
 
       if (primaryActionIsPlacement) {
         performHarvestAction(playerPosition);
-      } else if (primaryInteractTarget?.target) {
-        gameplay.performInteractAction({
-          playerPosition,
-          npcActors: session.npcActors,
-          interactables: session.interactables,
-          storyState: controls.storyState,
-          inventory: controls.inventory,
-          groundGrassPatches: session.groundGrassPatches,
-          logChair: session.logChair,
-          leafDen: session.leafDen,
-          timburrEncounter: session.timburrEncounter,
-          charmanderEncounter: session.charmanderEncounter,
-          onNpcInteractionStart({ targetId, playerPosition, npcActors, interactables }) {
-            faceInteractionTargetTowardPlayer({
-              targetId,
-              playerPosition,
-              npcActors,
-              interactables
-            });
-            if (controls.isScriptedInteractionActive?.()) {
-              return;
-            }
-            dialogueCamera?.focusNpcConversation({
-              targetId,
-              playerPosition,
-              npcActors,
-              interactables
-            });
-          }
-        });
-      } else if (!dialogueActive) {
+      } else if (primaryActionIsMove && !dialogueActive) {
         if (waterGunEquipped && primaryActionTarget?.groundCell) {
           const squirtleWaterGunResult = startSquirtleWaterGunAction({
             groundCell: primaryActionTarget.groundCell,
@@ -1139,9 +1692,57 @@ export function startGameLoop({
               forcedHarvestTarget: primaryActionTarget
             });
           }
-        } else {
-          performHarvestAction(playerPosition);
+        } else if (leafageEquipped && primaryActionTarget?.leafageGroundCell) {
+          const bulbasaurLeafageResult = startBulbasaurLeafageAction({
+            groundCell: primaryActionTarget.leafageGroundCell,
+            playerPosition
+          });
+
+          if (bulbasaurLeafageResult === "unavailable") {
+            performHarvestAction(playerPosition, {
+              forcedHarvestTarget: primaryActionTarget
+            });
+          }
         }
+      } else if (primaryInteractTarget?.target) {
+        gameplay.performInteractAction({
+          playerPosition,
+          npcActors: session.npcActors,
+          interactables: session.interactables,
+          storyState: controls.storyState,
+          inventory: controls.inventory,
+          groundGrassPatches: session.groundGrassPatches,
+          logChair: session.logChair,
+          leafDen: session.leafDen,
+          timburrEncounter: session.timburrEncounter,
+          charmanderEncounter: session.charmanderEncounter,
+          onNpcInteractionStart({
+            targetId,
+            playerPosition,
+            npcActors,
+            interactables,
+            targetPosition
+          }) {
+            faceInteractionTargetTowardPlayer({
+              targetId,
+              playerPosition,
+              npcActors,
+              interactables
+            });
+            if (controls.isScriptedInteractionActive?.()) {
+              return;
+            }
+            focusNpcConversationWhenDialogueOpens({
+              targetId,
+              playerPosition,
+              npcActors,
+              interactables,
+              targetPosition
+            });
+          }
+        });
+      } else if (!dialogueActive) {
+        performHarvestAction(playerPosition);
       }
     } else if (
       controls.isPrimaryActionActive?.() &&
@@ -1219,7 +1820,13 @@ export function startGameLoop({
         leafDen: session.leafDen,
         timburrEncounter: session.timburrEncounter,
         charmanderEncounter: session.charmanderEncounter,
-        onNpcInteractionStart({ targetId, playerPosition, npcActors, interactables }) {
+        onNpcInteractionStart({
+          targetId,
+          playerPosition,
+          npcActors,
+          interactables,
+          targetPosition
+        }) {
           faceInteractionTargetTowardPlayer({
             targetId,
             playerPosition,
@@ -1229,11 +1836,12 @@ export function startGameLoop({
           if (controls.isScriptedInteractionActive?.()) {
             return;
           }
-          dialogueCamera?.focusNpcConversation({
+          focusNpcConversationWhenDialogueOpens({
             targetId,
             playerPosition,
             npcActors,
-            interactables
+            interactables,
+            targetPosition
           });
         }
       });
@@ -1286,7 +1894,25 @@ export function startGameLoop({
     updateBulbasaurEncounter(deltaTime);
     updateCharmanderEncounter(deltaTime);
     updateTimburrEncounter(deltaTime);
+    updateSquirtleReassembly(deltaTime);
     updateSquirtleWaterGunAction(deltaTime);
+    updateBulbasaurLeafageAction(deltaTime);
+    const robotIdlePatrolActive = Boolean(
+      isGameFlow(gameFlowValues.GAMEPLAY) &&
+      !gameplayOpeningCameraActive &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !dialogueActive &&
+      !skillLearnActive &&
+      !scriptedInteractionActive
+    );
+    updateSquirtleIdlePatrol(deltaTime, {
+      active: robotIdlePatrolActive
+    });
+    updateBulbasaurIdlePatrol(deltaTime, {
+      active: robotIdlePatrolActive
+    });
 
     if (cinematicActive) {
       actTwoSequence.update(deltaTime);
@@ -1476,9 +2102,12 @@ export function startGameLoop({
       worldCanvas.height
     );
     nextFrame.render.viewProjection = followedViewProjection;
-    nextFrame.render.sceneObjects = getGameplayOpeningShipSceneObjects(
-      session.sceneObjects,
-      session.gameplayOpeningShip
+    nextFrame.render.sceneObjects = getSquirtleAssemblySceneObjects(
+      getGameplayOpeningShipSceneObjects(
+        session.sceneObjects,
+        session.gameplayOpeningShip
+      ),
+      session.actTwoSquirtle
     );
     nextFrame.render.skyTexture = session.skyTexture;
 
@@ -1782,6 +2411,9 @@ export function startGameLoop({
     if (Array.isArray(session.tallGrassInstances)) {
       session.tallGrassInstances.length = 0;
     }
+    if (Array.isArray(session.deadGrassInstances)) {
+      session.deadGrassInstances.length = 0;
+    }
 
     for (const groundGrassPatch of session.groundGrassPatches) {
       const shouldRustle =
@@ -1806,11 +2438,18 @@ export function startGameLoop({
         groundGrassPatch.id
       );
 
-      if (
+      const aliveGrassModelAvailable = Boolean(
         groundGrassPatch.state === "alive" &&
         session.tallGrassModel &&
         Array.isArray(session.tallGrassInstances)
-      ) {
+      );
+      const deadGrassModelAvailable = Boolean(
+        groundGrassPatch.state !== "alive" &&
+        session.deadGrassModel &&
+        Array.isArray(session.deadGrassInstances)
+      );
+
+      if (aliveGrassModelAvailable) {
         session.tallGrassInstances.push({
           id: `tall-grass-${groundGrassPatch.id}`,
           offset: [
@@ -1825,6 +2464,22 @@ export function startGameLoop({
           ),
           yaw: getTallGrassYaw(groundGrassPatch),
           swayStrength: getTallGrassSway(groundGrassPatch, shouldRustle, now)
+        });
+      } else if (deadGrassModelAvailable) {
+        session.deadGrassInstances.push({
+          id: `dead-grass-${groundGrassPatch.id}`,
+          offset: [
+            groundGrassPatch.position[0] + rustleOffset,
+            groundGrassPatch.position[1],
+            groundGrassPatch.position[2]
+          ],
+          scale: getTallGrassInstanceScale(
+            session.deadGrassModel,
+            groundGrassPatch,
+            grassRevivalScale
+          ),
+          yaw: getTallGrassYaw(groundGrassPatch),
+          swayStrength: 0
         });
       } else {
         nextFrame.render.grassBillboards.push({
@@ -1987,6 +2642,14 @@ export function startGameLoop({
         uvRect: rendering.fullUvRect
       });
     }
+    if (session.billCameo?.visible) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.billCameo.texture,
+        position: session.billCameo.position,
+        size: session.billCameo.size,
+        uvRect: rendering.fullUvRect
+      });
+    }
     if (session.actTwoRepairPlant) {
       const repairPlantTexture = session.actTwoRepairPlant.fixed ?
         session.repairPlantFixedTexture :
@@ -2000,14 +2663,19 @@ export function startGameLoop({
       });
     }
 
-    const visibleActTwoSquirtle =
-      actTwoTutorial.hasStarted() || controls.storyState.questIndex >= 1 ?
-        session.actTwoSquirtle :
-        null;
     if (session.actTwoSquirtle?.modelInstance) {
+      const squirtle = session.actTwoSquirtle;
+      const visibleActTwoSquirtle =
+        squirtle.visible ||
+        squirtle.recovered ||
+        actTwoTutorial.hasStarted() ||
+        controls.storyState.questIndex >= 1;
+      const assembledActTwoSquirtle =
+        squirtle.recovered || squirtle.assemblyState === "assembled";
       syncSquirtleModelInstance();
-      session.actTwoSquirtle.modelInstance.active = Boolean(
-        visibleActTwoSquirtle || session.squirtleWaterGunAction
+      squirtle.modelInstance.active = Boolean(
+        (visibleActTwoSquirtle && assembledActTwoSquirtle) ||
+        session.squirtleWaterGunAction
       );
     }
     nextFrame.render.genericBillboards.push(
@@ -2017,12 +2685,14 @@ export function startGameLoop({
         rendering.fullUvRect
       )
     );
-    nextFrame.render.genericBillboards.push({
-      texture: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.texture : null,
-      position: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.position : null,
-      size: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.size : null,
-      uvRect: rendering.fullUvRect
-    });
+    if (!session.bulbasaurEncounter?.modelInstance) {
+      nextFrame.render.genericBillboards.push({
+        texture: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.texture : null,
+        position: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.position : null,
+        size: session.bulbasaurEncounter?.visible ? session.bulbasaurEncounter.size : null,
+        uvRect: rendering.fullUvRect
+      });
+    }
     nextFrame.render.genericBillboards.push({
       texture: session.charmanderEncounter?.visible ? session.charmanderEncounter.texture : null,
       position: session.charmanderEncounter?.visible ? session.charmanderEncounter.position : null,

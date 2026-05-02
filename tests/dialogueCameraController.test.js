@@ -42,4 +42,36 @@ describe("createDialogueCameraController", () => {
       expect.objectContaining({ duration: expect.any(Number) })
     );
   });
+
+  it("can frame a conversation from an explicit dynamic target position", () => {
+    const camera = {
+      getPose: vi.fn(() => ({
+        target: [0, 0, 0],
+        direction: [0, 0.4, 1],
+        zoom: 2,
+        distance: 8
+      })),
+      startPoseTransition: vi.fn()
+    };
+    const cameraOrbit = {
+      sync: vi.fn()
+    };
+    const dialogueCamera = createDialogueCameraController({ camera, cameraOrbit });
+
+    dialogueCamera.focusNpcConversation({
+      playerPosition: [0, 0, 0],
+      targetId: "bulbasaurDryGrassMission",
+      targetPosition: [2, 0.02, 3],
+      npcActors: [],
+      interactables: []
+    });
+
+    expect(camera.startPoseTransition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: [1, 1.25, 1.5],
+        zoom: 3.9
+      }),
+      expect.objectContaining({ duration: expect.any(Number) })
+    );
+  });
 });

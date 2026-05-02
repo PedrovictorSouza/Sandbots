@@ -118,6 +118,10 @@ const GAMEPLAY_DEFAULT_UI_SECTIONS = Object.freeze([
   "hud",
   "builder"
 ]);
+const CHOPPER_BILL_CUTAWAY_START_TEXT =
+  "Our human, Bill, waited as long as he could. Very patient man. Very limited warranty.";
+const CHOPPER_BILL_CUTAWAY_END_TEXT =
+  "Anyway, you're promoted. Mostly because everyone else is dust.";
 const PLAYER_SKILL_DEFS = {
   transform: {
     id: "transform",
@@ -325,6 +329,164 @@ export function createApplicationRuntime({
 
   function getChopperNpcPosition() {
     return gameSession?.chopperNpcActor?.npcActor?.character?.getPosition?.() || null;
+  }
+
+  function setBillCameoVisible(visible) {
+    if (gameSession?.billCameo) {
+      gameSession.billCameo.visible = visible;
+    }
+  }
+
+  function focusBillCameo() {
+    const position = gameSession?.billCameo?.position;
+
+    if (!position) {
+      return false;
+    }
+
+    setBillCameoVisible(true);
+    dialogueCamera?.focusWorldPoint({
+      position,
+      height: 1.05
+    });
+    return true;
+  }
+
+  function refocusChopperConversation() {
+    const latestPlayerPosition = gameSession?.playerCharacter?.getPosition?.();
+
+    if (!latestPlayerPosition) {
+      return false;
+    }
+
+    dialogueCamera?.focusNpcConversation({
+      targetId: "tangrowth",
+      playerPosition: latestPlayerPosition,
+      npcActors: gameSession?.npcActors || [],
+      interactables: gameSession?.interactables || []
+    });
+    return true;
+  }
+
+  function revealDismantledSquirtle() {
+    const squirtle = gameSession?.actTwoSquirtle;
+
+    if (!squirtle) {
+      return false;
+    }
+
+    squirtle.visible = true;
+    if (!squirtle.recovered && squirtle.assemblyState !== "assembled") {
+      squirtle.assemblyState = squirtle.reassembly?.active ? "reassembling" : "dismantled";
+    }
+    if (squirtle.modelInstance && squirtle.assemblyState !== "assembled") {
+      squirtle.modelInstance.active = false;
+    }
+    return true;
+  }
+
+  function focusActTwoSquirtle({ defer = false } = {}) {
+    const position = gameSession?.actTwoSquirtle?.position;
+
+    if (!position) {
+      return false;
+    }
+
+    const focus = () => {
+      dialogueCamera?.focusWorldPoint({
+        position,
+        height: 1.05
+      });
+    };
+
+    if (defer && typeof windowRef.requestAnimationFrame === "function") {
+      windowRef.requestAnimationFrame(focus);
+    } else {
+      focus();
+    }
+    return true;
+  }
+
+  function focusActTwoSquirtleConversation({ defer = false } = {}) {
+    const position = gameSession?.actTwoSquirtle?.position;
+    const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+
+    if (!position || !playerPosition) {
+      return focusActTwoSquirtle({ defer });
+    }
+
+    const focus = () => {
+      const latestPlayerPosition = gameSession?.playerCharacter?.getPosition?.() || playerPosition;
+
+      dialogueCamera?.focusNpcConversation({
+        targetId: "squirtle",
+        playerPosition: latestPlayerPosition,
+        npcActors: gameSession?.npcActors || [],
+        interactables: gameSession?.interactables || [],
+        targetPosition: position
+      });
+    };
+
+    if (defer && typeof windowRef.requestAnimationFrame === "function") {
+      windowRef.requestAnimationFrame(focus);
+    } else {
+      focus();
+    }
+    return true;
+  }
+
+  function startSquirtleReassemblyBeforeDialogue(onComplete) {
+    const squirtle = gameSession?.actTwoSquirtle;
+
+    if (!squirtle || squirtle.recovered || squirtle.assemblyState === "assembled") {
+      return false;
+    }
+
+    revealDismantledSquirtle();
+    focusActTwoSquirtle({ defer: true });
+
+    if (squirtle.reassembly?.active) {
+      return true;
+    }
+
+    scriptedInteractionActive = true;
+    clearGameFlowInput();
+    squirtle.assemblyState = "reassembling";
+    squirtle.visible = true;
+    squirtle.reassembly = {
+      active: true,
+      elapsed: 0,
+      duration: squirtle.reassembly?.duration || 1.25,
+      progress: 0,
+      onComplete: () => {
+        scriptedInteractionActive = false;
+        squirtle.visible = true;
+        squirtle.assemblyState = "assembled";
+        focusActTwoSquirtleConversation();
+        onComplete?.();
+      }
+    };
+
+    return true;
+  }
+
+  function handleChopperOnboardingLineChange(line) {
+    if (line?.text === CHOPPER_BILL_CUTAWAY_START_TEXT) {
+      focusBillCameo();
+      return;
+    }
+
+    if (line?.text === CHOPPER_BILL_CUTAWAY_END_TEXT) {
+      setBillCameoVisible(false);
+      refocusChopperConversation();
+      return;
+    }
+
+    if (line?.id === "notice-squirtle-sound") {
+      setBillCameoVisible(false);
+      revealDismantledSquirtle();
+      focusActTwoSquirtle();
+    }
   }
 
   function syncQuestPanels() {
@@ -1063,15 +1225,12 @@ export function createApplicationRuntime({
         const openOnboardingConversation = () => {
           return storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_ONBOARDING, {
             onLineChange(line) {
-              if (line?.id !== "notice-squirtle-sound") {
-                return;
-              }
-
-              dialogueCamera?.focusWorldPoint({
-                position: gameSession?.actTwoSquirtle?.position
-              });
+              handleChopperOnboardingLineChange(line);
             },
-            onComplete: restoreCameraOnComplete
+            onComplete: () => {
+              setBillCameoVisible(false);
+              restoreCameraOnComplete();
+            }
           });
         };
 
@@ -1152,9 +1311,15 @@ export function createApplicationRuntime({
       }
 
       if (targetId === "squirtle" && dialogueId === "discovery") {
-        return storyBeats.playDialogue(STORY_BEAT_IDS.SQUIRTLE_DISCOVERY, {
+        const playDiscoveryDialogue = () => storyBeats.playDialogue(STORY_BEAT_IDS.SQUIRTLE_DISCOVERY, {
           onComplete: restoreCameraOnComplete
         });
+
+        if (startSquirtleReassemblyBeforeDialogue(playDiscoveryDialogue)) {
+          return true;
+        }
+
+        return playDiscoveryDialogue();
       }
 
       return false;
@@ -1163,6 +1328,8 @@ export function createApplicationRuntime({
     unlockPokedexReward() {
       if (gameSession?.actTwoSquirtle) {
         gameSession.actTwoSquirtle.recovered = true;
+        gameSession.actTwoSquirtle.visible = true;
+        gameSession.actTwoSquirtle.assemblyState = "assembled";
       }
 
       playerMemory.foundPokedex = true;
@@ -1718,6 +1885,9 @@ export function createApplicationRuntime({
     camera: engine.camera,
     cameraOrbit: engine.cameraOrbit
   });
+  uiRuntime.gameplayDialogue.setBeforeComplete?.(() => {
+    dialogueCamera.restoreGameplayCamera();
+  });
 
   sceneFlowRuntime = createSceneFlowRuntime({
     dom,
@@ -1956,6 +2126,14 @@ export function createApplicationRuntime({
         session.spawnActTwoPlayer?.();
         if (session.actTwoSquirtle) {
           session.actTwoSquirtle.recovered = false;
+          session.actTwoSquirtle.visible = false;
+          session.actTwoSquirtle.assemblyState = "hidden";
+          if (session.actTwoSquirtle.reassembly) {
+            session.actTwoSquirtle.reassembly.active = false;
+            session.actTwoSquirtle.reassembly.elapsed = 0;
+            session.actTwoSquirtle.reassembly.progress = 0;
+            session.actTwoSquirtle.reassembly.onComplete = null;
+          }
         }
       }
       if (sceneFlowRuntime.sceneDirector.is(GAME_FLOW.GAMEPLAY)) {

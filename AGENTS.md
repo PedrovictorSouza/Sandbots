@@ -101,6 +101,19 @@ Qualquer alteracao nesses sistemas deve preservar:
 
 Antes de alterar esses sistemas, a IA deve explicar o risco e propor a menor mudanca possivel. Mudancas em camera, stage, render frame ou fluxo de cenas devem ser tratadas como tarefas de risco alto.
 
+## 5.1. Regra para objetos 3D
+
+Todo objeto 3D novo, especialmente modelos vindos do PicoCAD/GLTF, deve ter orientacao configurada explicitamente ao ser integrado.
+
+A IA nao deve assumir que a frente visual do modelo coincide com o yaw logico do jogo. Ao adicionar ou trocar um modelo 3D, deve verificar e configurar:
+
+- Qual eixo do modelo representa a frente visual.
+- Se o modelo precisa de `yaw` offset, como `Math.PI`, para olhar para o alvo correto.
+- Se esse offset afeta efeitos anexados ao corpo, como boca, particulas, projeteis, fala ou interacao.
+- Se movimento, dialogo e acoes especiais continuam apontando para a mesma direcao visual.
+
+Preferir uma constante local e explicita por modelo, por exemplo `*_MODEL_FACE_YAW_OFFSET`, em vez de espalhar ajustes numericos soltos pelo codigo. Se o asset estiver vindo de costas, corrigir com offset do modelo, nao com mudancas globais na camera, input ou renderer.
+
 ## 6. Regra de implementacao
 
 Durante a implementacao, a IA deve:

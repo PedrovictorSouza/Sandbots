@@ -9,7 +9,8 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     groundPurifiedModel,
     houseModel,
     palmModel,
-    tallGrassModel
+    tallGrassModel,
+    deadGrassModel
   ] = await Promise.all([
     loadPicoModel({
       gl,
@@ -42,6 +43,14 @@ export async function loadTerrainAssets({ gl, setStatus }) {
       texturePath: "./Trees/tall-grass/tall-grass.png",
       normalizedSize: 1.34,
       onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: "./Trees/Dead-Grass/dead-grass.gltf",
+      binPath: "./Trees/Dead-Grass/dead-grass.bin",
+      texturePath: "./Trees/Dead-Grass/dead-grass.png",
+      normalizedSize: 1.34,
+      onStatus: setStatus
     })
   ]);
 
@@ -50,6 +59,7 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     groundPurifiedModel,
     houseModel,
     palmModel,
-    tallGrassModel
+    tallGrassModel,
+    deadGrassModel
   };
 }

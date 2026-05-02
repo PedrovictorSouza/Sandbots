@@ -600,9 +600,16 @@
 .hud {
   width: var(--hud-width);
   padding: 12px 14px 14px;
-  border: 4px solid var(--game-ui-border-dark);
-  background: var(--game-ui-panel);
+  border: 16px solid transparent;
+  border-image-source: url("../app/ui/images/quest-hud.png");
+  border-image-slice: 8;
+  border-image-width: 16px;
+  border-image-repeat: round;
+  background: #464646;
+  background-clip: padding-box;
   gap: 8px;
+  image-rendering: pixelated;
+  box-shadow: none;
   transform-origin: top left;
   transition: opacity 120ms steps(2, end), visibility 120ms steps(2, end);
 }
@@ -623,36 +630,31 @@
 
 .hud-current-action {
   display: grid;
-  gap: 5px;
-  padding: 0 0 10px 12px;
-  border-left: 4px solid #b9f3ff;
-  border-bottom: 3px solid #2b202c;
-  background:
-    linear-gradient(90deg, rgba(185, 243, 255, 0.12), rgba(185, 243, 255, 0) 68%);
+  gap: 4px;
+  padding: 0;
+  border-left: 0;
+  border-bottom: 0;
+  background: none;
 }
 
 .hud-current-action[data-action-kind="water"] {
-  border-left-color: #72d7ff;
-  background:
-    linear-gradient(90deg, rgba(68, 183, 255, 0.16), rgba(68, 183, 255, 0) 68%);
+  border-left-color: transparent;
+  background: none;
 }
 
 .hud-current-action[data-action-kind="leafage"] {
-  border-left-color: #9be56f;
-  background:
-    linear-gradient(90deg, rgba(128, 218, 86, 0.16), rgba(128, 218, 86, 0) 68%);
+  border-left-color: transparent;
+  background: none;
 }
 
 .hud-current-action[data-action-kind="talk"] {
-  border-left-color: #ffd783;
-  background:
-    linear-gradient(90deg, rgba(255, 215, 131, 0.16), rgba(255, 215, 131, 0) 68%);
+  border-left-color: transparent;
+  background: none;
 }
 
 .hud-current-action[data-action-kind="build"] {
-  border-left-color: #f2a35f;
-  background:
-    linear-gradient(90deg, rgba(242, 163, 95, 0.16), rgba(242, 163, 95, 0) 68%);
+  border-left-color: transparent;
+  background: none;
 }
 
 .hud .hud-current-action__eyebrow {
@@ -670,14 +672,7 @@
 }
 
 .hud-context {
-  display: grid;
-  gap: 6px;
   padding-top: 8px;
-  border-top: 3px solid #2b202c;
-  color: var(--game-ui-muted);
-  font-family: var(--game-ui-font);
-  font-size: 24px;
-  line-height: 1.08;
 }
 
 .hud-task-title {
@@ -687,14 +682,15 @@
   text-transform: uppercase;
 }
 
-.hud-task-subtitle,
-.hud-task-guidance {
+.hud-task-subtitle {
   font-size: 24px;
   line-height: 1.08;
   color: var(--game-ui-muted);
 }
 
 .hud-task-guidance {
+  font-size: 20px;
+  line-height: 1.08;
   color: #b9f3ff;
 }
 
@@ -722,6 +718,11 @@
 
 .hud-checklist__item[data-done="true"] {
   color: #b6ef8f;
+  animation: hud-check-complete-blink 3s steps(2, end) both;
+}
+
+.hud-checklist__item--tracked[data-task-flashing="true"] .hud-checklist__task-title,
+.hud-checklist__item--tracked[data-task-flashing="true"] .hud-checklist__task-copy {
   animation: hud-check-complete-blink 3s steps(2, end) both;
 }
 
@@ -1052,6 +1053,15 @@
     #22381f;
 }
 
+.mission-card[data-task-flashing="true"] {
+  animation: mission-card-complete-blink 3s steps(2, end) both;
+}
+
+.mission-card[data-task-flashing="true"] .mission-card__title,
+.mission-card[data-task-flashing="true"] .mission-card__copy {
+  animation: hud-check-complete-blink 3s steps(2, end) both;
+}
+
 .mission-card__copy {
   font-size: 24px;
   line-height: 1.08;
@@ -1075,12 +1085,46 @@
   color: var(--game-ui-muted);
 }
 
+@keyframes mission-card-complete-blink {
+  0%,
+  100% {
+    border-color: #b6ef8f;
+    background: var(--game-ui-panel-alt);
+    filter: brightness(1);
+  }
+
+  12%,
+  36%,
+  60%,
+  84% {
+    border-color: #f7ffe8;
+    background: #253820;
+    filter: brightness(1.25);
+  }
+
+  24%,
+  48%,
+  72% {
+    border-color: #83d96c;
+    background: #172412;
+    filter: brightness(0.95);
+  }
+}
+
 .inventory {
   width: var(--inventory-width);
   padding: 10px;
   border: 4px solid var(--game-ui-border-dark);
   background: var(--game-ui-panel);
   gap: 8px;
+}
+
+.inventory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
 }
 
 .inventory-grid {
@@ -1165,6 +1209,154 @@
   color: var(--game-ui-border);
 }
 
+.active-companion-hud {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 176px;
+  max-width: 246px;
+  min-height: 54px;
+  padding: 4px 8px 4px 4px;
+  border: 3px solid var(--game-ui-border);
+  background: #11111b;
+  box-shadow: inset 0 0 0 3px #2b202c;
+}
+
+.active-companion-hud[hidden] {
+  display: none;
+}
+
+.active-companion-hud__portrait {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 3px solid #2b202c;
+  background:
+    linear-gradient(180deg, rgba(185, 243, 255, 0.16), rgba(11, 11, 18, 0) 58%),
+    #0b0b12;
+  image-rendering: pixelated;
+}
+
+.active-companion-hud__text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.active-companion-hud__move,
+.active-companion-hud__name {
+  overflow: hidden;
+  line-height: 1;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-companion-hud__move {
+  color: #fff1e8;
+  font-size: 18px;
+}
+
+.active-companion-hud__name {
+  color: #b9f3ff;
+  font-size: 13px;
+}
+
+.active-companion-hud__robot {
+  position: absolute;
+  inset: 4px;
+  display: block;
+}
+
+.active-companion-hud__robot-part {
+  position: absolute;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.active-companion-hud__robot-part--body {
+  left: 10px;
+  top: 22px;
+  width: 20px;
+  height: 14px;
+  background: #48aef0;
+  box-shadow:
+    -5px 5px 0 #1c6fb2,
+    9px 4px 0 #ffd447;
+}
+
+.active-companion-hud__robot-part--head {
+  left: 8px;
+  top: 5px;
+  width: 24px;
+  height: 20px;
+  background: #4ec1ff;
+  box-shadow:
+    -5px 4px 0 #1b75b9,
+    7px 3px 0 #ffe070;
+}
+
+.active-companion-hud__robot-part--face {
+  left: 13px;
+  top: 10px;
+  width: 14px;
+  height: 10px;
+  background: #f6d6a9;
+}
+
+.active-companion-hud__robot-part--eye {
+  top: 12px;
+  width: 3px;
+  height: 5px;
+  background: #050307;
+}
+
+.active-companion-hud__robot-part--eye-left {
+  left: 15px;
+}
+
+.active-companion-hud__robot-part--eye-right {
+  left: 23px;
+}
+
+.active-companion-hud__robot-part--pack {
+  left: 27px;
+  top: 21px;
+  width: 7px;
+  height: 17px;
+  background: #ffe070;
+  box-shadow: 0 10px 0 #af7800;
+}
+
+.active-companion-hud[data-companion-id="bulbasaur"] {
+  border-color: #8fe56f;
+}
+
+.active-companion-hud[data-companion-id="bulbasaur"] .active-companion-hud__name {
+  color: #b6ef8f;
+}
+
+.active-companion-hud__robot[data-companion-id="bulbasaur"] .active-companion-hud__robot-part--body {
+  background: #25c652;
+  box-shadow:
+    -5px 5px 0 #168133,
+    9px 4px 0 #5edb6b;
+}
+
+.active-companion-hud__robot[data-companion-id="bulbasaur"] .active-companion-hud__robot-part--head {
+  background: #2ce067;
+  box-shadow:
+    -5px 4px 0 #168133,
+    7px 3px 0 #4a6d58;
+}
+
+.active-companion-hud__robot[data-companion-id="bulbasaur"] .active-companion-hud__robot-part--pack {
+  background: #4a6d58;
+  box-shadow: 0 10px 0 #2b202c;
+}
+
 .status {
   width: var(--status-width);
   min-height: 56px;
@@ -1238,9 +1430,15 @@
 .act-two-dialogue__body[data-speakerless="true"] {
   min-height: 196px;
   padding: 22px 28px;
-  border: 6px solid #f18b27;
-  background: #693600;
+  border: 12px solid transparent;
+  border-image-source: url("../app/ui/images/dialogue-box.png");
+  border-image-slice: 4 fill;
+  border-image-width: 12px;
+  border-image-repeat: round;
+  background: #08736d;
+  background-clip: padding-box;
   color: #fff1cf;
+  image-rendering: pixelated;
 }
 
 .act-two-dialogue__text,

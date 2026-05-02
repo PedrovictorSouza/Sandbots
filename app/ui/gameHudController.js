@@ -4,6 +4,7 @@ import {
   getInventorySlotRole,
   getInventorySlotRoleLabel
 } from "./inventoryPresentation.js";
+import { getCompanionAbilityByAbilityId } from "../gameplay/content/companionAbilities.js";
 
 export function createGameHudController({
   statusElement,
@@ -15,10 +16,10 @@ export function createGameHudController({
   inventoryGridElement,
   skillsPanelElement,
   skillsGridElement,
-  inventoryOrder,
-  itemDefs,
-  playerSkillDefs,
-  playerSkillOrder,
+  inventoryOrder = [],
+  itemDefs = {},
+  playerSkillDefs = {},
+  playerSkillOrder = [],
   npcProfiles,
   placeholderRecipes,
   getActiveQuest,
@@ -33,6 +34,7 @@ export function createGameHudController({
   initialStatus = "Inicializando cena..."
 }) {
   const MAX_VISIBLE_INVENTORY_SLOTS = 5;
+  const TRACKED_TASK_COMPLETION_FLASH_MS = 3000;
   const INITIAL_GAMEPLAY_GUIDE =
     "Use WASD ou o analogico esquerdo para falar com Chopper. Ele te orientara no que fazer.";
   const HUD_GUIDE_BY_QUEST_ID = Object.freeze({
@@ -65,6 +67,7 @@ export function createGameHudController({
     hudMeta: "",
     hudInstructions: "",
     nearbyHabitats: "",
+    activeCompanionHudHtml: "",
     hudFocusQuestId: null,
     hudQuestId: null
   };
@@ -77,6 +80,8 @@ export function createGameHudController({
   let hudBoardFlashTimeout = 0;
   let hudBoardEntranceVariant = false;
   const questLog = questSystem ? createQuestLog({ questSystem }) : null;
+  const trackedTaskCompletionDeadlines = new Map();
+  const hiddenCompletedTrackedTaskIds = new Set();
 
   function escapeHtml(value) {
     return String(value)
@@ -85,6 +90,111 @@ export function createGameHudController({
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  function getInventoryPanelElement() {
+    return inventoryGridElement?.closest?.(".inventory") || null;
+  }
+
+  function getOrCreateActiveCompanionHudElement() {
+    const inventoryPanelElement = getInventoryPanelElement();
+
+    if (!inventoryPanelElement) {
+      return null;
+    }
+
+    let headerElement = inventoryPanelElement.querySelector(".inventory-header");
+    if (!headerElement) {
+      headerElement = document.createElement("div");
+      headerElement.className = "inventory-header";
+
+      const titleElement = Array.from(inventoryPanelElement.children).find((element) => {
+        return element.tagName === "STRONG";
+      });
+
+      if (titleElement) {
+        inventoryPanelElement.insertBefore(headerElement, titleElement);
+        headerElement.appendChild(titleElement);
+      } else {
+        inventoryPanelElement.insertBefore(headerElement, inventoryGridElement);
+      }
+    }
+
+    let companionHudElement = headerElement.querySelector(".active-companion-hud");
+    if (!companionHudElement) {
+      companionHudElement = document.createElement("div");
+      companionHudElement.className = "active-companion-hud";
+      companionHudElement.hidden = true;
+      companionHudElement.setAttribute("aria-live", "polite");
+      headerElement.appendChild(companionHudElement);
+    }
+
+    return companionHudElement;
+  }
+
+  function renderRobotThumbnailHtml(companionId) {
+    const normalizedCompanionId = escapeHtml(companionId || "unknown");
+
+    return `
+      <span class="active-companion-hud__portrait" aria-hidden="true">
+        <span class="active-companion-hud__robot" data-companion-id="${normalizedCompanionId}">
+          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--body"></span>
+          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--head"></span>
+          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--face"></span>
+          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--eye active-companion-hud__robot-part--eye-left"></span>
+          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--eye active-companion-hud__robot-part--eye-right"></span>
+          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--pack"></span>
+        </span>
+      </span>
+    `;
+  }
+
+  function syncActiveCompanionHud(skills, activeSkillId = null) {
+    const companionHudElement = getOrCreateActiveCompanionHudElement();
+
+    if (!companionHudElement) {
+      return;
+    }
+
+    const activeAbility =
+      activeSkillId && skills?.[activeSkillId] ?
+        getCompanionAbilityByAbilityId(activeSkillId) :
+        null;
+    const skill = activeSkillId ? playerSkillDefs[activeSkillId] : null;
+
+    if (!activeAbility || !skill) {
+      companionHudElement.hidden = true;
+      companionHudElement.removeAttribute("data-companion-id");
+      companionHudElement.removeAttribute("data-element");
+      companionHudElement.removeAttribute("aria-label");
+      if (uiCache.activeCompanionHudHtml !== "") {
+        uiCache.activeCompanionHudHtml = "";
+        companionHudElement.innerHTML = "";
+      }
+      return;
+    }
+
+    companionHudElement.dataset.companionId = activeAbility.companionId;
+    companionHudElement.dataset.element = activeAbility.element;
+    companionHudElement.setAttribute(
+      "aria-label",
+      `${activeAbility.companionName}: ${activeAbility.label} selecionado`
+    );
+
+    const nextHtml = `
+      ${renderRobotThumbnailHtml(activeAbility.companionId)}
+      <span class="active-companion-hud__text">
+        <span class="active-companion-hud__move">${escapeHtml(skill.shortLabel || activeAbility.label)}</span>
+        <span class="active-companion-hud__name">${escapeHtml(activeAbility.companionName)}</span>
+      </span>
+    `;
+
+    if (uiCache.activeCompanionHudHtml !== nextHtml) {
+      uiCache.activeCompanionHudHtml = nextHtml;
+      companionHudElement.innerHTML = nextHtml;
+    }
+
+    companionHudElement.hidden = false;
   }
 
   function flashHudBoard() {
@@ -126,6 +236,54 @@ export function createGameHudController({
     }
 
     return Date.now();
+  }
+
+  function getTrackedTaskRenderOptions(storyState = {}) {
+    const flashingTaskIds = new Set();
+
+    if (!questLog?.getTrackedTaskStates) {
+      return {
+        flashingTaskIds,
+        hideCompletedTrackedTasks: true
+      };
+    }
+
+    const now = getHudTime();
+    const trackedTaskStates = questLog.getTrackedTaskStates(storyState);
+
+    for (const entry of trackedTaskStates) {
+      if (!entry.taskId) {
+        continue;
+      }
+
+      if (!entry.done) {
+        trackedTaskCompletionDeadlines.delete(entry.taskId);
+        hiddenCompletedTrackedTaskIds.delete(entry.taskId);
+        continue;
+      }
+
+      if (
+        !hiddenCompletedTrackedTaskIds.has(entry.taskId) &&
+        !trackedTaskCompletionDeadlines.has(entry.taskId)
+      ) {
+        trackedTaskCompletionDeadlines.set(entry.taskId, now + TRACKED_TASK_COMPLETION_FLASH_MS);
+      }
+    }
+
+    for (const [taskId, deadline] of trackedTaskCompletionDeadlines) {
+      if (deadline <= now) {
+        trackedTaskCompletionDeadlines.delete(taskId);
+        hiddenCompletedTrackedTaskIds.add(taskId);
+        continue;
+      }
+
+      flashingTaskIds.add(taskId);
+    }
+
+    return {
+      flashingTaskIds,
+      hideCompletedTrackedTasks: true
+    };
   }
 
   function getHudActionKind(copy = "") {
@@ -292,6 +450,7 @@ export function createGameHudController({
 
   function syncSkillsUi(skills, activeSkillId = null) {
     if (!skillsGridElement || !skillsPanelElement) {
+      syncActiveCompanionHud(skills, activeSkillId);
       return;
     }
 
@@ -322,6 +481,7 @@ export function createGameHudController({
     }).join("");
 
     skillsGridElement.innerHTML = nextHtml;
+    syncActiveCompanionHud(skills, activeSkillId);
   }
 
   function renderMissionCards(storyState, inventory, nearbyPrompt = "") {
@@ -330,7 +490,7 @@ export function createGameHudController({
     }
 
     if (questLog) {
-      const nextHtml = questLog.renderLogHtml(storyState);
+      const nextHtml = questLog.renderLogHtml(storyState, getTrackedTaskRenderOptions(storyState));
 
       if (uiCache.missionsHtml === nextHtml) {
         return;
@@ -464,7 +624,7 @@ export function createGameHudController({
       const activeQuestId = activeQuest?.id || null;
       const questChanged = activeQuestId && uiCache.hudFocusQuestId !== activeQuestId;
       const nextContext = questLog.renderActiveSummaryHtml();
-      const nextChecklist = questLog.renderChecklistHtml(storyState);
+      const nextChecklist = questLog.renderChecklistHtml(storyState, getTrackedTaskRenderOptions(storyState));
 
       if (questChanged) {
         replayHudBoardEntrance();

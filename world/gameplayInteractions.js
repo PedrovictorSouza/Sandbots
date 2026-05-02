@@ -1072,6 +1072,54 @@ export function createGameplayInteractions({
     charmanderEncounter = null,
     onNpcInteractionStart = () => {}
   }) {
+    const getInteractionTargetPosition = (target) => {
+      if (!target) {
+        return null;
+      }
+
+      const groundGrassTargetKinds = new Set([
+        "grassEncounter",
+        "charmanderGrassEncounter",
+        "timburrGrassEncounter",
+        "bulbasaurMission",
+        "bulbasaurRequestComplete",
+        "bulbasaurStrawBedRecipe",
+        "bulbasaurStrawBedComplete",
+        "leppaBerryGift"
+      ]);
+
+      if (groundGrassTargetKinds.has(target.kind) && target.cellId) {
+        const groundGrassPatch = groundGrassPatches.find((patch) => patch.cellId === target.cellId);
+        return groundGrassPatch?.position || null;
+      }
+
+      if (target.kind === "timburrLeafDenFurnitureComplete") {
+        return timburrEncounter?.position || null;
+      }
+
+      if (target.kind === "charmanderCelebrationRequest") {
+        return charmanderEncounter?.position || null;
+      }
+
+      return null;
+    };
+
+    const notifyInteractionStart = (target) => {
+      const targetPosition = getInteractionTargetPosition(target);
+      const interactionStartEvent = {
+        targetId: target.id,
+        playerPosition,
+        npcActors,
+        interactables
+      };
+
+      if (targetPosition) {
+        interactionStartEvent.targetPosition = targetPosition;
+      }
+
+      onNpcInteractionStart(interactionStartEvent);
+    };
+
     const nearbyTarget = findNearbyInteractable(
       playerPosition,
       npcActors,
@@ -1091,12 +1139,7 @@ export function createGameplayInteractions({
     const { target } = nearbyTarget;
 
     if (target.kind === "npc") {
-      const onDialogueOpen = () => onNpcInteractionStart({
-        targetId: target.id,
-        playerPosition,
-        npcActors,
-        interactables
-      });
+      const onDialogueOpen = () => notifyInteractionStart(target);
 
       if (target.id === "bufo" && getActiveQuest(storyState).id === "feedBufo") {
         return handleDeliveryInteraction(target.id, storyState, inventory, onDialogueOpen);
@@ -1108,6 +1151,7 @@ export function createGameplayInteractions({
     if (target.kind === "grassEncounter") {
       if (!storyState.flags.bulbasaurRevealed) {
         storyState.flags.bulbasaurRevealed = true;
+        notifyInteractionStart(target);
         onBulbasaurRevealed({
           cellId: target.cellId
         });
@@ -1118,6 +1162,7 @@ export function createGameplayInteractions({
     if (target.kind === "charmanderGrassEncounter") {
       if (!storyState.flags.charmanderRevealed) {
         storyState.flags.charmanderRevealed = true;
+        notifyInteractionStart(target);
         onCharmanderRevealed({
           cellId: target.cellId
         });
@@ -1128,6 +1173,7 @@ export function createGameplayInteractions({
     if (target.kind === "timburrGrassEncounter") {
       if (!storyState.flags.timburrRevealed) {
         storyState.flags.timburrRevealed = true;
+        notifyInteractionStart(target);
         onTimburrRevealed({
           cellId: target.cellId
         });
@@ -1136,6 +1182,7 @@ export function createGameplayInteractions({
     }
 
     if (target.kind === "bulbasaurMission") {
+      notifyInteractionStart(target);
       storyState.flags.bulbasaurDryGrassMissionAccepted = true;
       if (
         (storyState.flags.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
@@ -1147,21 +1194,25 @@ export function createGameplayInteractions({
     }
 
     if (target.kind === "bulbasaurRequestComplete") {
+      notifyInteractionStart(target);
       onBulbasaurDryGrassRequestCompleted();
       return true;
     }
 
     if (target.kind === "bulbasaurStrawBedRecipe") {
+      notifyInteractionStart(target);
       onBulbasaurStrawBedRecipeRequested();
       return true;
     }
 
     if (target.kind === "bulbasaurStrawBedComplete") {
+      notifyInteractionStart(target);
       onBulbasaurStrawBedRequestCompleted();
       return true;
     }
 
     if (target.kind === "leppaBerryGift") {
+      notifyInteractionStart(target);
       onLeppaBerryGiftRequested({
         targetId: target.id
       });
@@ -1190,6 +1241,7 @@ export function createGameplayInteractions({
     }
 
     if (target.kind === "timburrLeafDenFurnitureComplete") {
+      notifyInteractionStart(target);
       onTimburrLeafDenFurnitureCompleteRequested({
         targetId: target.id
       });
@@ -1197,6 +1249,7 @@ export function createGameplayInteractions({
     }
 
     if (target.kind === "charmanderCelebrationRequest") {
+      notifyInteractionStart(target);
       onCharmanderCelebrationSuggested({
         targetId: target.id
       });
@@ -1208,12 +1261,7 @@ export function createGameplayInteractions({
     }
 
     if (target.id === "ruinedPokemonCenter") {
-      onNpcInteractionStart({
-        targetId: target.id,
-        playerPosition,
-        npcActors,
-        interactables
-      });
+      notifyInteractionStart(target);
       onRuinedPokemonCenterInspectRequested({
         targetId: target.id
       });
@@ -1221,24 +1269,14 @@ export function createGameplayInteractions({
     }
 
     if (target.id === "pokemonCenterPc") {
-      onNpcInteractionStart({
-        targetId: target.id,
-        playerPosition,
-        npcActors,
-        interactables
-      });
+      notifyInteractionStart(target);
       onPokemonCenterPcCheckRequested({
         targetId: target.id
       });
       return true;
     }
 
-    return handleDeliveryInteraction(target.id, storyState, inventory, () => onNpcInteractionStart({
-      targetId: target.id,
-      playerPosition,
-      npcActors,
-      interactables
-    }));
+    return handleDeliveryInteraction(target.id, storyState, inventory, () => notifyInteractionStart(target));
   }
 
   function performHarvestAction({
