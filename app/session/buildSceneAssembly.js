@@ -153,10 +153,13 @@ export function buildSceneAssembly(session, assets) {
     groundPurifiedModel,
     houseModel,
     palmModel,
+    deadTreeModel,
+    leppaTreeDeadModel,
     tallGrassModel,
     deadGrassModel,
     workbenchModel,
     workshopModel,
+    boxModel,
     cloudModel,
     cloudShadowModel,
     chopperBodyModel,
@@ -164,6 +167,7 @@ export function buildSceneAssembly(session, assets) {
     playerModel,
     robot1Model,
     robot2Model,
+    gameplayOpeningShipModel,
     characterFactory
   } = assets;
 
@@ -219,12 +223,23 @@ export function buildSceneAssembly(session, assets) {
         { offset: [0, 0, 0], scale: 1, yaw: 0 },
         ...OUTPOST_INSTANCE_LAYOUT
       ]
-    }),
-    withTerrainSupportDrawDistance({
-      model: palmModel,
-      instances: session.palmInstances
     })
   );
+
+  if (deadTreeModel) {
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: deadTreeModel,
+      instances: session.palmInstances.map((instance) => instance.deadInstance || instance),
+      brightness: 0.78
+    }));
+  }
+
+  if (palmModel) {
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: palmModel,
+      instances: session.palmInstances.map((instance) => instance.aliveInstance || instance)
+    }));
+  }
 
   if (workbenchModel) {
     session.workbenchModelInstance = {
@@ -270,7 +285,7 @@ export function buildSceneAssembly(session, assets) {
   if (session.leppaTree) {
     session.sceneObjects.push(
       withTerrainSupportDrawDistance({
-        model: palmModel,
+        model: leppaTreeDeadModel || deadTreeModel || palmModel,
         instances: [session.leppaTree.deadInstance],
         brightness: 0.42
       }),
@@ -319,6 +334,16 @@ export function buildSceneAssembly(session, assets) {
       model: robot1Model,
       instances: [session.actTwoSquirtle.modelInstance],
       brightness: 1
+    }));
+  }
+
+  const robotRepairModuleModel = boxModel || gameplayOpeningShipModel;
+
+  if (robotRepairModuleModel && session.robotRepairModuleInstances?.length) {
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: robotRepairModuleModel,
+      instances: session.robotRepairModuleInstances,
+      brightness: 0.9
     }));
   }
 

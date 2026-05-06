@@ -1,4 +1,5 @@
 import {
+  loadImageAsset,
   loadPicoModel,
   loadTexturedModel
 } from "../../../rendering/worldAssets.js";
@@ -9,9 +10,23 @@ const WORKBENCH_MODEL_TEXTURE_PATH = new URL("../../buildings/workbench/workbenc
 const WORKSHOP_MODEL_GLTF_PATH = new URL("../../buildings/workshop/workshop.gltf", import.meta.url).href;
 const WORKSHOP_MODEL_BIN_PATH = new URL("../../buildings/workshop/workshop.bin", import.meta.url).href;
 const WORKSHOP_MODEL_TEXTURE_PATH = new URL("../../buildings/workshop/workshop.png", import.meta.url).href;
+const BOX_MODEL_GLTF_PATH = new URL("../../buildings/Box/box.gltf", import.meta.url).href;
+const BOX_MODEL_BIN_PATH = new URL("../../buildings/Box/box.bin", import.meta.url).href;
+const BOX_MODEL_TEXTURE_PATH = new URL("../../buildings/Box/box.png", import.meta.url).href;
 const CLOUD_MODEL_GLTF_PATH = new URL("../../buildings/cloud/cloud.gltf", import.meta.url).href;
 const CLOUD_MODEL_BIN_PATH = new URL("../../buildings/cloud/cloud.bin", import.meta.url).href;
 const CLOUD_MODEL_TEXTURE_PATH = new URL("../../buildings/cloud/cloud.png", import.meta.url).href;
+const DEAD_TREE_MODEL_GLTF_PATH = new URL("../../../Trees/Dead-Tree/Dead-Tree.gltf", import.meta.url).href;
+const DEAD_TREE_MODEL_BIN_PATH = new URL("../../../Trees/Dead-Tree/Dead-Tree.bin", import.meta.url).href;
+const DEAD_TREE_MODEL_TEXTURE_PATH = new URL("../../../Trees/Dead-Tree/Dead-Tree.png", import.meta.url).href;
+const LEPPA_TREE_DEAD_MODEL_GLTF_PATH = new URL("../../../Trees/Special-tree/Dead-Tree_Special.gltf", import.meta.url).href;
+const LEPPA_TREE_DEAD_MODEL_BIN_PATH = new URL("../../../Trees/Special-tree/Dead-Tree_Special.bin", import.meta.url).href;
+const LEPPA_TREE_DEAD_MODEL_TEXTURE_PATH = new URL("../../../Trees/Special-tree/Dead-Tree_Special.png", import.meta.url).href;
+const LEPPA_TREE_MUSICAL_NOTE_IMAGE_PATHS = [
+  new URL("../../../Trees/Special-tree/musical-note-1.png", import.meta.url).href,
+  new URL("../../../Trees/Special-tree/musical-note-2.png", import.meta.url).href,
+  new URL("../../../Trees/Special-tree/musical-note-3.png", import.meta.url).href
+];
 const CLOUD_SHADOW_TEXTURE_SIZE = 32;
 
 function getShadowPixelNoise(x, y) {
@@ -110,7 +125,11 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     deadGrassModel,
     workbenchModel,
     workshopModel,
-    cloudModel
+    boxModel,
+    deadTreeModel,
+    leppaTreeDeadModel,
+    cloudModel,
+    leppaTreeMusicalNoteImages
   ] = await Promise.all([
     loadPicoModel({
       gl,
@@ -170,12 +189,37 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     }),
     loadTexturedModel({
       gl,
+      gltfPath: BOX_MODEL_GLTF_PATH,
+      binPath: BOX_MODEL_BIN_PATH,
+      texturePath: BOX_MODEL_TEXTURE_PATH,
+      normalizedSize: 2.05,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: DEAD_TREE_MODEL_GLTF_PATH,
+      binPath: DEAD_TREE_MODEL_BIN_PATH,
+      texturePath: DEAD_TREE_MODEL_TEXTURE_PATH,
+      normalizedSize: 4.8,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: LEPPA_TREE_DEAD_MODEL_GLTF_PATH,
+      binPath: LEPPA_TREE_DEAD_MODEL_BIN_PATH,
+      texturePath: LEPPA_TREE_DEAD_MODEL_TEXTURE_PATH,
+      normalizedSize: 4.8,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
       gltfPath: CLOUD_MODEL_GLTF_PATH,
       binPath: CLOUD_MODEL_BIN_PATH,
       texturePath: CLOUD_MODEL_TEXTURE_PATH,
       normalizedSize: 8.8,
       onStatus: setStatus
-    })
+    }),
+    Promise.all(LEPPA_TREE_MUSICAL_NOTE_IMAGE_PATHS.map((path) => loadImageAsset(path)))
   ]);
 
   return {
@@ -187,7 +231,11 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     deadGrassModel,
     workbenchModel,
     workshopModel,
+    boxModel,
+    deadTreeModel,
+    leppaTreeDeadModel,
     cloudModel,
+    leppaTreeMusicalNoteImages,
     cloudShadowModel: createCloudShadowModel(gl)
   };
 }

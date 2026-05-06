@@ -24,6 +24,12 @@ function createStartingWoodDrops() {
   }));
 }
 
+function resetRepairModule(instance) {
+  if (instance) {
+    instance.active = true;
+  }
+}
+
 export function initializeGameplayState(
   session,
   {
@@ -42,11 +48,26 @@ export function initializeGameplayState(
   session.leafDenFurniture = [];
   session.dittoFlag = null;
   session.campfire = null;
+  resetRepairModule(session.actTwoSquirtle?.repairModuleInstance);
+  if (session.bulbasaurEncounter) {
+    session.bulbasaurEncounter.visible = false;
+    session.bulbasaurEncounter.jumpTimer = 0;
+    session.bulbasaurEncounter.originPosition = null;
+    session.bulbasaurEncounter.landingPosition = null;
+    session.bulbasaurEncounter.position = null;
+    resetRepairModule(session.bulbasaurEncounter.repairModuleInstance);
+  }
   if (session.charmanderEncounter) {
     session.charmanderEncounter.visible = false;
     session.charmanderEncounter.position = null;
     session.charmanderEncounter.targetPosition = null;
     session.charmanderEncounter.litCampfire = false;
+    resetRepairModule(session.charmanderEncounter.repairModuleInstance);
+  }
+  if (session.timburrEncounter) {
+    session.timburrEncounter.visible = false;
+    session.timburrEncounter.position = null;
+    resetRepairModule(session.timburrEncounter.repairModuleInstance);
   }
   if (session.leppaTree) {
     session.leppaTree.revived = false;

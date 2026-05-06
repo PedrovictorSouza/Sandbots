@@ -34,6 +34,8 @@ import {
   GROUND_GRASS_SIZE
 } from "../../rendering/worldAssets.js";
 
+const LEPPA_TREE_DEAD_MODEL_FACE_YAW_OFFSET = 0;
+
 function toSafeZoneFromPosition(position, radius) {
   return {
     position: [position[0], position[2]],
@@ -53,6 +55,7 @@ function buildElevatedTerrainSafeZones() {
       return toSafeZoneFromPosition(interactable.position, interactable.id === "squirtle" ? 24 : 7);
     }),
     ...RESOURCE_NODE_DEFS.map((resourceNode) => toSafeZoneFromPosition(resourceNode.position, 5.5)),
+    ...GROUND_FLOWER_LAYOUT.map((flowerPatch) => toSafeZoneFromPosition(flowerPatch.position, 2.6)),
     ...PALM_INSTANCE_LAYOUT.map((palm) => ({
       position: [palm.offset[0], palm.offset[2]],
       radius: 5.5
@@ -154,7 +157,7 @@ export function buildWorldLayout(session, assets) {
       id: "leppa-tree-dead",
       offset: [...LEPPA_TREE_POSITION],
       scale: 0.78,
-      yaw: -0.22,
+      yaw: -0.22 + LEPPA_TREE_DEAD_MODEL_FACE_YAW_OFFSET,
       active: false,
       swayStrength: 0
     },

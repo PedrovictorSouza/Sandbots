@@ -391,6 +391,33 @@ describe("createGameInputController", () => {
     expect(rightEvent.preventDefault).toHaveBeenCalledTimes(1);
   });
 
+  it("only rotates the camera with mouse movement while right dragging", () => {
+    const { controller } = createController();
+
+    controller.handlePointerMove({
+      buttons: 0,
+      movementX: 50,
+      movementY: -20,
+      target: document.body
+    });
+
+    expect(controller.consumeCameraLookDelta()).toEqual({
+      yaw: 0,
+      pitch: 0
+    });
+
+    controller.handlePointerMove({
+      buttons: 2,
+      movementX: 50,
+      movementY: -20,
+      target: document.body
+    });
+
+    const lookDelta = controller.consumeCameraLookDelta();
+    expect(lookDelta.yaw).toBeGreaterThan(0);
+    expect(lookDelta.pitch).toBeGreaterThan(0);
+  });
+
   it("cycles moves with D-pad left and right without using analog axes", () => {
     const gamepad = createGamepad();
     const windowRef = {

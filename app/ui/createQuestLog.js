@@ -83,8 +83,15 @@ function getHudObjectives(quest) {
 function getDerivedTrackedTaskIds(storyState = {}) {
   const flags = storyState.flags || {};
   const derivedTaskIds = [];
+  const openingLeppaTreeRequestPending =
+    flags.bulbasaurRevealed &&
+    flags.squirtleLeppaRequestAvailable &&
+    !flags.leppaTreeRevived &&
+    !flags.bulbasaurDryGrassMissionAccepted;
 
-  if (
+  if (openingLeppaTreeRequestPending) {
+    derivedTaskIds.push(FIELD_TASK_IDS.REVIVE_LEPPA_TREE);
+  } else if (
     flags.bulbasaurRevealed &&
     !flags.bulbasaurDryGrassMissionAccepted
   ) {
@@ -110,6 +117,7 @@ function getDerivedTrackedTaskIds(storyState = {}) {
   }
 
   if (
+    flags.bulbasaurDryGrassRequestTurnedIn &&
     flags.squirtleLeppaRequestAvailable &&
     !flags.leppaBerryGiftComplete
   ) {

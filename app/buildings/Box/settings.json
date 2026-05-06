@@ -1,0 +1,17 @@
+{
+  "snap_is_default":true,
+  "warn_on_exit":true,
+  "invert_mouse_controls":false,
+  "os_mouse":false,
+  "window_width":1920,
+  "window_height":965,
+  "last_path":"",
+  "recent_files":["unnamed_10.txt","workshop.txt","workbench.txt","unnamed_9.txt","unnamed_8.txt"],
+  "invert_zoom":false,
+  "texture_grid_size":16,
+  "show_grid":true,
+  "gif_file_increment":true,
+  "rmb_action":1,
+  "theme":"classic",
+  "auto_save_frequency":10
+}

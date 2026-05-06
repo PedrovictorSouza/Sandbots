@@ -113,7 +113,7 @@ const SCENE_VERTEX_SOURCE = `
     vec4 clip = uViewProjection * vec4(curvedWorld, 1.0);
 
     float phase = uTime * 3.5 + world.x * 1.7 + world.y * 2.3 + world.z * 1.1;
-    vec2 jitter = vec2(sin(phase), cos(phase * 0.83)) * (0.0072 * uJitterAmount);
+    vec2 jitter = vec2(sin(phase), cos(phase * 0.83)) * (0.0054 * uJitterAmount);
 
     clip.xy += jitter * clip.w;
     vec2 snapped = floor((clip.xy / clip.w) * uPixelSnap + 0.5) / uPixelSnap;
@@ -129,6 +129,9 @@ const SCENE_FRAGMENT_SOURCE = `
 
   uniform sampler2D uTexture;
   uniform float uBrightness;
+  uniform vec3 uInstanceTint;
+  uniform float uInstanceTintStrength;
+  uniform float uInstanceAlpha;
   varying vec2 vTexCoord;
   varying vec3 vWorldNormal;
 
@@ -149,8 +152,14 @@ const SCENE_FRAGMENT_SOURCE = `
     float solidShade = mix(1.0, 0.82, halfShadow);
     float ditherShade = mix(0.66, 0.78, checker);
     float shade = mix(solidShade, ditherShade, deepShadow);
+    vec3 litColor = texel.rgb * shade * uBrightness;
+    vec3 tintedColor = mix(
+      litColor,
+      litColor * uInstanceTint,
+      clamp(uInstanceTintStrength, 0.0, 1.0)
+    );
 
-    gl_FragColor = vec4(texel.rgb * shade * uBrightness, texel.a);
+    gl_FragColor = vec4(tintedColor, texel.a * clamp(uInstanceAlpha, 0.0, 1.0));
   }
 `;
 
@@ -402,7 +411,10 @@ export function createWorldRenderingResources(gl) {
     pixelSnap: gl.getUniformLocation(program, "uPixelSnap"),
     time: gl.getUniformLocation(program, "uTime"),
     texture: gl.getUniformLocation(program, "uTexture"),
-    brightness: gl.getUniformLocation(program, "uBrightness")
+    brightness: gl.getUniformLocation(program, "uBrightness"),
+    instanceTint: gl.getUniformLocation(program, "uInstanceTint"),
+    instanceTintStrength: gl.getUniformLocation(program, "uInstanceTintStrength"),
+    instanceAlpha: gl.getUniformLocation(program, "uInstanceAlpha")
   };
 
   const spriteProgram = createProgram(gl, SPRITE_VERTEX_SOURCE, SPRITE_FRAGMENT_SOURCE);

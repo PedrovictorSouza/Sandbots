@@ -24,6 +24,32 @@ const LEAFAGE_TALL_GRASS_HABITAT_COUNT = 4;
 const LEAFAGE_TALL_GRASS_GROUP_ID = "leafage-tall-grass-habitat-0";
 const BOULDER_SHADED_TALL_GRASS_GROUP_ID = "boulder-shaded-tall-grass-habitat-0";
 const LEAFAGE_GROUND_CELL_INTERACT_RADIUS_FACTOR = 0.82;
+const POKEMON_FOLLOW_FLAGS = Object.freeze({
+  squirtle: "squirtleFollowing",
+  bulbasaur: "bulbasaurFollowing",
+  charmander: "charmanderFollowing",
+  timburr: "timburrFollowing"
+});
+const POKEMON_FOLLOW_NAMES = Object.freeze({
+  squirtle: "Squirtle",
+  bulbasaur: "Bulbasaur",
+  charmander: "Charmander",
+  timburr: "Timburr"
+});
+const BEE_FIELD_FLOWER_GROUP_ID = "water-gun-flower-field-0";
+
+function markPokemonFollowing(storyState, pokemonId) {
+  const followFlag = POKEMON_FOLLOW_FLAGS[pokemonId];
+
+  if (!followFlag) {
+    return false;
+  }
+
+  storyState.flags ||= {};
+  const alreadyFollowing = Boolean(storyState.flags[followFlag]);
+  storyState.flags[followFlag] = true;
+  return !alreadyFollowing;
+}
 
 export function createGameplayInteractions({
   npcProfiles,
@@ -62,7 +88,9 @@ export function createGameplayInteractions({
   onPokemonCenterPcCheckRequested = () => {},
   onGroundItemCollected = () => {},
   onNaturePatchRevived = () => {},
+  onLeppaTreeRevived = () => {},
   onTallGrassHabitatRestored = () => {},
+  onFlowerHabitatRestored = () => {},
   getActiveQuest,
   hasItems,
   consumeItems,
@@ -837,6 +865,7 @@ export function createGameplayInteractions({
         storyState.flags.squirtleLeppaRequestAvailable &&
         !storyState.flags.leppaBerryGiftComplete
       ) {
+        markPokemonFollowing(storyState, targetId);
         onDialogueOpen();
         onLeppaBerryGiftRequested({
           targetId
@@ -854,6 +883,7 @@ export function createGameplayInteractions({
           type: QUEST_EVENT.TALK,
           targetId
         });
+        markPokemonFollowing(storyState, targetId);
         unlockPlayerAbility("waterGun");
         unlockPokedexReward();
         advanceQuest(
@@ -972,14 +1002,11 @@ export function createGameplayInteractions({
       resourceNodes,
       storyState
     );
-    const waterGunTreeChallengeActive = Boolean(
-      canPurifyGround &&
-      nearbyHarvestTarget?.palm &&
-      storyState?.flags?.bulbasaurStrawBedChallengeAvailable &&
-      !storyState.flags.bulbasaurStrawBedChallengeComplete &&
-      !storyState.flags.strawBedRecipeUnlocked
-    );
-    let nearestTarget = nearbyHarvestTarget?.palm ? null : nearbyHarvestTarget;
+    const waterGunTreeTargetActive = Boolean(canPurifyGround && nearbyHarvestTarget?.palm);
+    let nearestTarget =
+      nearbyHarvestTarget?.palm && !waterGunTreeTargetActive ?
+        null :
+        nearbyHarvestTarget;
 
     if (
       storyState?.flags?.logChairReceived &&
@@ -1049,10 +1076,6 @@ export function createGameplayInteractions({
           distance: nearbyLeafDen.distance
         };
       }
-    }
-
-    if (waterGunTreeChallengeActive) {
-      return nearbyHarvestTarget;
     }
 
     const nearbyLeafageTarget = canUseLeafage ?
@@ -1190,6 +1213,7 @@ export function createGameplayInteractions({
     if (target.kind === "grassEncounter") {
       if (!storyState.flags.bulbasaurRevealed) {
         storyState.flags.bulbasaurRevealed = true;
+        markPokemonFollowing(storyState, "bulbasaur");
         notifyInteractionStart(target);
         onBulbasaurRevealed({
           cellId: target.cellId
@@ -1201,6 +1225,7 @@ export function createGameplayInteractions({
     if (target.kind === "charmanderGrassEncounter") {
       if (!storyState.flags.charmanderRevealed) {
         storyState.flags.charmanderRevealed = true;
+        markPokemonFollowing(storyState, "charmander");
         notifyInteractionStart(target);
         onCharmanderRevealed({
           cellId: target.cellId
@@ -1212,6 +1237,7 @@ export function createGameplayInteractions({
     if (target.kind === "timburrGrassEncounter") {
       if (!storyState.flags.timburrRevealed) {
         storyState.flags.timburrRevealed = true;
+        markPokemonFollowing(storyState, "timburr");
         notifyInteractionStart(target);
         onTimburrRevealed({
           cellId: target.cellId
@@ -1222,6 +1248,7 @@ export function createGameplayInteractions({
 
     if (target.kind === "bulbasaurMission") {
       notifyInteractionStart(target);
+      markPokemonFollowing(storyState, "bulbasaur");
       storyState.flags.bulbasaurDryGrassMissionAccepted = true;
       if (
         (storyState.flags.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
@@ -1234,18 +1261,21 @@ export function createGameplayInteractions({
 
     if (target.kind === "bulbasaurRequestComplete") {
       notifyInteractionStart(target);
+      markPokemonFollowing(storyState, "bulbasaur");
       onBulbasaurDryGrassRequestCompleted();
       return true;
     }
 
     if (target.kind === "bulbasaurStrawBedRecipe") {
       notifyInteractionStart(target);
+      markPokemonFollowing(storyState, "bulbasaur");
       onBulbasaurStrawBedRecipeRequested();
       return true;
     }
 
     if (target.kind === "bulbasaurStrawBedComplete") {
       notifyInteractionStart(target);
+      markPokemonFollowing(storyState, "bulbasaur");
       onBulbasaurStrawBedRequestCompleted();
       return true;
     }
@@ -1276,6 +1306,7 @@ export function createGameplayInteractions({
 
     if (target.kind === "leppaBerryGift") {
       notifyInteractionStart(target);
+      markPokemonFollowing(storyState, target.id);
       onLeppaBerryGiftRequested({
         targetId: target.id
       });
@@ -1305,6 +1336,7 @@ export function createGameplayInteractions({
 
     if (target.kind === "timburrLeafDenFurnitureComplete") {
       notifyInteractionStart(target);
+      markPokemonFollowing(storyState, "timburr");
       onTimburrLeafDenFurnitureCompleteRequested({
         targetId: target.id
       });
@@ -1313,9 +1345,38 @@ export function createGameplayInteractions({
 
     if (target.kind === "charmanderCelebrationRequest") {
       notifyInteractionStart(target);
+      markPokemonFollowing(storyState, "charmander");
       onCharmanderCelebrationSuggested({
         targetId: target.id
       });
+      return true;
+    }
+
+    if (target.kind === "pokemonCompanion") {
+      notifyInteractionStart(target);
+      markPokemonFollowing(storyState, target.id);
+      pushNotice(`${POKEMON_FOLLOW_NAMES[target.id] || target.label || "Pokemon"} is following you.`);
+      return true;
+    }
+
+    if (target.kind === "beeFieldRepairBox") {
+      notifyInteractionStart(target);
+
+      if (
+        !(storyState.flags?.restoredFlowerBedHabitatIds || [])
+          .includes(BEE_FIELD_FLOWER_GROUP_ID)
+      ) {
+        pushNotice("Restore every flower in this field first.");
+        return true;
+      }
+
+      if (storyState.flags.beeFieldRepairBoxOpened) {
+        pushNotice("The Bee Box is already open.");
+        return true;
+      }
+
+      storyState.flags.beeFieldRepairBoxOpened = true;
+      pushNotice("The Bee Box clicks open. Something inside is waking up.");
       return true;
     }
 
@@ -1538,6 +1599,9 @@ export function createGameplayInteractions({
           )
         ) {
           pushNotice("The dead tree perked back up.");
+          onLeppaTreeRevived({
+            leppaTree
+          });
         }
 
         questSystem?.emit?.({
@@ -1624,6 +1688,11 @@ export function createGameplayInteractions({
             habitatSystem?.recordEvent?.({
               type: HABITAT_EVENT.RESTORE_HABITAT,
               targetId: "pretty-flower-bed"
+            });
+            onFlowerHabitatRestored({
+              groundCell: nearbyHarvestTarget.groundCell,
+              revivedFlower,
+              restoredFlowerBedHabitat
             });
             return true;
           }

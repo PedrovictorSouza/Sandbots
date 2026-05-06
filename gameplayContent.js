@@ -323,6 +323,7 @@ export const INVENTORY_ORDER = [
 export const WORLD_LIMIT = 144;
 
 const HABITAT_TILE_STEP = 1.425;
+const FLOWER_FIELD_TILE_STEP = HABITAT_TILE_STEP * 1.08;
 
 function createFourTileHabitatLayout(id, center, patchKind) {
   const halfStep = HABITAT_TILE_STEP * 0.5;
@@ -345,6 +346,37 @@ function createFourTileHabitatLayout(id, center, patchKind) {
   }));
 }
 
+function createGridHabitatLayout(id, center, patchKind, {
+  columns = 7,
+  rows = 7,
+  step = HABITAT_TILE_STEP
+} = {}) {
+  const [centerX, centerY, centerZ] = center;
+  const halfColumns = (columns - 1) * 0.5;
+  const halfRows = (rows - 1) * 0.5;
+  const layout = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const jitterSeed = row * columns + column;
+      const jitterX = ((jitterSeed % 3) - 1) * 0.08;
+      const jitterZ = (((jitterSeed + row) % 3) - 1) * 0.08;
+
+      layout.push({
+        id: `${id}-${patchKind}-${row}-${column}`,
+        habitatGroupId: id,
+        position: [
+          centerX + (column - halfColumns) * step + jitterX,
+          centerY,
+          centerZ + (row - halfRows) * step + jitterZ
+        ]
+      });
+    }
+  }
+
+  return layout;
+}
+
 export const GROUND_GRASS_LAYOUT = [
   ...createFourTileHabitatLayout("tall-grass-habitat-0", [8.55, 0, -5.7], "grass"),
   ...createFourTileHabitatLayout("tall-grass-habitat-1", [17.1, 0, -9.98], "grass"),
@@ -352,7 +384,12 @@ export const GROUND_GRASS_LAYOUT = [
 ];
 
 export const GROUND_FLOWER_LAYOUT = [
-  ...createFourTileHabitatLayout("pretty-flower-bed-habitat-0", [12.825, 0, -7.425], "flower")
+  ...createFourTileHabitatLayout("pretty-flower-bed-habitat-0", [12.825, 0, -7.425], "flower"),
+  ...createGridHabitatLayout("water-gun-flower-field-0", [96, 0, 76], "flower", {
+    columns: 9,
+    rows: 7,
+    step: FLOWER_FIELD_TILE_STEP
+  })
 ];
 
 export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
@@ -483,6 +520,22 @@ export const PALM_INSTANCE_LAYOUT = [
   { offset: [16, 0, 46], scale: 0.91, yaw: -0.27 },
   { offset: [6, 0, 30], scale: 0.85, yaw: 0.21 },
   { offset: [-6, 0, 24], scale: 0.82, yaw: -0.18 },
+  { offset: [-118, 0, -92], scale: 0.86, yaw: 0.31 },
+  { offset: [-128, 0, -28], scale: 0.9, yaw: -0.2 },
+  { offset: [-112, 0, 54], scale: 0.84, yaw: 0.18 },
+  { offset: [-86, 0, 118], scale: 0.88, yaw: -0.34 },
+  { offset: [-34, 0, 122], scale: 0.83, yaw: 0.26 },
+  { offset: [28, 0, 118], scale: 0.87, yaw: -0.16 },
+  { offset: [82, 0, 94], scale: 0.92, yaw: 0.23 },
+  { offset: [124, 0, 36], scale: 0.85, yaw: -0.3 },
+  { offset: [116, 0, -42], scale: 0.89, yaw: 0.14 },
+  { offset: [74, 0, -108], scale: 0.86, yaw: -0.24 },
+  { offset: [12, 0, -124], scale: 0.88, yaw: 0.33 },
+  { offset: [-58, 0, -116], scale: 0.84, yaw: -0.18 },
+  { offset: [-28, 0, 82], scale: 0.83, yaw: 0.2 },
+  { offset: [34, 0, 78], scale: 0.86, yaw: -0.22 },
+  { offset: [58, 0, 58], scale: 0.84, yaw: 0.17 },
+  { offset: [-72, 0, 72], scale: 0.88, yaw: -0.28 },
 ];
 
 export const OUTPOST_INSTANCE_LAYOUT = [

@@ -1124,7 +1124,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "grassEncounter",
           id: "rustlingGrass",
-          label: "Investigate the rustling grass",
+          label: "Inspect dismantled Bulbasaur",
           cellId: "ground-2-3"
         },
         distance: 1.05
@@ -1162,7 +1162,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "charmanderGrassEncounter",
           id: "charmanderRustlingGrass",
-          label: "Inspect the rustling grass",
+          label: "Repair dismantled Charmander",
           cellId: "ground-8-7"
         },
         distance: 1.05
@@ -1570,10 +1570,12 @@ describe("createGameplayInteractions", () => {
       return true;
     });
     const pushNotice = vi.fn();
+    const onLeppaTreeRevived = vi.fn();
     const interactions = createInteractions({
       findNearbyGroundCell,
       purifyGroundCell,
-      pushNotice
+      pushNotice,
+      onLeppaTreeRevived
     });
 
     const result = interactions.performHarvestAction({
@@ -1592,13 +1594,18 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(true);
     expect(storyState.flags.leppaTreeRevived).toBe(true);
-    expect(leppaTree.aliveInstance.active).toBe(true);
+    expect(leppaTree.deadInstance.active).toBe(true);
+    expect(leppaTree.deadInstance.tintStrength).toBeGreaterThan(0);
+    expect(leppaTree.aliveInstance.active).toBe(false);
     expect(purifyGroundCell).toHaveBeenCalledWith(
       finalGroundCell,
       [finalGroundCell],
       groundPurifiedInstances
     );
     expect(pushNotice).toHaveBeenCalledWith("The dead tree perked back up.");
+    expect(onLeppaTreeRevived).toHaveBeenCalledWith({
+      leppaTree
+    });
   });
 
   it("requests the Leppa Berry gift flow from Bulbasaur's Look at this interaction", () => {
@@ -2611,7 +2618,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "timburrGrassEncounter",
           id: "timburrRustlingGrass",
-          label: "Inspect the Boulder-Shaded Tall Grass",
+          label: "Repair dismantled Timburr",
           cellId: "boulder-ground-0"
         },
         distance: 1.1

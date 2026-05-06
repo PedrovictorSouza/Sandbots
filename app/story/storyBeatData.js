@@ -25,6 +25,7 @@ import { QUEST_EVENT } from "../quest/questData.js";
 export const FIELD_TASK_IDS = Object.freeze({
   MAKING_HABITATS: "making-habitats",
   BULBASAUR_DRY_GRASS_REQUEST: "bulbasaur-dry-grass-request",
+  REVIVE_LEPPA_TREE: "revive-leppa-tree",
   WATER_DRY_TALL_GRASS: "water-dry-tall-grass",
   BULBASAUR_LEAFAGE_REWARD: "bulbasaur-leafage-reward",
   BULBASAUR_GREEN_CORNER_PLAY_SEED: "bulbasaur-green-corner-play-seed",
@@ -108,6 +109,12 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
     title: "Talk to Bulbasaur",
     description: "Bulbasaur has a request. Help him, and he will teach you a new move.",
     completeFlag: "bulbasaurDryGrassMissionAccepted"
+  },
+  [FIELD_TASK_IDS.REVIVE_LEPPA_TREE]: {
+    id: FIELD_TASK_IDS.REVIVE_LEPPA_TREE,
+    title: "Revive the dead tree",
+    description: "Use Water Gun on the four dry tiles around the dead tree.",
+    completeFlag: "leppaTreeRevived"
   },
   [FIELD_TASK_IDS.WATER_DRY_TALL_GRASS]: {
     id: FIELD_TASK_IDS.WATER_DRY_TALL_GRASS,
@@ -244,7 +251,7 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       }
 
       if (flags.charmanderRustlingGrassCellId) {
-        return "Inspect the rustling grass.";
+        return "Repair the dismantled Charmander module.";
       }
 
       const current = Math.min(4, Number(flags.leafageTallGrassCount || 0));
@@ -289,7 +296,7 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       }
 
       if (flags.boulderShadedTallGrassHabitatCreated) {
-        return "Inspect the rustling Boulder-Shaded Tall Grass.";
+        return "Repair the dismantled Timburr module near the boulder.";
       }
 
       const current = Math.min(4, Number(flags.boulderShadedTallGrassCount || 0));
@@ -519,6 +526,14 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       {
         type: STORY_BEAT_EFFECT.SET_FLAG,
         flag: "chopperPatrolEnabled"
+      },
+      {
+        type: STORY_BEAT_EFFECT.SET_FLAG,
+        flag: "squirtleLeppaRequestAvailable"
+      },
+      {
+        type: STORY_BEAT_EFFECT.TRACK_FIELD_TASK,
+        taskId: FIELD_TASK_IDS.REVIVE_LEPPA_TREE
       },
       {
         type: STORY_BEAT_EFFECT.OPEN_POKEDEX_ENTRY,

@@ -59,7 +59,7 @@ function createSystem(overrides = {}) {
 
 describe("createStoryBeatSystem", () => {
   it("falls back to beat dialogue and applies Bulbasaur encouragement rewards", () => {
-    const { openConversation, pokedexRuntime, storyState, system } = createSystem();
+    const { openConversation, pokedexRuntime, storyState, system, trackFieldTask } = createSystem();
 
     system.playDialogue(STORY_BEAT_IDS.CHOPPER_BULBASAUR_ENCOURAGEMENT);
 
@@ -76,6 +76,8 @@ describe("createStoryBeatSystem", () => {
     openConversation.mock.results[0].value.complete();
 
     expect(storyState.flags.chopperPatrolEnabled).toBe(true);
+    expect(storyState.flags.squirtleLeppaRequestAvailable).toBe(true);
+    expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.REVIVE_LEPPA_TREE);
     expect(pokedexRuntime.unlock).toHaveBeenCalledTimes(1);
     expect(pokedexRuntime.setOpen).toHaveBeenCalledWith(true, {
       markSeen: true,

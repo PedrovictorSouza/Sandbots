@@ -49,7 +49,7 @@ import { SMALL_ISLAND_DIALOGUES } from "../dialogue/dialogueData.js";
 import { createQuestSystem } from "../quest/createQuestSystem.js";
 import { QUEST_EVENT, SMALL_ISLAND_QUESTS } from "../quest/questData.js";
 import { createStoryBeatSystem } from "../story/createStoryBeatSystem.js";
-import { STORY_BEAT_IDS } from "../story/storyBeatData.js";
+import { FIELD_TASK_IDS, STORY_BEAT_IDS } from "../story/storyBeatData.js";
 import { createHabitatSystem } from "../sandbox/createHabitatSystem.js";
 import { HABITAT_EVENT, SMALL_ISLAND_HABITATS } from "../sandbox/habitatData.js";
 import {
@@ -88,6 +88,7 @@ import { createDialogueCameraController } from "../runtime/dialogueCameraControl
 import { createGameAppController } from "../runtime/gameAppController.js";
 import { shouldGamepadSourceHarvestTarget } from "../runtime/gamepadHarvestPolicy.js";
 import { startGameLoop } from "../runtime/gameLoop.js";
+import { createMusicRuntime, MUSIC_TRACK_IDS } from "../runtime/musicRuntime.js";
 import { createUiRuntime } from "../runtime/createUiRuntime.js";
 import { createSceneFlowRuntime } from "../scene/createSceneFlowRuntime.js";
 import {
@@ -115,6 +116,11 @@ const INTERACT_PROMPT = "E talk";
 const ENABLE_GAMEPLAY_DEV_BOOT = true;
 const ENABLE_QUEST_PERSISTENCE = false;
 const DEFAULT_DEV_SCENE = DEV_SCENE.GAMEPLAY;
+const WATER_GUN_FLOWER_FIELD_GROUP_ID = "water-gun-flower-field-0";
+const FLOWER_FIELD_COMPLETION_SPARK_BUDGET = 420;
+const FLOWER_FIELD_COMPLETION_MIN_SPARKS_PER_PATCH = 4;
+const FLOWER_FIELD_COMPLETION_MAX_SPARKS_PER_PATCH = 8;
+const FLOWER_FIELD_COMPLETION_SPARK_INTERVAL = 0.095;
 const GAMEPLAY_DEFAULT_UI_SECTIONS = Object.freeze([
   "hud",
   "builder"
@@ -168,6 +174,14 @@ const CHOPPER_SECOND_TALK_STOP_DISTANCE = 1.45;
 const SQUIRTLE_DIALOGUE_MIN_PLAYER_DISTANCE = 1.55;
 const TALL_GRASS_MEMORY_APPROACH_DURATION = 1.05;
 const POKEMON_CENTER_GUIDE_FLIGHT_DURATION = 2.8;
+const LEPPA_TREE_TASK_CAMERA_FOCUS_HEIGHT = 1.75;
+const LEPPA_TREE_TASK_CAMERA_FOCUS_TRANSITION_MS = 460;
+const LEPPA_TREE_TASK_CAMERA_ORBIT_DURATION_MS = 4200;
+const LEPPA_TREE_TASK_CAMERA_ORBIT_DISTANCE = 6.2;
+const LEPPA_TREE_TASK_CAMERA_ORBIT_ZOOM = 4.45;
+const LEPPA_TREE_TASK_CAMERA_ORBIT_PITCH = 0.34;
+const LEPPA_TREE_TASK_CAMERA_FOCUS_RETRY_MS = 160;
+const LEPPA_TREE_TASK_CAMERA_FOCUS_MAX_WAIT_MS = 8000;
 const LEAF_DEN_KIT_LIFE_COIN_COST = 10;
 
 function scheduleIdleTask(windowRef, callback, timeout = 1200) {
@@ -247,6 +261,15 @@ export function createApplicationRuntime({
   const pressedKeys = new Set();
   const inventory = createInitialInventory();
   const storyState = createStoryState();
+  const musicRuntime = createMusicRuntime({
+    audioFactory: (src) => {
+      if (typeof windowRef.Audio !== "function") {
+        return null;
+      }
+
+      return new windowRef.Audio(src);
+    }
+  });
   const playerMemory = {
     gender: null,
     confirmation: null,
@@ -276,6 +299,9 @@ export function createApplicationRuntime({
   let storyBeats = null;
   let questCompletionPop = null;
   let scriptedInteractionActive = false;
+  let leppaTreeTaskCameraFocusActive = false;
+  let leppaTreeTaskCameraFocusTimeout = null;
+  let leppaTreeTaskCameraFocusFrame = null;
   let followerCallRequested = false;
   let activeFieldMoveId = null;
 
@@ -437,6 +463,171 @@ export function createApplicationRuntime({
     return true;
   }
 
+  function clearLeppaTreeTaskCameraFocusTimeout() {
+    if (leppaTreeTaskCameraFocusTimeout !== null) {
+      windowRef.clearTimeout?.(leppaTreeTaskCameraFocusTimeout);
+      leppaTreeTaskCameraFocusTimeout = null;
+    }
+  }
+
+  function clearLeppaTreeTaskCameraFocusFrame() {
+    if (leppaTreeTaskCameraFocusFrame !== null) {
+      if (typeof windowRef.cancelAnimationFrame === "function") {
+        windowRef.cancelAnimationFrame(leppaTreeTaskCameraFocusFrame);
+      } else {
+        windowRef.clearTimeout?.(leppaTreeTaskCameraFocusFrame);
+      }
+      leppaTreeTaskCameraFocusFrame = null;
+    }
+  }
+
+  function requestLeppaTreeTaskCameraFocusFrame(callback) {
+    if (typeof windowRef.requestAnimationFrame === "function") {
+      leppaTreeTaskCameraFocusFrame = windowRef.requestAnimationFrame((timestamp) => {
+        leppaTreeTaskCameraFocusFrame = null;
+        callback(timestamp);
+      });
+      return;
+    }
+
+    leppaTreeTaskCameraFocusFrame = windowRef.setTimeout(() => {
+      leppaTreeTaskCameraFocusFrame = null;
+      callback(getRuntimeNow());
+    }, 16);
+  }
+
+  function finishLeppaTreeTaskCameraFocus() {
+    clearLeppaTreeTaskCameraFocusTimeout();
+    clearLeppaTreeTaskCameraFocusFrame();
+
+    if (!leppaTreeTaskCameraFocusActive) {
+      return;
+    }
+
+    leppaTreeTaskCameraFocusActive = false;
+    clearGameFlowInput();
+    scriptedInteractionActive = false;
+    dialogueCamera?.restoreGameplayCamera();
+  }
+
+  function startLeppaTreeTaskCameraOrbit(position) {
+    if (!leppaTreeTaskCameraFocusActive || !Array.isArray(position)) {
+      finishLeppaTreeTaskCameraFocus();
+      return;
+    }
+
+    const camera = engine?.camera;
+
+    if (!camera?.getPose || !camera?.setPose) {
+      finishLeppaTreeTaskCameraFocus();
+      return;
+    }
+
+    const startedAt = getRuntimeNow();
+    const currentPose = camera.getPose();
+    const currentDirection = currentPose.direction || [1, LEPPA_TREE_TASK_CAMERA_ORBIT_PITCH, 0];
+    const startYaw = Math.atan2(currentDirection[2] || 0, currentDirection[0] || 1);
+    const pitch = Math.max(
+      0.18,
+      Math.min(0.58, Math.abs(currentDirection[1]) || LEPPA_TREE_TASK_CAMERA_ORBIT_PITCH)
+    );
+    const target = [
+      position[0],
+      LEPPA_TREE_TASK_CAMERA_FOCUS_HEIGHT,
+      position[2]
+    ];
+
+    const orbit = (now = getRuntimeNow()) => {
+      if (!leppaTreeTaskCameraFocusActive) {
+        return;
+      }
+
+      const progress = Math.min(
+        1,
+        (now - startedAt) / LEPPA_TREE_TASK_CAMERA_ORBIT_DURATION_MS
+      );
+      const angle = startYaw + Math.PI * 2 * progress;
+      const direction = [Math.cos(angle), pitch, Math.sin(angle)];
+
+      clearGameFlowInput();
+      camera.setPose({
+        target,
+        direction,
+        zoom: LEPPA_TREE_TASK_CAMERA_ORBIT_ZOOM,
+        distance: LEPPA_TREE_TASK_CAMERA_ORBIT_DISTANCE
+      });
+      engine.cameraOrbit?.sync?.(direction);
+
+      if (progress >= 1) {
+        finishLeppaTreeTaskCameraFocus();
+        return;
+      }
+
+      requestLeppaTreeTaskCameraFocusFrame(orbit);
+    };
+
+    requestLeppaTreeTaskCameraFocusFrame(orbit);
+  }
+
+  function shouldWaitForLeppaTreeTaskCameraFocus() {
+    return Boolean(
+      uiRuntime?.pokedexUiState?.open ||
+      uiRuntime?.gameplayDialogue?.isActive?.() ||
+      gamePaused ||
+      builderPanelOpen ||
+      !sceneFlowRuntime?.sceneDirector?.is?.(GAME_FLOW.GAMEPLAY) ||
+      (scriptedInteractionActive && !leppaTreeTaskCameraFocusActive)
+    );
+  }
+
+  function scheduleLeppaTreeTaskCameraFocus(startedAt = getRuntimeNow()) {
+    clearLeppaTreeTaskCameraFocusTimeout();
+    clearLeppaTreeTaskCameraFocusFrame();
+
+    const attemptFocus = () => {
+      leppaTreeTaskCameraFocusTimeout = null;
+
+      const position = gameSession?.leppaTree?.position;
+
+      if (!Array.isArray(position)) {
+        if (getRuntimeNow() - startedAt > LEPPA_TREE_TASK_CAMERA_FOCUS_MAX_WAIT_MS) {
+          return;
+        }
+
+        leppaTreeTaskCameraFocusTimeout = windowRef.setTimeout(
+          attemptFocus,
+          LEPPA_TREE_TASK_CAMERA_FOCUS_RETRY_MS
+        );
+        return;
+      }
+
+      if (shouldWaitForLeppaTreeTaskCameraFocus()) {
+        leppaTreeTaskCameraFocusTimeout = windowRef.setTimeout(
+          attemptFocus,
+          LEPPA_TREE_TASK_CAMERA_FOCUS_RETRY_MS
+        );
+        return;
+      }
+
+      leppaTreeTaskCameraFocusActive = true;
+      scriptedInteractionActive = true;
+      clearGameFlowInput();
+      dialogueCamera?.focusWorldPoint({
+        position,
+        height: LEPPA_TREE_TASK_CAMERA_FOCUS_HEIGHT
+      });
+      leppaTreeTaskCameraFocusTimeout = windowRef.setTimeout(
+        () => {
+          leppaTreeTaskCameraFocusTimeout = null;
+          startLeppaTreeTaskCameraOrbit(position);
+        },
+        LEPPA_TREE_TASK_CAMERA_FOCUS_TRANSITION_MS
+      );
+    };
+
+    leppaTreeTaskCameraFocusTimeout = windowRef.setTimeout(attemptFocus, 0);
+  }
+
   function movePlayerAwayFromSquirtleForDialogue() {
     const squirtlePosition = gameSession?.actTwoSquirtle?.position;
     const playerCharacter = gameSession?.playerCharacter;
@@ -542,6 +733,11 @@ export function createApplicationRuntime({
 
     storyState.flags.trackedTaskIds.push(taskId);
     syncQuestPanels();
+
+    if (taskId === FIELD_TASK_IDS.REVIVE_LEPPA_TREE) {
+      scheduleLeppaTreeTaskCameraFocus();
+    }
+
     return true;
   }
 
@@ -1477,26 +1673,15 @@ export function createApplicationRuntime({
       });
       const encounter = gameSession?.bulbasaurEncounter;
 
-      if (!rustlingGrassPatch || !encounter) {
+      if (!encounter) {
         return;
       }
 
-      const originPosition = [
-        rustlingGrassPatch.position[0],
-        rustlingGrassPatch.position[1] + 0.06,
-        rustlingGrassPatch.position[2]
-      ];
-      const landingPosition = [
-        rustlingGrassPatch.position[0] + 0.82,
-        rustlingGrassPatch.position[1] + 0.02,
-        rustlingGrassPatch.position[2] - 0.24
-      ];
+      const repairPosition = encounter.repairPosition || rustlingGrassPatch?.position;
 
-      encounter.visible = true;
-      encounter.jumpTimer = encounter.jumpDuration;
-      encounter.originPosition = originPosition;
-      encounter.landingPosition = landingPosition;
-      encounter.position = [...originPosition];
+      if (!Array.isArray(repairPosition)) {
+        return;
+      }
 
       const openChopperEncouragement = () => {
         const playerPosition = gameSession?.playerCharacter?.getPosition?.();
@@ -1522,9 +1707,25 @@ export function createApplicationRuntime({
         });
       };
 
-      storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_HABITAT_DISCOVERY, {
+      const openBulbasaurDiscoveryDialogue = () => storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_HABITAT_DISCOVERY, {
         onComplete: openChopperEncouragement
       });
+
+      encounter.visible = false;
+      encounter.jumpTimer = 0;
+      encounter.originPosition = null;
+      encounter.landingPosition = null;
+      encounter.position = null;
+      encounter.revealBoxOpening = {
+        active: true,
+        elapsed: 0,
+        duration: 1.15,
+        bulbasaurVisible: false,
+        onComplete: openBulbasaurDiscoveryDialogue
+      };
+      if (encounter.repairModuleInstance) {
+        encounter.repairModuleInstance.active = true;
+      }
     },
     onBulbasaurDryGrassMissionAccepted() {
       storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_DRY_GRASS_REQUEST);
@@ -1551,14 +1752,17 @@ export function createApplicationRuntime({
       });
       const encounter = gameSession?.charmanderEncounter;
 
-      if (rustlingGrassPatch && encounter) {
+      if (encounter) {
+        const repairPosition = encounter.repairPosition || rustlingGrassPatch?.position;
+        if (!Array.isArray(repairPosition)) {
+          return;
+        }
         encounter.visible = true;
-        encounter.position = [
-          rustlingGrassPatch.position[0] + 0.72,
-          rustlingGrassPatch.position[1] + 0.02,
-          rustlingGrassPatch.position[2] - 0.18
-        ];
+        encounter.position = [...repairPosition];
         encounter.targetPosition = [...encounter.position];
+        if (encounter.repairModuleInstance) {
+          encounter.repairModuleInstance.active = false;
+        }
       }
 
       storyBeats.playDialogue(STORY_BEAT_IDS.CHARMANDER_DISCOVERY, {
@@ -1571,13 +1775,16 @@ export function createApplicationRuntime({
       });
       const encounter = gameSession?.timburrEncounter;
 
-      if (rustlingGrassPatch && encounter) {
+      if (encounter) {
+        const repairPosition = encounter.repairPosition || rustlingGrassPatch?.position;
+        if (!Array.isArray(repairPosition)) {
+          return;
+        }
         encounter.visible = true;
-        encounter.position = [
-          rustlingGrassPatch.position[0] + 0.58,
-          rustlingGrassPatch.position[1] + 0.02,
-          rustlingGrassPatch.position[2] - 0.28
-        ];
+        encounter.position = [...repairPosition];
+        if (encounter.repairModuleInstance) {
+          encounter.repairModuleInstance.active = false;
+        }
       }
 
       storyBeats.playDialogue(STORY_BEAT_IDS.TIMBURR_DISCOVERY, {
@@ -1968,6 +2175,37 @@ export function createApplicationRuntime({
         patch,
         type
       });
+    },
+    onFlowerHabitatRestored({ restoredFlowerBedHabitat } = {}) {
+      if (
+        !gameSession?.natureRevivalEffects ||
+        restoredFlowerBedHabitat?.id !== WATER_GUN_FLOWER_FIELD_GROUP_ID
+      ) {
+        return;
+      }
+
+      const fieldPatches = (gameSession.groundFlowerPatches || []).filter((patch) => {
+        return patch.habitatGroupId === WATER_GUN_FLOWER_FIELD_GROUP_ID;
+      });
+      const sparksPerPatch = Math.max(
+        FLOWER_FIELD_COMPLETION_MIN_SPARKS_PER_PATCH,
+        Math.min(
+          FLOWER_FIELD_COMPLETION_MAX_SPARKS_PER_PATCH,
+          Math.floor(FLOWER_FIELD_COMPLETION_SPARK_BUDGET / Math.max(1, fieldPatches.length))
+        )
+      );
+
+      for (const patch of fieldPatches) {
+        startNatureRevivalEffect(gameSession.natureRevivalEffects, {
+          patch,
+          type: "flower",
+          maxSparks: sparksPerPatch,
+          emitInterval: FLOWER_FIELD_COMPLETION_SPARK_INTERVAL
+        });
+      }
+    },
+    onLeppaTreeRevived() {
+      musicRuntime.play(MUSIC_TRACK_IDS.FIRST_TREE_REVIVED);
     },
     getActiveQuest,
     hasItems,

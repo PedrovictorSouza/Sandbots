@@ -31,13 +31,22 @@ import { resolveTransientNoticeRoute } from "./contextualPromptNotice.js";
 const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 1500;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
-const BULBASAUR_WORKBENCH_GUIDE_TARGET = WORKBENCH_POSITION;
 const BULBASAUR_WORKBENCH_GUIDE_SPEED = 2.4;
+const BULBASAUR_WORKBENCH_GUIDE_WAYPOINT_DISTANCE = 0.08;
+const BULBASAUR_WORKBENCH_GUIDE_RAMP_COLLIDER_ID = "workbench-ramp-collider";
+const BULBASAUR_WORKBENCH_GUIDE_RAMP_APPROACH_MARGIN = 0.92;
+const BULBASAUR_WORKBENCH_GUIDE_SIDE_APPROACH_MARGIN = 1.22;
+const BEE_FIELD_FLOWER_GROUP_ID = "water-gun-flower-field-0";
+const BEE_FIELD_REPAIR_BOX_LOCKED_ALPHA = 0.5;
 const CHARMANDER_FOLLOW_SPEED = 2.65;
 const CHARMANDER_FOLLOW_DISTANCE = 1.28;
 const CHARMANDER_CAMPFIRE_LIGHT_DISTANCE = 1.9;
 const TIMBURR_FOLLOW_SPEED = 2.45;
 const TIMBURR_FOLLOW_DISTANCE = 1.62;
+const SQUIRTLE_FOLLOW_SPEED = 2.65;
+const SQUIRTLE_FOLLOW_DISTANCE = 1.18;
+const BULBASAUR_FOLLOW_SPEED = 2.45;
+const BULBASAUR_FOLLOW_DISTANCE = 1.46;
 const TALL_GRASS_MIN_FOOTPRINT = 1.28;
 const SQUIRTLE_WATER_GUN_SPEED = 4.8;
 const SQUIRTLE_WATER_GUN_STAND_DISTANCE = 1.18;
@@ -46,11 +55,28 @@ const SQUIRTLE_WATER_GUN_SPRAY_DURATION = 0.82;
 const SQUIRTLE_WATER_GUN_IMPACT_TIME = 0.34;
 const SQUIRTLE_WATER_GUN_ARC_HEIGHT = 0.86;
 const SQUIRTLE_WATER_GUN_PARTICLE_COUNT = 9;
+const WATER_GUN_FIRST_USE_PROMPT_FLAG = "waterGunFirstUsePromptDismissed";
+const WATER_GUN_FIRST_USE_PROMPT_TEXT = "Press LT to use Squirtle";
 const SQUIRTLE_REASSEMBLY_PART_SCALE = 0.5;
 const SQUIRTLE_MODEL_FACE_YAW_OFFSET = Math.PI;
 const BULBASAUR_MODEL_FACE_YAW_OFFSET = Math.PI;
 const ROBOT_MODEL_SCALE = 0.5;
 const BULBASAUR_ROBOT_MODEL_SCALE = ROBOT_MODEL_SCALE * 1.3;
+const ROBOT_REPAIR_BOX_FLOAT_HEIGHT = 0.74;
+const ROBOT_REPAIR_BOX_BOB_HEIGHT = 0.06;
+const ROBOT_REPAIR_BOX_BOB_SPEED = 2.2;
+const ROBOT_REPAIR_BOX_SPIN_SPEED = Math.PI * 0.826;
+const ROBOT_REPAIR_BOX_MODEL_PITCH_OFFSET = 0;
+const ROBOT_REPAIR_BOX_OPEN_PITCH = Math.PI * 0.58;
+const ROBOT_REPAIR_BOX_OPEN_ROLL = Math.PI * 0.08;
+const ROBOT_REPAIR_BOX_OPEN_LIFT = 0.18;
+const ROBOT_REPAIR_BOX_OPEN_BACKSTEP = 0.28;
+const BULBASAUR_REVEAL_BOX_DURATION = 1.15;
+const BULBASAUR_REVEAL_VISIBLE_PROGRESS = 0.56;
+const REPAIR_BOX_PROMPT_DISTANCE = 2.8;
+const REPAIR_BOX_ACTIVE_TINT = Object.freeze([0.38, 1.72, 0.42]);
+const REPAIR_BOX_ACTIVE_TINT_STRENGTH = 0.68;
+const REPAIR_BOX_INACTIVE_ALPHA = 0.5;
 const ROBOT_IDLE_PATROL_SPEED = 0.82;
 const ROBOT_IDLE_PATROL_PAUSE_DURATION = 0.75;
 const ROBOT_IDLE_PATROL_ARRIVE_DISTANCE = 0.08;
@@ -64,6 +90,35 @@ const PLAYER_MODEL_TURN_SPEED = 14;
 const GRASS_PLAYER_BEND_RADIUS = 0.92;
 const GRASS_PLAYER_BEND_OFFSET = 0.14;
 const GRASS_PLAYER_BEND_SWAY = 0.18;
+const FLOWER_ARRANGEMENT_OFFSETS = Object.freeze([
+  [-0.34, -0.24, 0.82],
+  [-0.16, 0.08, 0.66],
+  [-0.06, -0.34, 0.58],
+  [0.12, -0.08, 0.9],
+  [0.24, 0.22, 0.72],
+  [0.38, -0.18, 0.64],
+  [0.02, 0.3, 0.78]
+]);
+const FLOWER_PLAYER_REACT_RADIUS = 1.26;
+const FLOWER_PLAYER_REACT_OFFSET = 0.34;
+const FLOWER_PLAYER_REACT_SCALE = 0.34;
+const FLOWER_AMBIENT_WOBBLE = 0.055;
+const LEPPA_TREE_DANCE_SWAY = 0.28;
+const LEPPA_TREE_DANCE_SPEED = 0.0056;
+const LEPPA_TREE_MUSIC_NOTE_EMIT_INTERVAL = 0.36;
+const LEPPA_TREE_MUSIC_NOTE_MAX_PARTICLES = 12;
+const LEPPA_TREE_MUSIC_NOTE_BURST_COUNT = 3;
+const LEPPA_TREE_MUSIC_NOTE_DURATION = 2.45;
+const LEPPA_TREE_MUSIC_NOTE_BASE_HEIGHT = 1.72;
+const LEPPA_TREE_MUSIC_NOTE_IMAGE_ASPECTS = Object.freeze([
+  190 / 235,
+  97 / 227,
+  130 / 247
+]);
+const LEPPA_TREE_MISSION_PARTICLE_COUNT = 9;
+const LEPPA_TREE_MISSION_PARTICLE_RADIUS = 0.72;
+const LEPPA_TREE_MISSION_PARTICLE_BASE_HEIGHT = 0.62;
+const LEPPA_TREE_MISSION_PARTICLE_HEIGHT = 1.64;
 const FPS_PANEL_UPDATE_INTERVAL = 0.25;
 const CAMERA_DEBUG_ENABLED = (() => {
   try {
@@ -130,15 +185,20 @@ function getTallGrassInstanceScale(tallGrassModel, groundGrassPatch, revivalScal
 
 function getTallGrassYaw(groundGrassPatch) {
   const seed = `${groundGrassPatch?.cellId || ""}:${groundGrassPatch?.id || ""}`;
+  const hash = getStableHash(seed);
+  const quarterTurn = (hash % 4) * Math.PI * 0.5;
+  const smallTurn = ((hash % 13) - 6) * 0.035;
+  return quarterTurn + smallTurn;
+}
+
+function getStableHash(seed) {
   let hash = 0;
 
   for (let index = 0; index < seed.length; index += 1) {
     hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
   }
 
-  const quarterTurn = (hash % 4) * Math.PI * 0.5;
-  const smallTurn = ((hash % 13) - 6) * 0.035;
-  return quarterTurn + smallTurn;
+  return hash;
 }
 
 function getTallGrassSway(groundGrassPatch, shouldRustle, now) {
@@ -146,6 +206,55 @@ function getTallGrassSway(groundGrassPatch, shouldRustle, now) {
   const ambient = Math.sin(now * 0.0018 + position[0] * 0.63 + position[2] * 0.41) * 0.018;
   const rustle = shouldRustle ? Math.sin(now * 0.024) * 0.09 : 0;
   return ambient + rustle;
+}
+
+function getFlowerArrangementBillboards({
+  groundFlowerPatch,
+  texture,
+  playerPosition,
+  revivalScale,
+  now
+}) {
+  if (!groundFlowerPatch?.position || !texture) {
+    return [];
+  }
+
+  const [patchX, patchY, patchZ] = groundFlowerPatch.position;
+  const seedHash = getStableHash(`${groundFlowerPatch.cellId || ""}:${groundFlowerPatch.id || ""}`);
+  const playerDeltaX = Array.isArray(playerPosition) ? patchX - playerPosition[0] : 0;
+  const playerDeltaZ = Array.isArray(playerPosition) ? patchZ - playerPosition[2] : 0;
+  const playerDistance = Array.isArray(playerPosition) ?
+    Math.hypot(playerDeltaX, playerDeltaZ) :
+    Infinity;
+  const playerDirectionX = playerDistance > 0.001 ? playerDeltaX / playerDistance : 0;
+  const playerDirectionZ = playerDistance > 0.001 ? playerDeltaZ / playerDistance : 1;
+  const playerReact = Math.max(
+    0,
+    1 - playerDistance / FLOWER_PLAYER_REACT_RADIUS
+  );
+  const playerReactStrength = playerReact * playerReact;
+
+  return FLOWER_ARRANGEMENT_OFFSETS.map(([offsetX, offsetZ, scale], index) => {
+    const jitterHash = getStableHash(`${seedHash}:${index}`);
+    const jitterX = (((jitterHash % 11) - 5) / 5) * 0.045;
+    const jitterZ = ((((jitterHash >> 4) % 11) - 5) / 5) * 0.045;
+    const phase = (seedHash % 97) * 0.09 + index * 1.47;
+    const wobble = Math.sin(now * 0.0042 + phase) * FLOWER_AMBIENT_WOBBLE;
+    const scatter = FLOWER_PLAYER_REACT_OFFSET * playerReactStrength * (0.68 + scale * 0.28);
+    const lift = Math.sin(playerReactStrength * Math.PI) * 0.08;
+    const arrangementScale = scale * revivalScale * (1 + FLOWER_PLAYER_REACT_SCALE * playerReactStrength);
+
+    return {
+      texture,
+      position: [
+        patchX + offsetX + jitterX + playerDirectionX * scatter,
+        patchY + lift + index * 0.002,
+        patchZ + offsetZ + jitterZ + playerDirectionZ * scatter
+      ],
+      size: groundFlowerPatch.size.map((value) => value * arrangementScale),
+      rotation: wobble + playerReactStrength * 0.26 * (index % 2 === 0 ? 1 : -1)
+    };
+  });
 }
 
 function getGrassPlayerBend(groundGrassPatch, playerPosition) {
@@ -198,6 +307,13 @@ function easeOutCubic(value) {
 
 function lerp(start, end, progress) {
   return start + (end - start) * progress;
+}
+
+function isOpeningLeppaTreeRequestActive(storyState) {
+  return Boolean(
+    storyState?.flags?.squirtleLeppaRequestAvailable &&
+    !storyState.flags.leppaTreeRevived
+  );
 }
 
 function getShortestAngleDelta(fromAngle, toAngle) {
@@ -263,6 +379,7 @@ export function startGameLoop({
     cameraOrbit
   });
   const fpsPanelController = createFpsPanelController(fpsPanel);
+  let repairBoxElapsed = 0;
   let cameraDebugElement = null;
   const cameraDebugErrors = [];
 
@@ -365,22 +482,250 @@ export function startGameLoop({
 
     session.actTwoSquirtle.modelInstance.offset = [...session.actTwoSquirtle.position];
     session.actTwoSquirtle.modelInstance.scale = ROBOT_MODEL_SCALE;
+    if (session.actTwoSquirtle.repairModuleInstance) {
+      syncRepairBoxInstance(
+        session.actTwoSquirtle.repairModuleInstance,
+        session.actTwoSquirtle.position,
+        Boolean(
+          !session.actTwoSquirtle.recovered &&
+          session.actTwoSquirtle.assemblyState !== "assembled" &&
+          !session.actTwoSquirtle.reassembly?.active
+        )
+      );
+    }
     syncInteractablePosition("squirtle", session.actTwoSquirtle.position);
+  }
+
+  function getRepairBoxFloatOffset(position) {
+    const bob = Math.sin(repairBoxElapsed * ROBOT_REPAIR_BOX_BOB_SPEED) * ROBOT_REPAIR_BOX_BOB_HEIGHT;
+    return [
+      position[0],
+      position[1] + ROBOT_REPAIR_BOX_FLOAT_HEIGHT + bob,
+      position[2]
+    ];
+  }
+
+  function getEncounterRepairBoxPosition(encounter) {
+    return encounter?.repairBoxPosition || encounter?.repairPosition || null;
+  }
+
+  function getEncounterRepairBoxOpeningProgress(encounter) {
+    const revealBoxOpening = encounter?.revealBoxOpening;
+
+    if (!revealBoxOpening?.active) {
+      return 0;
+    }
+
+    return clamp01(Number(revealBoxOpening.elapsed || 0) / Number(revealBoxOpening.duration || 1));
+  }
+
+  function syncRepairBoxInstance(instance, basePosition, active, { openingProgress = 0 } = {}) {
+    if (!instance || !Array.isArray(basePosition)) {
+      return;
+    }
+
+    const opened = easeOutCubic(openingProgress);
+
+    instance.baseOffset = [...basePosition];
+    instance.offset = getRepairBoxFloatOffset(basePosition);
+    instance.repairBoxBaseYaw ??= Number(instance.yaw || 0);
+    instance.repairBoxBaseScale ??= Number(instance.scale || 1);
+    instance.scale = instance.repairBoxBaseScale;
+    instance.yaw = instance.repairBoxBaseYaw + repairBoxElapsed * ROBOT_REPAIR_BOX_SPIN_SPEED;
+    instance.pitch = ROBOT_REPAIR_BOX_MODEL_PITCH_OFFSET;
+    instance.roll = 0;
+
+    if (opened > 0) {
+      instance.repairBoxOpenYaw ??= instance.yaw;
+      instance.yaw = instance.repairBoxOpenYaw;
+      instance.pitch = ROBOT_REPAIR_BOX_MODEL_PITCH_OFFSET - ROBOT_REPAIR_BOX_OPEN_PITCH * opened;
+      instance.roll = ROBOT_REPAIR_BOX_OPEN_ROLL * opened;
+      instance.offset = [
+        instance.offset[0],
+        instance.offset[1] + ROBOT_REPAIR_BOX_OPEN_LIFT * opened,
+        instance.offset[2] + ROBOT_REPAIR_BOX_OPEN_BACKSTEP * opened
+      ];
+      instance.scale = instance.repairBoxBaseScale * (1 - 0.08 * opened);
+    } else {
+      instance.repairBoxOpenYaw = null;
+    }
+
+    instance.active = Boolean(active);
+  }
+
+  function syncDismantledEncounterModule(encounter) {
+    if (!encounter?.repairModuleInstance) {
+      return;
+    }
+
+    const openingProgress = getEncounterRepairBoxOpeningProgress(encounter);
+
+    syncRepairBoxInstance(
+      encounter.repairModuleInstance,
+      getEncounterRepairBoxPosition(encounter),
+      openingProgress > 0 || !encounter.visible,
+      { openingProgress }
+    );
   }
 
   function syncBulbasaurModelInstance() {
     const encounter = session.bulbasaurEncounter;
 
     if (!encounter?.modelInstance) {
+      syncDismantledEncounterModule(encounter);
       return;
     }
 
+    syncDismantledEncounterModule(encounter);
     encounter.modelInstance.active = Boolean(encounter.visible && Array.isArray(encounter.position));
     encounter.modelInstance.scale = BULBASAUR_ROBOT_MODEL_SCALE;
 
     if (Array.isArray(encounter.position)) {
       encounter.modelInstance.offset = [...encounter.position];
     }
+  }
+
+  function syncCompanionRepairModules() {
+    syncDismantledEncounterModule(session.charmanderEncounter);
+    syncDismantledEncounterModule(session.timburrEncounter);
+  }
+
+  function isBeeFieldRestored() {
+    return (controls.storyState?.flags?.restoredFlowerBedHabitatIds || [])
+      .includes(BEE_FIELD_FLOWER_GROUP_ID);
+  }
+
+  function syncBeeFieldRepairBox() {
+    const beeFieldRepairBox = session.beeFieldRepairBox;
+
+    if (!beeFieldRepairBox) {
+      return;
+    }
+
+    const basePosition = beeFieldRepairBox.baseOffset || beeFieldRepairBox.offset;
+    const unlocked = isBeeFieldRestored();
+    const opened = Boolean(controls.storyState?.flags?.beeFieldRepairBoxOpened);
+
+    syncRepairBoxInstance(
+      beeFieldRepairBox,
+      basePosition,
+      true,
+      { openingProgress: opened ? 1 : 0 }
+    );
+    syncInteractablePosition("beeFieldRepairBox", basePosition);
+    beeFieldRepairBox.alpha = unlocked ? 1 : BEE_FIELD_REPAIR_BOX_LOCKED_ALPHA;
+    beeFieldRepairBox.tint = unlocked && !opened ? REPAIR_BOX_ACTIVE_TINT : null;
+    beeFieldRepairBox.tintStrength = unlocked && !opened ? REPAIR_BOX_ACTIVE_TINT_STRENGTH : 0;
+  }
+
+  function syncActiveRepairBoxHighlight() {
+    const repairModuleInstances = [
+      session.actTwoSquirtle?.repairModuleInstance,
+      session.bulbasaurEncounter?.repairModuleInstance,
+      session.charmanderEncounter?.repairModuleInstance,
+      session.timburrEncounter?.repairModuleInstance
+    ];
+    let highlighted = false;
+
+    for (const repairModuleInstance of repairModuleInstances) {
+      if (!repairModuleInstance) {
+        continue;
+      }
+
+      if (!highlighted && repairModuleInstance.active) {
+        repairModuleInstance.tint = REPAIR_BOX_ACTIVE_TINT;
+        repairModuleInstance.tintStrength = REPAIR_BOX_ACTIVE_TINT_STRENGTH;
+        repairModuleInstance.alpha = 1;
+        highlighted = true;
+        continue;
+      }
+
+      repairModuleInstance.tint = null;
+      repairModuleInstance.tintStrength = 0;
+      repairModuleInstance.alpha = repairModuleInstance.active ? REPAIR_BOX_INACTIVE_ALPHA : 1;
+    }
+  }
+
+  function getSelectedRepairBoxParticleTarget() {
+    const repairModuleInstances = [
+      session.actTwoSquirtle?.repairModuleInstance,
+      session.bulbasaurEncounter?.repairModuleInstance,
+      session.charmanderEncounter?.repairModuleInstance,
+      session.timburrEncounter?.repairModuleInstance
+    ];
+    const selectedRepairModule = repairModuleInstances.find((instance) => {
+      return instance?.active && Array.isArray(instance.offset);
+    });
+
+    return selectedRepairModule ?
+      {
+        id: `${selectedRepairModule.id}-rustling-particles`,
+        position: [...selectedRepairModule.offset]
+      } :
+      null;
+  }
+
+  function getRepairBoxPromptPosition(encounter) {
+    const basePosition =
+      getEncounterRepairBoxPosition(encounter) ||
+      encounter?.repairModuleInstance?.baseOffset ||
+      encounter?.repairModuleInstance?.offset;
+
+    return Array.isArray(basePosition) ? [...basePosition] : null;
+  }
+
+  function getNearbyRepairBoxPrompt(playerPosition) {
+    if (!Array.isArray(playerPosition)) {
+      return null;
+    }
+
+    const repairBoxTargets = [
+      {
+        name: "Squirtle",
+        encounter: session.actTwoSquirtle
+      },
+      {
+        name: "Bulbasaur",
+        encounter: session.bulbasaurEncounter
+      },
+      {
+        name: "Charmander",
+        encounter: session.charmanderEncounter
+      },
+      {
+        name: "Timburr",
+        encounter: session.timburrEncounter
+      }
+    ];
+    let nearestPrompt = null;
+    let nearestDistance = Infinity;
+
+    for (const repairBoxTarget of repairBoxTargets) {
+      if (!repairBoxTarget?.encounter?.repairModuleInstance?.active) {
+        continue;
+      }
+
+      const worldPosition = getRepairBoxPromptPosition(repairBoxTarget.encounter);
+
+      if (!worldPosition) {
+        continue;
+      }
+
+      const distance = Math.hypot(
+        playerPosition[0] - worldPosition[0],
+        playerPosition[2] - worldPosition[2]
+      );
+
+      if (distance <= REPAIR_BOX_PROMPT_DISTANCE && distance < nearestDistance) {
+        nearestPrompt = {
+          text: repairBoxTarget.name,
+          worldPosition
+        };
+        nearestDistance = distance;
+      }
+    }
+
+    return nearestPrompt;
   }
 
   function syncInteractablePosition(interactableId, position) {
@@ -558,9 +903,53 @@ export function startGameLoop({
     );
   }
 
+  function moveGroundCompanionTowardPlayer(companion, {
+    deltaTime,
+    speed,
+    followDistance,
+    modelFaceYawOffset = null
+  }) {
+    if (
+      !companion ||
+      !session.playerCharacter ||
+      !Array.isArray(companion.position)
+    ) {
+      return false;
+    }
+
+    const playerPosition = session.playerCharacter.getPosition();
+    const deltaX = playerPosition[0] - companion.position[0];
+    const deltaZ = playerPosition[2] - companion.position[2];
+    const distance = Math.hypot(deltaX, deltaZ);
+
+    companion.patrol = null;
+
+    if (distance <= followDistance || distance <= 0.001) {
+      return true;
+    }
+
+    const travel = Math.min(speed * deltaTime, distance - followDistance);
+    const previousPosition = [...companion.position];
+    companion.position = [
+      companion.position[0] + (deltaX / distance) * travel,
+      0.04,
+      companion.position[2] + (deltaZ / distance) * travel
+    ];
+
+    if (companion.modelInstance && modelFaceYawOffset !== null) {
+      companion.modelInstance.yaw = getRobotModelYawToward(
+        previousPosition,
+        companion.position,
+        modelFaceYawOffset
+      );
+    }
+
+    return true;
+  }
+
   function updateSquirtleIdlePatrol(deltaTime, { active }) {
     const squirtle = session.actTwoSquirtle;
-    const canPatrol = Boolean(
+    const canMove = Boolean(
       active &&
       squirtle?.recovered &&
       squirtle.assemblyState === "assembled" &&
@@ -568,10 +957,21 @@ export function startGameLoop({
       getSquirtleWaterGunQueue().length === 0
     );
 
-    if (!canPatrol) {
+    if (!canMove) {
       if (squirtle) {
         squirtle.patrol = null;
       }
+      syncSquirtleModelInstance();
+      return;
+    }
+
+    if (controls.storyState?.flags?.squirtleFollowing) {
+      moveGroundCompanionTowardPlayer(squirtle, {
+        deltaTime,
+        speed: SQUIRTLE_FOLLOW_SPEED,
+        followDistance: SQUIRTLE_FOLLOW_DISTANCE,
+        modelFaceYawOffset: SQUIRTLE_MODEL_FACE_YAW_OFFSET
+      });
       syncSquirtleModelInstance();
       return;
     }
@@ -600,6 +1000,7 @@ export function startGameLoop({
       encounter?.visible &&
       Array.isArray(encounter.position) &&
       !session.bulbasaurLeafageAction &&
+      !encounter.revealBoxOpening?.active &&
       !workbenchGuideActive &&
       !jumpActive
     );
@@ -608,6 +1009,17 @@ export function startGameLoop({
       if (encounter) {
         encounter.patrol = null;
       }
+      syncBulbasaurModelInstance();
+      return;
+    }
+
+    if (controls.storyState?.flags?.bulbasaurFollowing) {
+      moveGroundCompanionTowardPlayer(encounter, {
+        deltaTime,
+        speed: BULBASAUR_FOLLOW_SPEED,
+        followDistance: BULBASAUR_FOLLOW_DISTANCE,
+        modelFaceYawOffset: BULBASAUR_MODEL_FACE_YAW_OFFSET
+      });
       syncBulbasaurModelInstance();
       return;
     }
@@ -1230,43 +1642,165 @@ export function startGameLoop({
     return [...targetIds];
   }
 
+  function revealBulbasaurAtRepairPosition(encounter) {
+    if (!encounter || !Array.isArray(encounter.repairPosition)) {
+      return false;
+    }
+
+    encounter.visible = true;
+    encounter.jumpTimer = 0;
+    encounter.originPosition = null;
+    encounter.landingPosition = null;
+    encounter.position = [...encounter.repairPosition];
+    return true;
+  }
+
+  function updateBulbasaurRevealBoxOpening(deltaTime, encounter) {
+    const opening = encounter?.revealBoxOpening;
+
+    if (!opening?.active) {
+      return false;
+    }
+
+    if (!Array.isArray(encounter.repairPosition)) {
+      opening.active = false;
+      return false;
+    }
+
+    opening.duration = Number(opening.duration || BULBASAUR_REVEAL_BOX_DURATION);
+    opening.elapsed = Math.min(opening.duration, Number(opening.elapsed || 0) + deltaTime);
+    const progress = clamp01(opening.elapsed / opening.duration);
+
+    if (progress >= BULBASAUR_REVEAL_VISIBLE_PROGRESS && !opening.bulbasaurVisible) {
+      revealBulbasaurAtRepairPosition(encounter);
+      opening.bulbasaurVisible = true;
+    }
+
+    if (progress >= 1) {
+      revealBulbasaurAtRepairPosition(encounter);
+      if (encounter.repairModuleInstance) {
+        encounter.repairModuleInstance.active = false;
+      }
+      opening.active = false;
+      const onComplete = opening.onComplete;
+      opening.onComplete = null;
+      encounter.revealBoxOpening = null;
+      syncBulbasaurModelInstance();
+      if (typeof onComplete === "function") {
+        onComplete();
+      }
+      return true;
+    }
+
+    syncBulbasaurModelInstance();
+    return true;
+  }
+
+  function getWorkbenchRampCollider() {
+    return (session.elevatedTerrainColliders || [])
+      .find((collider) => collider?.id === BULBASAUR_WORKBENCH_GUIDE_RAMP_COLLIDER_ID) || null;
+  }
+
+  function getBulbasaurWorkbenchGuidePath() {
+    const rampCollider = getWorkbenchRampCollider();
+
+    if (!rampCollider?.position || !rampCollider?.size) {
+      return [[...WORKBENCH_POSITION]];
+    }
+
+    const padding = rampCollider.padding ?? 0;
+    const halfX = (rampCollider.size[0] || 0) * 0.5 + padding;
+    const halfZ = (rampCollider.size[2] || 0) * 0.5 + padding;
+    const groundY = WORKBENCH_POSITION[1];
+    const rampY = rampCollider.surfaceY ?? groundY;
+    const approachX =
+      rampCollider.position[0] - halfX - BULBASAUR_WORKBENCH_GUIDE_SIDE_APPROACH_MARGIN;
+    const approachZ =
+      rampCollider.position[2] - halfZ - BULBASAUR_WORKBENCH_GUIDE_RAMP_APPROACH_MARGIN;
+
+    return [
+      [approachX, groundY, approachZ],
+      [rampCollider.position[0], groundY, approachZ],
+      [rampCollider.position[0], rampY, rampCollider.position[2]]
+    ];
+  }
+
+  function advanceBulbasaurAlongWorkbenchGuide(deltaTime, encounter) {
+    const path = getBulbasaurWorkbenchGuidePath();
+    const waypointIndex = Math.min(
+      Math.max(0, encounter.workbenchGuideWaypointIndex || 0),
+      path.length - 1
+    );
+    const currentPosition =
+      encounter.position ||
+      encounter.landingPosition ||
+      BULBASAUR_WORKBENCH_GUIDE_START;
+    const targetPosition = path[waypointIndex];
+    const deltaX = targetPosition[0] - currentPosition[0];
+    const deltaZ = targetPosition[2] - currentPosition[2];
+    const distance = Math.hypot(deltaX, deltaZ);
+    const step = BULBASAUR_WORKBENCH_GUIDE_SPEED * deltaTime;
+
+    encounter.visible = true;
+    encounter.jumpTimer = 0;
+    encounter.originPosition = null;
+    encounter.landingPosition = null;
+
+    if (distance <= step || distance <= BULBASAUR_WORKBENCH_GUIDE_WAYPOINT_DISTANCE) {
+      encounter.position = [...targetPosition];
+      if (waypointIndex < path.length - 1) {
+        encounter.workbenchGuideWaypointIndex = waypointIndex + 1;
+      }
+    } else {
+      const progress = step / distance;
+      encounter.position = [
+        currentPosition[0] + deltaX * progress,
+        currentPosition[1] + (targetPosition[1] - currentPosition[1]) * progress,
+        currentPosition[2] + deltaZ * progress
+      ];
+      encounter.workbenchGuideWaypointIndex = waypointIndex;
+    }
+
+    if (encounter.modelInstance && distance > 0.001) {
+      encounter.modelInstance.yaw = getRobotModelYawToward(
+        currentPosition,
+        targetPosition,
+        BULBASAUR_MODEL_FACE_YAW_OFFSET
+      );
+    }
+  }
+
   function updateBulbasaurEncounter(deltaTime) {
     const encounter = session.bulbasaurEncounter;
+
+    if (updateBulbasaurRevealBoxOpening(deltaTime, encounter)) {
+      return;
+    }
+
+    if (
+      controls.storyState?.flags?.bulbasaurRevealed &&
+      encounter &&
+      !encounter.visible &&
+      Array.isArray(encounter.repairPosition)
+    ) {
+      revealBulbasaurAtRepairPosition(encounter);
+      if (encounter.repairModuleInstance) {
+        encounter.repairModuleInstance.active = false;
+      }
+    }
 
     if (
       controls.storyState?.flags?.bulbasaurWorkbenchGuideAvailable &&
       !controls.storyState?.flags?.workbenchDiyRecipesReceived &&
       encounter
     ) {
-      const currentPosition =
-        encounter.position ||
-        encounter.landingPosition ||
-        BULBASAUR_WORKBENCH_GUIDE_START;
-      const deltaX = BULBASAUR_WORKBENCH_GUIDE_TARGET[0] - currentPosition[0];
-      const deltaZ = BULBASAUR_WORKBENCH_GUIDE_TARGET[2] - currentPosition[2];
-      const distance = Math.hypot(deltaX, deltaZ);
-      const step = BULBASAUR_WORKBENCH_GUIDE_SPEED * deltaTime;
-
-      encounter.visible = true;
-      encounter.jumpTimer = 0;
-      encounter.originPosition = null;
-      encounter.landingPosition = null;
-      encounter.position = distance <= step || distance <= 0.001 ?
-        [...BULBASAUR_WORKBENCH_GUIDE_TARGET] :
-        [
-          currentPosition[0] + (deltaX / distance) * step,
-          BULBASAUR_WORKBENCH_GUIDE_TARGET[1],
-          currentPosition[2] + (deltaZ / distance) * step
-        ];
-      if (encounter.modelInstance) {
-        encounter.modelInstance.yaw = getRobotModelYawToward(
-          currentPosition,
-          BULBASAUR_WORKBENCH_GUIDE_TARGET,
-          BULBASAUR_MODEL_FACE_YAW_OFFSET
-        );
-      }
+      advanceBulbasaurAlongWorkbenchGuide(deltaTime, encounter);
       syncBulbasaurModelInstance();
       return;
+    }
+
+    if (encounter) {
+      encounter.workbenchGuideWaypointIndex = 0;
     }
 
     if (!encounter?.visible || !encounter.position) {
@@ -1325,32 +1859,13 @@ export function startGameLoop({
     if (
       controls.storyState.flags.charmanderFollowing &&
       session.playerCharacter &&
-      (
-        !controls.storyState.flags.charmanderCampfireLit ||
-        (
-          controls.storyState.flags.leafDenKitPlaced &&
-          !controls.storyState.flags.leafDenConstructionStarted
-        ) ||
-        (
-          controls.storyState.flags.charmanderCelebrationSuggested &&
-          !controls.storyState.flags.charmanderCelebrationComplete
-        )
-      )
+      !controls.storyState.flags.leafDenConstructionStarted
     ) {
-      const playerPosition = session.playerCharacter.getPosition();
-      const deltaX = playerPosition[0] - encounter.position[0];
-      const deltaZ = playerPosition[2] - encounter.position[2];
-      const distance = Math.hypot(deltaX, deltaZ);
-      const step = CHARMANDER_FOLLOW_SPEED * deltaTime;
-
-      if (distance > CHARMANDER_FOLLOW_DISTANCE && distance > 0.001) {
-        const travel = Math.min(step, distance - CHARMANDER_FOLLOW_DISTANCE);
-        encounter.position = [
-          encounter.position[0] + (deltaX / distance) * travel,
-          0.04,
-          encounter.position[2] + (deltaZ / distance) * travel
-        ];
-      }
+      moveGroundCompanionTowardPlayer(encounter, {
+        deltaTime,
+        speed: CHARMANDER_FOLLOW_SPEED,
+        followDistance: CHARMANDER_FOLLOW_DISTANCE
+      });
     }
 
     if (
@@ -1390,20 +1905,11 @@ export function startGameLoop({
       session.playerCharacter &&
       !controls.storyState.flags.leafDenConstructionStarted
     ) {
-      const playerPosition = session.playerCharacter.getPosition();
-      const deltaX = playerPosition[0] - encounter.position[0];
-      const deltaZ = playerPosition[2] - encounter.position[2];
-      const distance = Math.hypot(deltaX, deltaZ);
-      const step = TIMBURR_FOLLOW_SPEED * deltaTime;
-
-      if (distance > TIMBURR_FOLLOW_DISTANCE && distance > 0.001) {
-        const travel = Math.min(step, distance - TIMBURR_FOLLOW_DISTANCE);
-        encounter.position = [
-          encounter.position[0] + (deltaX / distance) * travel,
-          0.04,
-          encounter.position[2] + (deltaZ / distance) * travel
-        ];
-      }
+      moveGroundCompanionTowardPlayer(encounter, {
+        deltaTime,
+        speed: TIMBURR_FOLLOW_SPEED,
+        followDistance: TIMBURR_FOLLOW_DISTANCE
+      });
     }
   }
 
@@ -1429,6 +1935,188 @@ export function startGameLoop({
     flags.rustlingGrassCellId = flags.pendingRustlingGrassCellId;
     delete flags.pendingRustlingGrassCellId;
     delete flags.rustlingGrassDelay;
+  }
+
+  function updateLeppaTreeDance(now) {
+    const leppaTree = session.leppaTree;
+    const deadInstance = leppaTree?.deadInstance;
+
+    if (!deadInstance) {
+      return;
+    }
+
+    if (!leppaTree.revived) {
+      deadInstance.swayStrength = 0;
+      return;
+    }
+
+    deadInstance.swayStrength = Math.sin(now * LEPPA_TREE_DANCE_SPEED) * LEPPA_TREE_DANCE_SWAY;
+  }
+
+  function createLeppaTreeMusicNoteParticle(leppaTree, textureCount) {
+    const state = leppaTree.musicNotes;
+    const index = state.nextIndex % textureCount;
+    state.nextIndex += 1;
+
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 0.24 + Math.random() * 0.58;
+    const height = LEPPA_TREE_MUSIC_NOTE_BASE_HEIGHT + Math.random() * 0.54;
+    const lateralSpeed = 0.12 + Math.random() * 0.1;
+
+    return {
+      age: 0,
+      duration: LEPPA_TREE_MUSIC_NOTE_DURATION * (0.86 + Math.random() * 0.28),
+      textureIndex: index,
+      position: [
+        leppaTree.position[0] + Math.cos(angle) * radius,
+        leppaTree.position[1] + height,
+        leppaTree.position[2] + Math.sin(angle) * radius
+      ],
+      drift: [
+        Math.cos(angle) * lateralSpeed,
+        0.54 + Math.random() * 0.28,
+        Math.sin(angle) * lateralSpeed
+      ],
+      size: 0.42 + Math.random() * 0.16,
+      rotation: (Math.random() - 0.5) * 0.32,
+      rotationSpeed: (Math.random() - 0.5) * 0.42,
+      phase: Math.random() * Math.PI * 2
+    };
+  }
+
+  function resetLeppaTreeMusicNotes(leppaTree) {
+    if (!leppaTree?.musicNotes) {
+      return;
+    }
+
+    leppaTree.musicNotes.active = false;
+    leppaTree.musicNotes.emitTimer = 0;
+    leppaTree.musicNotes.particles.length = 0;
+  }
+
+  function updateLeppaTreeMusicNotes(deltaTime) {
+    const leppaTree = session.leppaTree;
+    const textures = session.leppaTreeMusicalNoteTextures || [];
+
+    if (!leppaTree?.revived || !Array.isArray(leppaTree.position) || textures.length === 0) {
+      resetLeppaTreeMusicNotes(leppaTree);
+      return;
+    }
+
+    leppaTree.musicNotes ||= {
+      active: false,
+      emitTimer: 0,
+      nextIndex: 0,
+      particles: []
+    };
+
+    if (!leppaTree.musicNotes.active) {
+      leppaTree.musicNotes.active = true;
+      for (let index = 0; index < LEPPA_TREE_MUSIC_NOTE_BURST_COUNT; index += 1) {
+        leppaTree.musicNotes.particles.push(
+          createLeppaTreeMusicNoteParticle(leppaTree, textures.length)
+        );
+      }
+    }
+
+    leppaTree.musicNotes.emitTimer += deltaTime;
+    while (
+      leppaTree.musicNotes.emitTimer >= LEPPA_TREE_MUSIC_NOTE_EMIT_INTERVAL &&
+      leppaTree.musicNotes.particles.length < LEPPA_TREE_MUSIC_NOTE_MAX_PARTICLES
+    ) {
+      leppaTree.musicNotes.emitTimer -= LEPPA_TREE_MUSIC_NOTE_EMIT_INTERVAL;
+      leppaTree.musicNotes.particles.push(
+        createLeppaTreeMusicNoteParticle(leppaTree, textures.length)
+      );
+    }
+    leppaTree.musicNotes.emitTimer = Math.min(
+      leppaTree.musicNotes.emitTimer,
+      LEPPA_TREE_MUSIC_NOTE_EMIT_INTERVAL
+    );
+
+    for (let index = leppaTree.musicNotes.particles.length - 1; index >= 0; index -= 1) {
+      const particle = leppaTree.musicNotes.particles[index];
+      particle.age += deltaTime;
+
+      if (particle.age >= particle.duration) {
+        leppaTree.musicNotes.particles.splice(index, 1);
+        continue;
+      }
+
+      particle.position[0] += particle.drift[0] * deltaTime;
+      particle.position[1] += particle.drift[1] * deltaTime;
+      particle.position[2] += particle.drift[2] * deltaTime;
+      particle.rotation += particle.rotationSpeed * deltaTime;
+    }
+  }
+
+  function getLeppaTreeMusicNoteBillboards(leppaTree, textures, uvRect, now) {
+    if (!leppaTree?.revived || !Array.isArray(textures) || textures.length === 0) {
+      return [];
+    }
+
+    const particles = leppaTree.musicNotes?.particles || [];
+
+    return particles.map((particle) => {
+      const progress = clamp01(particle.age / particle.duration);
+      const textureIndex = particle.textureIndex % textures.length;
+      const aspect = LEPPA_TREE_MUSIC_NOTE_IMAGE_ASPECTS[textureIndex] || 1;
+      const height = particle.size * (1 + progress * 0.22);
+      const fadeIn = clamp01(progress / 0.18);
+      const fadeOut = clamp01((1 - progress) / 0.32);
+      const floatWobble = Math.sin(now * 0.0024 + particle.phase) * 0.045;
+
+      return {
+        texture: textures[textureIndex],
+        position: [
+          particle.position[0] + Math.sin(now * 0.0016 + particle.phase) * 0.045,
+          particle.position[1],
+          particle.position[2] + Math.cos(now * 0.0014 + particle.phase) * 0.045
+        ],
+        size: [height * aspect, height],
+        uvRect,
+        alpha: fadeIn * fadeOut,
+        rotation: particle.rotation + floatWobble
+      };
+    });
+  }
+
+  function getLeppaTreeMissionParticleBillboards(leppaTree, texture, uvRect, now, storyState) {
+    if (
+      !isOpeningLeppaTreeRequestActive(storyState) ||
+      !Array.isArray(leppaTree?.position) ||
+      !texture
+    ) {
+      return [];
+    }
+
+    const time = now * 0.001;
+    const [treeX, treeY, treeZ] = leppaTree.position;
+
+    return Array.from({ length: LEPPA_TREE_MISSION_PARTICLE_COUNT }, (_, index) => {
+      const cycle = (time * 0.38 + index * 0.137) % 1;
+      const angle = time * (0.68 + (index % 3) * 0.08) + index * 2.399;
+      const radius =
+        LEPPA_TREE_MISSION_PARTICLE_RADIUS *
+        (0.54 + (index % 4) * 0.12 + Math.sin(time * 1.7 + index) * 0.035);
+      const fadeIn = clamp01(cycle / 0.22);
+      const fadeOut = clamp01((1 - cycle) / 0.28);
+      const pulse = 0.82 + Math.sin(time * 5.2 + index * 1.31) * 0.18;
+      const size = (0.15 + (index % 3) * 0.024) * pulse * (1 - cycle * 0.18);
+
+      return {
+        texture,
+        position: [
+          treeX + Math.cos(angle) * radius,
+          treeY + LEPPA_TREE_MISSION_PARTICLE_BASE_HEIGHT + cycle * LEPPA_TREE_MISSION_PARTICLE_HEIGHT,
+          treeZ + Math.sin(angle) * radius
+        ],
+        size: [size, size],
+        uvRect,
+        alpha: fadeIn * fadeOut,
+        rotation: angle * 0.18
+      };
+    });
   }
 
   function getRustlingGrassParticleBillboards(groundGrassPatch, texture, now, uvRect) {
@@ -1463,6 +2151,7 @@ export function startGameLoop({
     const deltaTime = Math.min(0.033, rawDeltaTime);
     previousTime = now;
     fpsPanelController.update(rawDeltaTime);
+    repairBoxElapsed += deltaTime;
     let cinematicActive = isGameFlow(gameFlowValues.CINEMATIC);
     const introActive = isGameFlow(gameFlowValues.INTRO);
     let tutorialActive = isGameFlow(gameFlowValues.TUTORIAL);
@@ -1712,12 +2401,9 @@ export function startGameLoop({
       controls.playerSkills?.leafage &&
       activeMoveId === "leafage"
     );
-    const isWaterGunTreeChallengeTarget = (target) => Boolean(
+    const isWaterGunTreeTarget = (target) => Boolean(
       waterGunEquipped &&
-      target?.palm &&
-      controls.storyState.flags.bulbasaurStrawBedChallengeAvailable &&
-      !controls.storyState.flags.bulbasaurStrawBedChallengeComplete &&
-      !controls.storyState.flags.strawBedRecipeUnlocked
+      target?.palm
     );
 
     function performHarvestAction(playerPosition, options = {}) {
@@ -1786,9 +2472,18 @@ export function startGameLoop({
       const primaryActionPlacementBlocked = primaryActionPlacementTarget && gamepadPrimaryMoveRequested;
       const primaryActionIsMove = Boolean(
         (waterGunEquipped && primaryActionTarget?.groundCell) ||
-        isWaterGunTreeChallengeTarget(primaryActionTarget) ||
+        isWaterGunTreeTarget(primaryActionTarget) ||
         (leafageEquipped && primaryActionTarget?.leafageGroundCell)
       );
+      if (
+        waterGunEquipped &&
+        (
+          harvestRequestSource === "gamepadPrimary" ||
+          harvestRequestSource === "keyboardPrimary"
+        )
+      ) {
+        controls.storyState.flags[WATER_GUN_FIRST_USE_PROMPT_FLAG] = true;
+      }
       const primaryInteractTarget =
         !dialogueActive &&
         !primaryActionIsPlacement &&
@@ -1825,7 +2520,7 @@ export function startGameLoop({
               forcedHarvestTarget: primaryActionTarget
             });
           }
-        } else if (isWaterGunTreeChallengeTarget(primaryActionTarget)) {
+        } else if (isWaterGunTreeTarget(primaryActionTarget)) {
           performHarvestAction(playerPosition, {
             useWaterGun: true,
             forcedHarvestTarget: primaryActionTarget
@@ -1930,10 +2625,7 @@ export function startGameLoop({
         waterGunTarget?.leppaTree?.action === "water" ||
         waterGunTarget?.leppaTree?.action === "headbutt" ||
         (
-          waterGunTarget?.palm &&
-          controls.storyState.flags.bulbasaurStrawBedChallengeAvailable &&
-          !controls.storyState.flags.bulbasaurStrawBedChallengeComplete &&
-          !controls.storyState.flags.strawBedRecipeUnlocked
+          waterGunTarget?.palm
         )
       ) {
         performHarvestAction(playerPosition, {
@@ -2033,6 +2725,8 @@ export function startGameLoop({
     gameplay.updateResourceNodes(deltaTime, session.resourceNodes);
     session.updateCloudAtmosphere?.(deltaTime);
     gameplay.syncLeppaTreeState?.(session.leppaTree, controls.storyState);
+    updateLeppaTreeDance(now);
+    updateLeppaTreeMusicNotes(deltaTime);
     updateChopperNpcActor(session.chopperNpcActor, {
       deltaTime,
       storyState: controls.storyState,
@@ -2042,6 +2736,8 @@ export function startGameLoop({
     updateBulbasaurEncounter(deltaTime);
     updateCharmanderEncounter(deltaTime);
     updateTimburrEncounter(deltaTime);
+    syncCompanionRepairModules();
+    syncBeeFieldRepairBox();
     updateSquirtleReassembly(deltaTime);
     updateSquirtleWaterGunAction(deltaTime);
     updateBulbasaurLeafageAction(deltaTime);
@@ -2309,6 +3005,7 @@ export function startGameLoop({
       worldCanvas.width,
       worldCanvas.height
     );
+    syncActiveRepairBoxHighlight();
     nextFrame.render.viewProjection = followedViewProjection;
     nextFrame.render.sceneObjects = getSquirtleAssemblySceneObjects(
       getGameplayOpeningShipSceneObjects(
@@ -2385,6 +3082,7 @@ export function startGameLoop({
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
       controls.storyState.flags.bulbasaurRevealed &&
+      !isOpeningLeppaTreeRequestActive(controls.storyState) &&
       !controls.storyState.flags.bulbasaurDryGrassMissionAccepted;
     const shouldShowBulbasaurWorkbenchGuideSpeech =
       !shouldShowTangrowthSpeech &&
@@ -2497,8 +3195,22 @@ export function startGameLoop({
       controls.storyState.flags.charmanderCelebrationRequestAvailable &&
       !controls.storyState.flags.charmanderCelebrationSuggested &&
       !controls.storyState.flags.charmanderCelebrationComplete;
+    const nearbyRepairBoxPrompt = getNearbyRepairBoxPrompt(
+      session.playerCharacter?.getPosition?.()
+    );
+    const shouldShowRepairBoxPrompt =
+      canShowWorldSpaceUi &&
+      Boolean(nearbyRepairBoxPrompt);
+    const shouldShowWaterGunFirstUsePrompt =
+      canShowWorldSpaceUi &&
+      session.playerCharacter &&
+      controls.playerSkills?.waterGun &&
+      activeMoveId === "waterGun" &&
+      !controls.storyState.flags[WATER_GUN_FIRST_USE_PROMPT_FLAG] &&
+      !controls.isPrimaryActionActive?.();
     const shouldShowCharacterWorldPrompt =
       canShowWorldSpaceUi &&
+      !shouldShowRepairBoxPrompt &&
       session.playerCharacter &&
       nearbyInteractable?.target &&
       controls.shouldBagButtonInteract?.();
@@ -2593,6 +3305,14 @@ export function startGameLoop({
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = transientNoticeRoute.worldPromptMessage;
       nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+    } else if (shouldShowRepairBoxPrompt) {
+      nextFrame.worldPrompt.visible = true;
+      nextFrame.worldPrompt.text = nearbyRepairBoxPrompt.text;
+      nextFrame.worldPrompt.worldPosition = nearbyRepairBoxPrompt.worldPosition;
+    } else if (shouldShowWaterGunFirstUsePrompt) {
+      nextFrame.worldPrompt.visible = true;
+      nextFrame.worldPrompt.text = WATER_GUN_FIRST_USE_PROMPT_TEXT;
+      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
     } else if (shouldShowCharacterWorldPrompt) {
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = "Press X";
@@ -2638,9 +3358,11 @@ export function startGameLoop({
       session.playerCharacter && !cinematicActive ?
         session.playerCharacter.getPosition() :
         null;
+    const selectedRepairBoxParticleTarget = getSelectedRepairBoxParticleTarget();
+    let shouldShowRepairBoxRustlingParticles = false;
 
     for (const groundGrassPatch of session.groundGrassPatches) {
-      const shouldRustle =
+      const hasRustlingEncounter =
         groundGrassPatch.state === "alive" &&
         (
           (
@@ -2656,7 +3378,8 @@ export function startGameLoop({
             !controls.storyState.flags.timburrRevealed
           )
         );
-      const rustleOffset = shouldRustle ? Math.sin(now * 0.024) * 0.11 : 0;
+      const shouldRustleGrass = false;
+      const rustleOffset = shouldRustleGrass ? Math.sin(now * 0.024) * 0.11 : 0;
       const playerBend = getGrassPlayerBend(groundGrassPatch, grassBendPlayerPosition);
       const grassRevivalScale = getNatureRevivalScale(
         session.natureRevivalEffects,
@@ -2688,7 +3411,7 @@ export function startGameLoop({
             grassRevivalScale
           ),
           yaw: getTallGrassYaw(groundGrassPatch),
-          swayStrength: getTallGrassSway(groundGrassPatch, shouldRustle, now) + playerBend.swayStrength
+          swayStrength: getTallGrassSway(groundGrassPatch, shouldRustleGrass, now) + playerBend.swayStrength
         });
       } else if (deadGrassModelAvailable) {
         session.deadGrassInstances.push({
@@ -2720,16 +3443,20 @@ export function startGameLoop({
         });
       }
 
-      if (shouldRustle) {
-        nextFrame.render.genericBillboards.push(
-          ...getRustlingGrassParticleBillboards(
-            groundGrassPatch,
-            session.natureRevivalSparkTexture,
-            now,
-            rendering.fullUvRect
-          )
-        );
+      if (hasRustlingEncounter) {
+        shouldShowRepairBoxRustlingParticles = true;
       }
+    }
+
+    if (shouldShowRepairBoxRustlingParticles && selectedRepairBoxParticleTarget) {
+      nextFrame.render.genericBillboards.push(
+        ...getRustlingGrassParticleBillboards(
+          selectedRepairBoxParticleTarget,
+          session.natureRevivalSparkTexture,
+          now,
+          rendering.fullUvRect
+        )
+      );
     }
 
     for (const groundFlowerPatch of session.groundFlowerPatches) {
@@ -2737,10 +3464,22 @@ export function startGameLoop({
         session.natureRevivalEffects,
         groundFlowerPatch.id
       );
+
+      if (groundFlowerPatch.state === "alive") {
+        nextFrame.render.flowerBillboards.push(
+          ...getFlowerArrangementBillboards({
+            groundFlowerPatch,
+            texture: session.greenFlowerTexture,
+            playerPosition: grassBendPlayerPosition,
+            revivalScale: flowerRevivalScale,
+            now
+          })
+        );
+        continue;
+      }
+
       nextFrame.render.flowerBillboards.push({
-        texture: groundFlowerPatch.state === "alive" ?
-          session.greenFlowerTexture :
-          session.deadFlowerTexture,
+        texture: session.deadFlowerTexture,
         position: groundFlowerPatch.position,
         size: groundFlowerPatch.size.map((value) => value * flowerRevivalScale)
       });
@@ -2780,6 +3519,23 @@ export function startGameLoop({
           size: leppaBerryDrop.size,
           uvRect: rendering.fullUvRect
         }))
+    );
+    nextFrame.render.genericBillboards.push(
+      ...getLeppaTreeMusicNoteBillboards(
+        session.leppaTree,
+        session.leppaTreeMusicalNoteTextures,
+        rendering.fullUvRect,
+        now
+      )
+    );
+    nextFrame.render.genericBillboards.push(
+      ...getLeppaTreeMissionParticleBillboards(
+        session.leppaTree,
+        session.natureRevivalSparkTexture,
+        rendering.fullUvRect,
+        now,
+        controls.storyState
+      )
     );
     appendGameplayOpeningShipBillboards({
       billboards: nextFrame.render.genericBillboards,

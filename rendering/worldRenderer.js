@@ -261,6 +261,9 @@ export function createWorldRenderer({
       gl.uniform1f(uniforms.instanceYaw, instance.yaw || 0);
       gl.uniform1f(uniforms.instancePitch, instance.pitch || 0);
       gl.uniform1f(uniforms.instanceRoll, instance.roll || 0);
+      gl.uniform3fv(uniforms.instanceTint, instance.tint || [1, 1, 1]);
+      gl.uniform1f(uniforms.instanceTintStrength, instance.tintStrength || 0);
+      gl.uniform1f(uniforms.instanceAlpha, instance.alpha ?? 1);
       if (uniforms.localYaw) {
         gl.uniform1f(uniforms.localYaw, instance.localYaw || 0);
       }

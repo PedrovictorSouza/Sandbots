@@ -44,11 +44,66 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "grassEncounter",
         id: "rustlingGrass",
-        label: "Investigate the rustling grass",
+        label: "Inspect dismantled Bulbasaur",
         cellId: "ground-3-1"
       },
       distance: expect.any(Number)
     });
+  });
+
+  it("uses Bulbasaur's dismantled module position for the first repair interaction", () => {
+    const storyState = {
+      flags: {
+        bulbasaurRevealed: false,
+        rustlingGrassCellId: "ground-3-1"
+      }
+    };
+    const grassPatches = [
+      {
+        id: "grass-3",
+        cellId: "ground-3-1",
+        position: [8.4, 0.02, -4.2],
+        state: "alive"
+      }
+    ];
+    const bulbasaurEncounter = {
+      repairPosition: [11.3, 0.04, -6.1]
+    };
+
+    const resultNearModule = findNearbyInteractable(
+      [11.1, 0, -6],
+      [],
+      [],
+      storyState,
+      grassPatches,
+      null,
+      null,
+      null,
+      null,
+      null,
+      bulbasaurEncounter
+    );
+    const resultNearGrass = findNearbyInteractable(
+      [8.1, 0, -3.9],
+      [],
+      [],
+      storyState,
+      grassPatches,
+      null,
+      null,
+      null,
+      null,
+      null,
+      bulbasaurEncounter
+    );
+
+    expect(resultNearModule?.target).toEqual({
+      kind: "grassEncounter",
+      id: "rustlingGrass",
+      label: "Inspect dismantled Bulbasaur",
+      cellId: "ground-3-1"
+    });
+    expect(resultNearGrass).toBeNull();
   });
 
   it("detects Charmander's Leafage rustling grass encounter", () => {
@@ -76,10 +131,72 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "charmanderGrassEncounter",
         id: "charmanderRustlingGrass",
-        label: "Inspect the rustling grass",
+        label: "Repair dismantled Charmander",
         cellId: "ground-8-7"
       },
       distance: expect.any(Number)
+    });
+  });
+
+  it("uses companion dismantled module positions for later repair interactions", () => {
+    const grassPatches = [
+      {
+        id: "leafage-grass-a",
+        cellId: "ground-8-7",
+        position: [8.4, 0.02, -4.2],
+        state: "alive"
+      },
+      {
+        id: "boulder-grass-a",
+        cellId: "boulder-ground-0",
+        position: [4.6, 0.02, -8.2],
+        state: "alive"
+      }
+    ];
+
+    const resultNearCharmanderModule = findNearbyInteractable(
+      [12.2, 0, -6.4],
+      [],
+      [],
+      {
+        flags: {
+          charmanderRevealed: false,
+          charmanderRustlingGrassCellId: "ground-8-7"
+        }
+      },
+      grassPatches,
+      null,
+      null,
+      null,
+      { repairPosition: [12.4, 0.04, -6.5] }
+    );
+    const resultNearTimburrModule = findNearbyInteractable(
+      [15.1, 0, -9.2],
+      [],
+      [],
+      {
+        flags: {
+          timburrRevealed: false,
+          timburrRustlingGrassCellId: "boulder-ground-0"
+        }
+      },
+      grassPatches,
+      null,
+      null,
+      { repairPosition: [15.2, 0.04, -9.3] }
+    );
+
+    expect(resultNearCharmanderModule?.target).toEqual({
+      kind: "charmanderGrassEncounter",
+      id: "charmanderRustlingGrass",
+      label: "Repair dismantled Charmander",
+      cellId: "ground-8-7"
+    });
+    expect(resultNearTimburrModule?.target).toEqual({
+      kind: "timburrGrassEncounter",
+      id: "timburrRustlingGrass",
+      label: "Repair dismantled Timburr",
+      cellId: "boulder-ground-0"
     });
   });
 
@@ -115,6 +232,33 @@ describe("findNearbyInteractable", () => {
       },
       distance: expect.any(Number)
     });
+  });
+
+  it("holds Bulbasaur's dry grass mission until the opening Leppa tree is revived", () => {
+    const result = findNearbyInteractable(
+      [8.1, 0, -3.9],
+      [],
+      [],
+      {
+        flags: {
+          bulbasaurRevealed: true,
+          squirtleLeppaRequestAvailable: true,
+          bulbasaurDryGrassMissionAccepted: false,
+          restoredGrassCount: 4,
+          rustlingGrassCellId: "ground-3-1"
+        }
+      },
+      [
+        {
+          id: "grass-3",
+          cellId: "ground-3-1",
+          position: [8.4, 0.02, -4.2],
+          state: "alive"
+        }
+      ]
+    );
+
+    expect(result).toBeNull();
   });
 
   it("uses Bulbasaur's visible encounter position for mission interaction", () => {
@@ -177,6 +321,55 @@ describe("findNearbyInteractable", () => {
       distance: expect.any(Number)
     });
     expect(resultNearGrass).toBeNull();
+  });
+
+  it("keeps Bulbasaur talk available from the opened repair box position", () => {
+    const storyState = {
+      flags: {
+        bulbasaurRevealed: true,
+        bulbasaurDryGrassMissionAccepted: false,
+        restoredGrassCount: 4,
+        rustlingGrassCellId: "ground-3-1"
+      }
+    };
+    const grassPatches = [
+      {
+        id: "grass-3",
+        cellId: "ground-3-1",
+        position: [8.55, 0.02, -5.7],
+        state: "alive"
+      }
+    ];
+    const bulbasaurEncounter = {
+      visible: true,
+      position: [8.55, 0.02, -5.7],
+      repairBoxPosition: [10.1, 0.04, -4.65]
+    };
+
+    const result = findNearbyInteractable(
+      [10.1, 0, -4.65],
+      [],
+      [],
+      storyState,
+      grassPatches,
+      null,
+      null,
+      null,
+      null,
+      null,
+      bulbasaurEncounter
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "bulbasaurMission",
+        id: "bulbasaurDryGrassMission",
+        label: "Talk to Bulbasaur",
+        cellId: "ground-3-1",
+        position: [8.55, 0.02, -5.7]
+      },
+      distance: expect.any(Number)
+    });
   });
 
   it("still detects Bulbasaur mission interaction if enough grass was watered before accepting it", () => {
@@ -274,7 +467,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "timburrGrassEncounter",
         id: "timburrRustlingGrass",
-        label: "Inspect the Boulder-Shaded Tall Grass",
+        label: "Repair dismantled Timburr",
         cellId: "boulder-ground-0"
       },
       distance: expect.any(Number)
@@ -305,6 +498,15 @@ describe("findNearbyInteractable", () => {
       { id: "north", offset: [2, 0, 0.6], tileSpan: 1.425 }
     ])).toBe(true);
     expect(storyState.flags.leppaTreeRevived).toBe(true);
+    expect(leppaTree.deadInstance.active).toBe(true);
+    expect(leppaTree.deadInstance.tintStrength).toBeGreaterThan(0);
+    expect(leppaTree.aliveInstance.active).toBe(false);
+    expect(reviveLeppaTreeFromWateredTiles(leppaTree, storyState, [
+      { id: "east", offset: [3.4, 0, 2], tileSpan: 1.425 },
+      { id: "west", offset: [0.6, 0, 2], tileSpan: 1.425 },
+      { id: "south", offset: [2, 0, 3.4], tileSpan: 1.425 },
+      { id: "north", offset: [2, 0, 0.6], tileSpan: 1.425 }
+    ])).toBe(false);
     expect(findNearbyLeppaTree([2.4, 0, 2.2], leppaTree, storyState)).toEqual({
       leppaTree,
       action: "headbutt",

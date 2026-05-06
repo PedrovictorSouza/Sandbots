@@ -192,6 +192,37 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain("field note");
   });
 
+  it("shows the Leppa tree revival before Bulbasaur's dry grass request", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        bulbasaurRevealed: true,
+        squirtleLeppaRequestAvailable: true,
+        trackedTaskIds: ["making-habitats"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("Revive the dead tree");
+    expect(checklistHtml).toContain("four dry tiles around the dead tree");
+    expect(checklistHtml).not.toContain("Talk to Bulbasaur");
+    expect(logHtml).toContain('data-task-id="revive-leppa-tree"');
+
+    storyState.flags.leppaTreeRevived = true;
+
+    const revivedChecklistHtml = questLog.renderChecklistHtml(storyState);
+    expect(revivedChecklistHtml).toContain("Talk to Bulbasaur");
+    expect(revivedChecklistHtml).not.toContain("Revive the dead tree");
+  });
+
   it("shows the Leafage turn-in above old habitat notes after 10 dry grass patches", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "inspect-rustling-grass");
     const questLog = createQuestLog({
@@ -293,6 +324,7 @@ describe("createQuestLog", () => {
       flags: {
         makingHabitatsComplete: true,
         bulbasaurDryGrassMissionComplete: true,
+        bulbasaurDryGrassRequestTurnedIn: true,
         squirtleLeppaRequestAvailable: true,
         trackedTaskIds: ["making-habitats", "water-dry-tall-grass"]
       }
@@ -403,7 +435,9 @@ describe("createQuestLog", () => {
     expect(questLog.renderChecklistHtml(storyState)).toContain("2/4 tall grass grown");
 
     storyState.flags.charmanderRustlingGrassCellId = "ground-1-1";
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Inspect the rustling grass.");
+    expect(questLog.renderChecklistHtml(storyState)).toContain(
+      "Repair the dismantled Charmander module."
+    );
 
     storyState.flags.charmanderRevealed = true;
     expect(questLog.renderChecklistHtml(storyState)).toContain("D-Pad Up");
@@ -460,7 +494,9 @@ describe("createQuestLog", () => {
     expect(questLog.renderChecklistHtml(storyState)).toContain("2/4 tall grass grown");
 
     storyState.flags.boulderShadedTallGrassHabitatCreated = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Inspect the rustling");
+    expect(questLog.renderChecklistHtml(storyState)).toContain(
+      "Repair the dismantled Timburr module near the boulder."
+    );
 
     storyState.flags.timburrRevealed = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);

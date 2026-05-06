@@ -366,6 +366,12 @@ export function createGameInputController({
       return;
     }
 
+    const pointerButtons = Number(event.buttons || 0);
+    const secondaryButtonHeld = (pointerButtons & 2) === 2;
+    if (!secondaryButtonHeld) {
+      return;
+    }
+
     const movementX = Number(event.movementX || 0);
     const movementY = Number(event.movementY || 0);
 

@@ -1,5 +1,6 @@
 import {
   BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION,
+  GROUND_FLOWER_LAYOUT,
   ITEM_DEFS,
   POKEMON_CENTER_PC_POSITION,
   WORLD_MARKER_STYLES
@@ -13,6 +14,63 @@ import { createPlayerDustState } from "./playerDustParticles.js";
 import { createNatureRevivalEffectState } from "./natureRevivalEffects.js";
 import { createColliderGizmoTextures } from "./colliderGizmos.js";
 import { createGameplayOpeningShipState } from "./gameplayOpeningShip.js";
+
+const BULBASAUR_REPAIR_MODULE_POSITION = [8.55, 0.04, -5.7];
+const BULBASAUR_REPAIR_BOX_POSITION = [
+  BULBASAUR_REPAIR_MODULE_POSITION[0] + 1.55,
+  BULBASAUR_REPAIR_MODULE_POSITION[1],
+  BULBASAUR_REPAIR_MODULE_POSITION[2] + 1.05
+];
+const CHARMANDER_REPAIR_MODULE_POSITION = [17.4, 0.04, -7.6];
+const TIMBURR_REPAIR_MODULE_POSITION = [
+  BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION[0] + 1.45,
+  0.04,
+  BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION[2] - 0.85
+];
+const BEE_FIELD_FLOWER_GROUP_ID = "water-gun-flower-field-0";
+const ROBOT_REPAIR_MODULE_SCALE = 0.391;
+const ROBOT_REPAIR_MODULE_FLOAT_HEIGHT = 0.74;
+
+function getRobotRepairModuleOffset(position) {
+  return [
+    position[0],
+    position[1] + ROBOT_REPAIR_MODULE_FLOAT_HEIGHT,
+    position[2]
+  ];
+}
+
+function createRobotRepairModuleInstance(id, position, yaw = 0) {
+  return {
+    id,
+    baseOffset: [...position],
+    offset: getRobotRepairModuleOffset(position),
+    scale: ROBOT_REPAIR_MODULE_SCALE,
+    yaw,
+    pitch: 0,
+    roll: 0,
+    active: true
+  };
+}
+
+function resolveFlowerGroupCenter(groupId) {
+  const flowerPatches = GROUND_FLOWER_LAYOUT.filter((flowerPatch) => {
+    return flowerPatch.habitatGroupId === groupId;
+  });
+
+  if (!flowerPatches.length) {
+    return [0, 0.04, 0];
+  }
+
+  const center = flowerPatches.reduce((accumulator, flowerPatch) => {
+    accumulator[0] += flowerPatch.position[0];
+    accumulator[2] += flowerPatch.position[2];
+    return accumulator;
+  }, [0, 0.04, 0]);
+
+  center[0] /= flowerPatches.length;
+  center[2] /= flowerPatches.length;
+  return center;
+}
 
 function createPlayerDustCanvas() {
   const canvas = document.createElement("canvas");
@@ -574,7 +632,8 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     skyImage,
     gameplayOpeningShipModel,
     robot1Model,
-    billImage
+    billImage,
+    leppaTreeMusicalNoteImages
   } = assets;
   const characterAssets = characterFactory.getSharedAssets();
 
@@ -623,6 +682,8 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     model: gameplayOpeningShipModel
   });
   session.natureRevivalSparkTexture = worldTextureFactory.fromCanvas(createNatureRevivalSparkCanvas());
+  session.leppaTreeMusicalNoteTextures = (leppaTreeMusicalNoteImages || [])
+    .map((image) => worldTextureFactory.fromImage(image));
   session.squirtleWaterSprayTexture = worldTextureFactory.fromCanvas(createSquirtleWaterSprayCanvas());
   session.squirtleWaterGunQueue = [];
   session.natureRevivalEffects = createNatureRevivalEffectState();
@@ -658,7 +719,12 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
       scale: 0.5,
       yaw: 0,
       active: false
-    }
+    },
+    repairModuleInstance: createRobotRepairModuleInstance(
+      "squirtle-dismantled-module",
+      ACT_TWO_SQUIRTLE_POSITION,
+      -0.4
+    )
   };
 
   session.bulbasaurEncounter = {
@@ -669,7 +735,14 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     jumpDuration: 0.9,
     originPosition: null,
     landingPosition: null,
-    position: null
+    position: null,
+    repairPosition: [...BULBASAUR_REPAIR_MODULE_POSITION],
+    repairBoxPosition: [...BULBASAUR_REPAIR_BOX_POSITION],
+    repairModuleInstance: createRobotRepairModuleInstance(
+      "bulbasaur-dismantled-module",
+      BULBASAUR_REPAIR_BOX_POSITION,
+      0.35
+    )
   };
 
   session.charmanderEncounter = {
@@ -678,15 +751,59 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     visible: false,
     position: null,
     targetPosition: null,
-    litCampfire: false
+    litCampfire: false,
+    repairPosition: [...CHARMANDER_REPAIR_MODULE_POSITION],
+    repairModuleInstance: createRobotRepairModuleInstance(
+      "charmander-dismantled-module",
+      CHARMANDER_REPAIR_MODULE_POSITION,
+      -0.62
+    )
   };
 
   session.timburrEncounter = {
     texture: session.timburrTexture,
     size: [0.96, 0.96],
     visible: false,
-    position: null
+    position: null,
+    repairPosition: [...TIMBURR_REPAIR_MODULE_POSITION],
+    repairModuleInstance: createRobotRepairModuleInstance(
+      "timburr-dismantled-module",
+      TIMBURR_REPAIR_MODULE_POSITION,
+      0.85
+    )
   };
+
+  session.beeFieldRepairBox = createRobotRepairModuleInstance(
+    "bee-field-repair-module",
+    resolveFlowerGroupCenter(BEE_FIELD_FLOWER_GROUP_ID),
+    -0.15
+  );
+  session.beeFieldRepairBox.lockedAlpha = 0.5;
+  session.beeFieldRepairBox.alpha = session.beeFieldRepairBox.lockedAlpha;
+  session.beeFieldRepairBox.flowerGroupId = BEE_FIELD_FLOWER_GROUP_ID;
+  session.interactables ||= [];
+  session.interactables.push({
+    id: "beeFieldRepairBox",
+    label: "Bee Box",
+    type: "beeFieldRepairBox",
+    position: [...session.beeFieldRepairBox.baseOffset],
+    markerKey: null,
+    interactDistance: 2.1,
+    activeWhen: (state) => {
+      return (
+        (state.flags?.restoredFlowerBedHabitatIds || []).includes(BEE_FIELD_FLOWER_GROUP_ID) &&
+        !state.flags?.beeFieldRepairBoxOpened
+      );
+    }
+  });
+
+  session.robotRepairModuleInstances = [
+    session.actTwoSquirtle.repairModuleInstance,
+    session.bulbasaurEncounter.repairModuleInstance,
+    session.charmanderEncounter.repairModuleInstance,
+    session.timburrEncounter.repairModuleInstance,
+    session.beeFieldRepairBox
+  ];
 
   session.pokemonCenterPc = {
     texture: session.pokemonCenterPcTexture,

@@ -26,6 +26,9 @@ const BULBASAUR_STRAW_BED_TREE_TARGET_COUNT = 5;
 const BULBASAUR_STRAW_BED_STICK_TARGET_COUNT = 10;
 const TERRAIN_COLLIDER_INDEX_MIN_SIZE = 128;
 const TERRAIN_COLLIDER_INDEX_CELL_SIZE = 8;
+const DEAD_TREE_MODEL_FACE_YAW_OFFSET = 0;
+const LEPPA_TREE_REVIVED_TINT = Object.freeze([1.82, 1.72, 1.24]);
+const LEPPA_TREE_REVIVED_TINT_STRENGTH = 0.76;
 const terrainColliderIndexCache = new WeakMap();
 
 export function createFacingStaticController(facing) {
@@ -121,6 +124,36 @@ function overlapsTreeSpacing(treeModel, placed, candidate) {
   return Math.hypot(deltaX, deltaZ) < minimumCenterDistance;
 }
 
+function createTreeVisualInstance(instance, { active, swayStrength, yawOffset = 0 }) {
+  return {
+    ...instance,
+    yaw: (instance.yaw || 0) + yawOffset,
+    active,
+    swayStrength
+  };
+}
+
+export function syncPalmTreeVisualState(instance) {
+  if (!instance) {
+    return instance;
+  }
+
+  const alive = Boolean(instance.alive);
+  const active = instance.active !== false;
+
+  if (instance.deadInstance) {
+    instance.deadInstance.active = active && !alive;
+    instance.deadInstance.swayStrength = instance.swayStrength || 0;
+  }
+
+  if (instance.aliveInstance) {
+    instance.aliveInstance.active = active && alive;
+    instance.aliveInstance.swayStrength = instance.swayStrength || 0;
+  }
+
+  return instance;
+}
+
 export function buildPalmInstances(houseModel, treeModel, candidates) {
   const placed = [];
 
@@ -136,15 +169,30 @@ export function buildPalmInstances(houseModel, treeModel, candidates) {
     placed.push(candidate);
   }
 
-  return placed.map((instance, index) => ({
-    ...instance,
-    id: `palm-${index}`,
-    active: true,
-    hitCount: 0,
-    shakeTimer: 0,
-    shakeDuration: PALM_SHAKE_DURATION,
-    swayStrength: 0
-  }));
+  return placed.map((instance, index) => {
+    const palmInstance = {
+      ...instance,
+      id: `palm-${index}`,
+      active: true,
+      alive: false,
+      hitCount: 0,
+      shakeTimer: 0,
+      shakeDuration: PALM_SHAKE_DURATION,
+      swayStrength: 0
+    };
+
+    palmInstance.deadInstance = createTreeVisualInstance(palmInstance, {
+      active: true,
+      swayStrength: 0,
+      yawOffset: DEAD_TREE_MODEL_FACE_YAW_OFFSET
+    });
+    palmInstance.aliveInstance = createTreeVisualInstance(palmInstance, {
+      active: false,
+      swayStrength: 0
+    });
+
+    return syncPalmTreeVisualState(palmInstance);
+  });
 }
 
 export function findNearbyPalm(playerPosition, treeModel, palmInstances) {
@@ -197,18 +245,6 @@ export function updateBulbasaurStrawBedChallengeCompletion(storyState) {
 }
 
 export function waterNearbyPalm(playerPosition, treeModel, palmInstances, storyState) {
-  if (
-    !storyState?.flags?.bulbasaurStrawBedChallengeAvailable ||
-    storyState.flags.strawBedRecipeUnlocked
-  ) {
-    return {
-      hit: false,
-      counted: false,
-      challengeComplete: false,
-      palm: null
-    };
-  }
-
   const nearestPalm = findNearbyPalm(playerPosition, treeModel, palmInstances);
 
   if (!nearestPalm) {
@@ -221,13 +257,32 @@ export function waterNearbyPalm(playerPosition, treeModel, palmInstances, storyS
   }
 
   nearestPalm.shakeTimer = nearestPalm.shakeDuration || PALM_SHAKE_DURATION;
+  const revived = !nearestPalm.alive;
+  nearestPalm.alive = true;
+  syncPalmTreeVisualState(nearestPalm);
+
+  const challengeActive = Boolean(
+    storyState?.flags?.bulbasaurStrawBedChallengeAvailable &&
+    !storyState.flags.strawBedRecipeUnlocked
+  );
+
+  if (!challengeActive) {
+    return {
+      hit: true,
+      counted: false,
+      challengeComplete: false,
+      palm: nearestPalm,
+      revived
+    };
+  }
 
   if (nearestPalm.wateredForBulbasaurChallenge) {
     return {
       hit: true,
       counted: false,
       challengeComplete: false,
-      palm: nearestPalm
+      palm: nearestPalm,
+      revived
     };
   }
 
@@ -241,7 +296,8 @@ export function waterNearbyPalm(playerPosition, treeModel, palmInstances, storyS
     hit: true,
     counted: true,
     challengeComplete: updateBulbasaurStrawBedChallengeCompletion(storyState),
-    palm: nearestPalm
+    palm: nearestPalm,
+    revived
   };
 }
 
@@ -316,6 +372,7 @@ export function strikeNearbyPalm(
   nearestPalm.active = false;
   nearestPalm.swayStrength = 0;
   nearestPalm.shakeTimer = 0;
+  syncPalmTreeVisualState(nearestPalm);
 
   const dropBatch = buildWoodDrops(treeModel, nearestPalm, nextWoodDropId);
   woodDrops.push(...dropBatch.drops);
@@ -333,6 +390,7 @@ export function updatePalmShake(deltaTime, palmInstances) {
     if (instance.active === false || instance.shakeTimer <= 0) {
       instance.shakeTimer = 0;
       instance.swayStrength = 0;
+      syncPalmTreeVisualState(instance);
       continue;
     }
 
@@ -340,6 +398,7 @@ export function updatePalmShake(deltaTime, palmInstances) {
     const progress = 1 - instance.shakeTimer / instance.shakeDuration;
     const envelope = instance.shakeTimer / instance.shakeDuration;
     instance.swayStrength = Math.sin(progress * Math.PI * 5.5) * 0.22 * envelope;
+    syncPalmTreeVisualState(instance);
   }
 }
 
@@ -382,11 +441,13 @@ export function syncLeppaTreeState(leppaTree, storyState) {
   leppaTree.revived = revived;
 
   if (leppaTree.deadInstance) {
-    leppaTree.deadInstance.active = requestActive && !revived;
+    leppaTree.deadInstance.active = requestActive || revived;
+    leppaTree.deadInstance.tint = revived ? LEPPA_TREE_REVIVED_TINT : null;
+    leppaTree.deadInstance.tintStrength = revived ? LEPPA_TREE_REVIVED_TINT_STRENGTH : 0;
   }
 
   if (leppaTree.aliveInstance) {
-    leppaTree.aliveInstance.active = revived;
+    leppaTree.aliveInstance.active = false;
   }
 
   return leppaTree;
@@ -426,6 +487,10 @@ export function findNearbyLeppaTree(playerPosition, leppaTree, storyState) {
 
 export function reviveLeppaTree(leppaTree, storyState) {
   if (!leppaTree || !isLeppaTreeRequestActive(storyState)) {
+    return false;
+  }
+
+  if (storyState?.flags?.leppaTreeRevived || leppaTree.revived) {
     return false;
   }
 
@@ -758,16 +823,20 @@ export function findNearbyInteractable(
     });
 
     if (rustlingGrassPatch) {
+      const interactionPosition =
+        bulbasaurEncounter?.repairBoxPosition ||
+        bulbasaurEncounter?.repairPosition ||
+        rustlingGrassPatch.position;
       const distance = Math.hypot(
-        playerPosition[0] - rustlingGrassPatch.position[0],
-        playerPosition[2] - rustlingGrassPatch.position[2]
+        playerPosition[0] - interactionPosition[0],
+        playerPosition[2] - interactionPosition[2]
       );
 
       if (distance <= 1.6 && distance < nearestDistance) {
         nearest = {
           kind: "grassEncounter",
           id: "rustlingGrass",
-          label: "Investigate the rustling grass",
+          label: "Inspect dismantled Bulbasaur",
           cellId: rustlingGrassPatch.cellId
         };
         nearestDistance = distance;
@@ -787,6 +856,10 @@ export function findNearbyInteractable(
     bulbasaurEncounter?.visible && Array.isArray(bulbasaurEncounter.position) ?
       bulbasaurEncounter.position :
       null;
+  const bulbasaurRepairBoxPosition =
+    Array.isArray(bulbasaurEncounter?.repairBoxPosition) ?
+      bulbasaurEncounter.repairBoxPosition :
+      null;
   const bulbasaurInteractionPosition =
     bulbasaurEncounterPosition || bulbasaurGrassPatch?.position || null;
   const createBulbasaurTarget = (target) => {
@@ -799,10 +872,23 @@ export function findNearbyInteractable(
       return;
     }
 
-    const distance = Math.hypot(
+    let distance = Math.hypot(
       playerPosition[0] - bulbasaurInteractionPosition[0],
       playerPosition[2] - bulbasaurInteractionPosition[2]
     );
+
+    if (
+      target.kind === "bulbasaurMission" &&
+      bulbasaurRepairBoxPosition
+    ) {
+      distance = Math.min(
+        distance,
+        Math.hypot(
+          playerPosition[0] - bulbasaurRepairBoxPosition[0],
+          playerPosition[2] - bulbasaurRepairBoxPosition[2]
+        )
+      );
+    }
 
     if (distance <= 1.85 && distance < nearestDistance) {
       nearest = createBulbasaurTarget(target);
@@ -824,16 +910,17 @@ export function findNearbyInteractable(
     });
 
     if (rustlingGrassPatch) {
+      const interactionPosition = charmanderEncounter?.repairPosition || rustlingGrassPatch.position;
       const distance = Math.hypot(
-        playerPosition[0] - rustlingGrassPatch.position[0],
-        playerPosition[2] - rustlingGrassPatch.position[2]
+        playerPosition[0] - interactionPosition[0],
+        playerPosition[2] - interactionPosition[2]
       );
 
       if (distance <= 1.85 && distance < nearestDistance) {
         nearest = {
           kind: "charmanderGrassEncounter",
           id: "charmanderRustlingGrass",
-          label: "Inspect the rustling grass",
+          label: "Repair dismantled Charmander",
           cellId: rustlingGrassPatch.cellId
         };
         nearestDistance = distance;
@@ -855,16 +942,17 @@ export function findNearbyInteractable(
     });
 
     if (rustlingGrassPatch) {
+      const interactionPosition = timburrEncounter?.repairPosition || rustlingGrassPatch.position;
       const distance = Math.hypot(
-        playerPosition[0] - rustlingGrassPatch.position[0],
-        playerPosition[2] - rustlingGrassPatch.position[2]
+        playerPosition[0] - interactionPosition[0],
+        playerPosition[2] - interactionPosition[2]
       );
 
       if (distance <= 1.85 && distance < nearestDistance) {
         nearest = {
           kind: "timburrGrassEncounter",
           id: "timburrRustlingGrass",
-          label: "Inspect the Boulder-Shaded Tall Grass",
+          label: "Repair dismantled Timburr",
           cellId: rustlingGrassPatch.cellId
         };
         nearestDistance = distance;
@@ -874,6 +962,10 @@ export function findNearbyInteractable(
 
   const bulbasaurMissionActive =
     storyState?.flags?.bulbasaurRevealed &&
+    !(
+      storyState?.flags?.squirtleLeppaRequestAvailable &&
+      !storyState?.flags?.leppaTreeRevived
+    ) &&
     !storyState?.flags?.bulbasaurDryGrassMissionAccepted &&
     Boolean(rustlingGrassCellId);
   const bulbasaurRequestReady =
@@ -897,6 +989,7 @@ export function findNearbyInteractable(
 
   const leppaGiftReady =
     storyState?.flags?.squirtleLeppaRequestAvailable &&
+    storyState?.flags?.bulbasaurDryGrassRequestTurnedIn &&
     storyState?.flags?.leppaBerryCollected &&
     !storyState?.flags?.leppaBerryGiftComplete &&
     storyState?.flags?.bulbasaurRevealed &&
@@ -1025,6 +1118,50 @@ export function findNearbyInteractable(
     }
   }
 
+  const setNearbyCompanionTarget = ({ id, label, encounter, revealedFlag }) => {
+    if (
+      !storyState?.flags?.[revealedFlag] ||
+      !encounter?.visible ||
+      !Array.isArray(encounter.position)
+    ) {
+      return;
+    }
+
+    const distance = Math.hypot(
+      playerPosition[0] - encounter.position[0],
+      playerPosition[2] - encounter.position[2]
+    );
+
+    if (distance <= 1.85 && distance < nearestDistance) {
+      nearest = {
+        kind: "pokemonCompanion",
+        id,
+        label: `Talk to ${label}`,
+        position: [...encounter.position]
+      };
+      nearestDistance = distance;
+    }
+  };
+
+  setNearbyCompanionTarget({
+    id: "bulbasaur",
+    label: "Bulbasaur",
+    encounter: bulbasaurEncounter,
+    revealedFlag: "bulbasaurRevealed"
+  });
+  setNearbyCompanionTarget({
+    id: "charmander",
+    label: "Charmander",
+    encounter: charmanderEncounter,
+    revealedFlag: "charmanderRevealed"
+  });
+  setNearbyCompanionTarget({
+    id: "timburr",
+    label: "Timburr",
+    encounter: timburrEncounter,
+    revealedFlag: "timburrRevealed"
+  });
+
   return nearest ? { target: nearest, distance: nearestDistance } : null;
 }
 
@@ -1150,6 +1287,10 @@ export function buildNearbyPrompt({
   }
 
   if (harvestTarget?.palm) {
+    if (activeMoveId === "waterGun") {
+      return "[Enter] Use Water Gun on the dead tree";
+    }
+
     if (
       storyState?.flags?.bulbasaurStrawBedChallengeAvailable &&
       !storyState.flags.bulbasaurStrawBedChallengeComplete &&

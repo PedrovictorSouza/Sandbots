@@ -6,7 +6,7 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
   <section class="pause-overlay" id="pause-overlay" hidden aria-label="Pause screen">
     <div class="pause-overlay__label">PAUSE</div>
   </section>
-  <div class="render-frame" id="render-frame" data-crt-filter="on">
+  <div class="render-frame" id="render-frame">
         <canvas id="viewport" class="layer" width="426" height="240"></canvas>
         <div id="warm-overlay" aria-hidden="true"></div>
         <canvas id="sprite-layer" class="layer" width="426" height="240"></canvas>

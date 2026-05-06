@@ -39,7 +39,9 @@ export function createNatureRevivalEffectState() {
 
 export function startNatureRevivalEffect(effectState, {
   patch,
-  type = "grass"
+  type = "grass",
+  maxSparks = MAX_SPARKS_PER_EFFECT,
+  emitInterval = SPARK_EMIT_INTERVAL
 } = {}) {
   if (!effectState || !patch) {
     return;
@@ -53,6 +55,8 @@ export function startNatureRevivalEffect(effectState, {
     age: 0,
     emitTimer: 0,
     duration: REVIVAL_DURATION,
+    maxSparks,
+    emitInterval,
     radius,
     position: [...patch.position],
     sparks: []
@@ -84,9 +88,11 @@ export function updateNatureRevivalEffects(effectState, deltaTime = 0) {
 
     if (effect.age <= REVIVAL_DURATION) {
       effect.emitTimer += deltaTime;
+      const effectEmitInterval = effect.emitInterval || SPARK_EMIT_INTERVAL;
+      const effectMaxSparks = effect.maxSparks || MAX_SPARKS_PER_EFFECT;
 
-      while (effect.emitTimer >= SPARK_EMIT_INTERVAL && effect.sparks.length < MAX_SPARKS_PER_EFFECT) {
-        effect.emitTimer -= SPARK_EMIT_INTERVAL;
+      while (effect.emitTimer >= effectEmitInterval && effect.sparks.length < effectMaxSparks) {
+        effect.emitTimer -= effectEmitInterval;
         effect.sparks.push(createSpark(effect.position, effect.radius));
       }
     }
