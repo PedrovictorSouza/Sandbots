@@ -2,7 +2,6 @@ import { getInventoryPresentationOrder } from "../ui/inventoryPresentation.js";
 
 export function createBagUiRuntime({
   bagOnboarding,
-  bagDetails,
   gameplayUiVisibility,
   inventory,
   inventoryOrder,
@@ -10,19 +9,18 @@ export function createBagUiRuntime({
   isBagDetailItemId
 }) {
   let bagOnboardingActive = false;
-  let bagDetailsOpen = false;
   let restoreQuestAfterBagOverlay = false;
   let selectedBagItemId = null;
 
   function beginOverlay() {
-    if (!bagOnboardingActive && !bagDetailsOpen) {
+    if (!bagOnboardingActive) {
       restoreQuestAfterBagOverlay = gameplayUiVisibility.isSectionVisible("quest");
       gameplayUiVisibility.hideSections(["quest"]);
     }
   }
 
   function endOverlay() {
-    if (bagOnboardingActive || bagDetailsOpen) {
+    if (bagOnboardingActive) {
       return;
     }
 
@@ -51,20 +49,15 @@ export function createBagUiRuntime({
   function syncDetailsPanel() {
     const itemId = resolveSelectedItemId();
     if (!itemId) {
-      bagDetails.setItem(null, 0);
       return false;
     }
 
     selectedBagItemId = itemId;
-    bagDetails.setItem(itemDefs[itemId], inventory[itemId] || 0);
     return true;
   }
 
   function selectItem(itemId) {
     selectedBagItemId = itemId;
-    if (bagDetailsOpen) {
-      syncDetailsPanel();
-    }
   }
 
   function showOnboarding() {
@@ -90,13 +83,8 @@ export function createBagUiRuntime({
   }
 
   function showDetails() {
-    if (!syncDetailsPanel()) {
-      return;
-    }
-
-    beginOverlay();
-    bagDetailsOpen = true;
-    gameplayUiVisibility.showSections(["bagDetails", "inventory"]);
+    syncDetailsPanel();
+    gameplayUiVisibility.showSections(["inventory"]);
 
     if (bagOnboardingActive) {
       dismissOnboarding();
@@ -104,22 +92,11 @@ export function createBagUiRuntime({
   }
 
   function hideDetails() {
-    if (!bagDetailsOpen && !gameplayUiVisibility.isSectionVisible("bagDetails")) {
-      return;
-    }
-
-    bagDetailsOpen = false;
     gameplayUiVisibility.hideSections(["bagDetails"]);
-    endOverlay();
   }
 
   function inspect() {
     gameplayUiVisibility.showSections(["inventory"]);
-
-    if (bagDetailsOpen) {
-      hideDetails();
-      return;
-    }
 
     showDetails();
   }
@@ -142,7 +119,7 @@ export function createBagUiRuntime({
     hideDetails,
     getSelectedItemId: () => resolveSelectedItemId(),
     inspect,
-    isDetailsOpen: () => bagDetailsOpen,
+    isDetailsOpen: () => false,
     selectItem,
     showDetails,
     showOnboarding,

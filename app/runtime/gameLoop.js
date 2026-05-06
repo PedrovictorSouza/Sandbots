@@ -18,6 +18,7 @@ import {
   getGameplayOpeningShipSceneObjects
 } from "../session/gameplayOpeningShip.js";
 import {
+  RUINED_POKEMON_CENTER_GUIDE_POSITION,
   WORKBENCH_INTERACT_DISTANCE,
   WORKBENCH_POSITION
 } from "../../gameplayContent.js";
@@ -63,6 +64,7 @@ const PLAYER_MODEL_TURN_SPEED = 14;
 const GRASS_PLAYER_BEND_RADIUS = 0.92;
 const GRASS_PLAYER_BEND_OFFSET = 0.14;
 const GRASS_PLAYER_BEND_SWAY = 0.18;
+const FPS_PANEL_UPDATE_INTERVAL = 0.25;
 const CAMERA_DEBUG_ENABLED = (() => {
   try {
     return new URLSearchParams(globalThis.location?.search || "").get("cameraDebug") === "1";
@@ -70,6 +72,44 @@ const CAMERA_DEBUG_ENABLED = (() => {
     return false;
   }
 })();
+
+function createFpsPanelController(fpsPanelElement) {
+  let elapsed = 0;
+  let frames = 0;
+
+  function classifyFps(fps) {
+    if (fps < 30) {
+      return "low";
+    }
+
+    if (fps < 50) {
+      return "mid";
+    }
+
+    return "good";
+  }
+
+  return {
+    update(rawDeltaTime) {
+      if (!fpsPanelElement || !(rawDeltaTime > 0)) {
+        return;
+      }
+
+      elapsed += rawDeltaTime;
+      frames += 1;
+
+      if (elapsed < FPS_PANEL_UPDATE_INTERVAL) {
+        return;
+      }
+
+      const fps = Math.round(frames / elapsed);
+      fpsPanelElement.textContent = `FPS ${fps}`;
+      fpsPanelElement.dataset.fpsQuality = classifyFps(fps);
+      elapsed = 0;
+      frames = 0;
+    }
+  };
+}
 
 function getTallGrassInstanceScale(tallGrassModel, groundGrassPatch, revivalScale) {
   const modelFootprint = Math.max(
@@ -177,6 +217,7 @@ function rotateAngleToward(fromAngle, toAngle, maxStep) {
 export function startGameLoop({
   camera,
   mount,
+  fpsPanel = null,
   worldCanvas,
   worldRenderer,
   worldSpeech,
@@ -221,6 +262,7 @@ export function startGameLoop({
     camera,
     cameraOrbit
   });
+  const fpsPanelController = createFpsPanelController(fpsPanel);
   let cameraDebugElement = null;
   const cameraDebugErrors = [];
 
@@ -357,6 +399,18 @@ export function startGameLoop({
     const workbench = session.interactables?.find((entry) => entry.id === "workbench");
     if (workbench) {
       workbench.interactDistance = WORKBENCH_INTERACT_DISTANCE;
+    }
+  }
+
+  function syncPokemonCenterWorkshopVisualState() {
+    const assembled = Boolean(controls.storyState?.flags?.challengesUnlocked);
+
+    if (session.pokemonCenterWorkshopAssembledInstance) {
+      session.pokemonCenterWorkshopAssembledInstance.active = assembled;
+    }
+
+    for (const instance of session.pokemonCenterWorkshopDismantledInstances || []) {
+      instance.active = !assembled;
     }
   }
 
@@ -1405,8 +1459,10 @@ export function startGameLoop({
 
   function frame(now) {
     const nextFrame = frameSnapshotController.beginFrame();
-    const deltaTime = Math.min(0.033, (now - previousTime) / 1000);
+    const rawDeltaTime = Math.max(0, (now - previousTime) / 1000);
+    const deltaTime = Math.min(0.033, rawDeltaTime);
     previousTime = now;
+    fpsPanelController.update(rawDeltaTime);
     let cinematicActive = isGameFlow(gameFlowValues.CINEMATIC);
     const introActive = isGameFlow(gameFlowValues.INTRO);
     let tutorialActive = isGameFlow(gameFlowValues.TUTORIAL);
@@ -1433,6 +1489,7 @@ export function startGameLoop({
     camera.resizeCanvases();
     camera.update(deltaTime);
     syncWorkbenchInteractable();
+    syncPokemonCenterWorkshopVisualState();
     if (session.gameplayOpeningRequested) {
       gameplayCameraDirector.requestOpening();
       session.gameplayOpeningRequested = false;
@@ -1655,6 +1712,13 @@ export function startGameLoop({
       controls.playerSkills?.leafage &&
       activeMoveId === "leafage"
     );
+    const isWaterGunTreeChallengeTarget = (target) => Boolean(
+      waterGunEquipped &&
+      target?.palm &&
+      controls.storyState.flags.bulbasaurStrawBedChallengeAvailable &&
+      !controls.storyState.flags.bulbasaurStrawBedChallengeComplete &&
+      !controls.storyState.flags.strawBedRecipeUnlocked
+    );
 
     function performHarvestAction(playerPosition, options = {}) {
       return gameplay.performHarvestAction({
@@ -1722,6 +1786,7 @@ export function startGameLoop({
       const primaryActionPlacementBlocked = primaryActionPlacementTarget && gamepadPrimaryMoveRequested;
       const primaryActionIsMove = Boolean(
         (waterGunEquipped && primaryActionTarget?.groundCell) ||
+        isWaterGunTreeChallengeTarget(primaryActionTarget) ||
         (leafageEquipped && primaryActionTarget?.leafageGroundCell)
       );
       const primaryInteractTarget =
@@ -1738,7 +1803,8 @@ export function startGameLoop({
             session.leafDen,
             session.timburrEncounter,
             session.charmanderEncounter,
-            session.leppaTree
+            session.leppaTree,
+            session.bulbasaurEncounter
           ) :
           null;
 
@@ -1759,6 +1825,11 @@ export function startGameLoop({
               forcedHarvestTarget: primaryActionTarget
             });
           }
+        } else if (isWaterGunTreeChallengeTarget(primaryActionTarget)) {
+          performHarvestAction(playerPosition, {
+            useWaterGun: true,
+            forcedHarvestTarget: primaryActionTarget
+          });
         } else if (leafageEquipped && primaryActionTarget?.leafageGroundCell) {
           const bulbasaurLeafageResult = startBulbasaurLeafageAction({
             groundCell: primaryActionTarget.leafageGroundCell,
@@ -1785,6 +1856,7 @@ export function startGameLoop({
           leppaBerryDrops: session.leppaBerryDrops,
           timburrEncounter: session.timburrEncounter,
           charmanderEncounter: session.charmanderEncounter,
+          bulbasaurEncounter: session.bulbasaurEncounter,
           onNpcInteractionStart({
             targetId,
             playerPosition,
@@ -1865,6 +1937,7 @@ export function startGameLoop({
         )
       ) {
         performHarvestAction(playerPosition, {
+          forcedHarvestTarget: waterGunTarget,
           useWaterGun: true
         });
       }
@@ -1892,6 +1965,7 @@ export function startGameLoop({
         leppaBerryDrops: session.leppaBerryDrops,
         timburrEncounter: session.timburrEncounter,
         charmanderEncounter: session.charmanderEncounter,
+        bulbasaurEncounter: session.bulbasaurEncounter,
         onNpcInteractionStart({
           targetId,
           playerPosition,
@@ -1957,11 +2031,13 @@ export function startGameLoop({
     hud.updateTransientNotice(deltaTime);
     gameplay.updatePalmShake(deltaTime, session.palmInstances);
     gameplay.updateResourceNodes(deltaTime, session.resourceNodes);
+    session.updateCloudAtmosphere?.(deltaTime);
     gameplay.syncLeppaTreeState?.(session.leppaTree, controls.storyState);
     updateChopperNpcActor(session.chopperNpcActor, {
       deltaTime,
       storyState: controls.storyState,
-      isNpcActive: rendering.isNpcActive
+      isNpcActive: rendering.isNpcActive,
+      guidePosition: RUINED_POKEMON_CENTER_GUIDE_POSITION
     });
     updateBulbasaurEncounter(deltaTime);
     updateCharmanderEncounter(deltaTime);
@@ -2154,7 +2230,8 @@ export function startGameLoop({
           session.leafDen,
           session.timburrEncounter,
           session.charmanderEncounter,
-          session.leppaTree
+          session.leppaTree,
+          session.bulbasaurEncounter
         ) :
         null;
     const activeQuest = gameplay.getActiveQuest(controls.storyState);

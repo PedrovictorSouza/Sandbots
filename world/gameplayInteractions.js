@@ -75,7 +75,6 @@ export function createGameplayInteractions({
   purifyGroundCell,
   reviveGroundFlower = () => {},
   reviveGroundGrass = () => {},
-  strikeNearbyPalm,
   waterNearbyPalm = () => ({
     hit: false,
     counted: false,
@@ -87,7 +86,6 @@ export function createGameplayInteractions({
   questSystem = null,
   habitatSystem = null
 }) {
-  let nextWoodDropId = 1;
   let missedInteractAttempts = 0;
   let missedHarvestAttempts = 0;
 
@@ -494,9 +492,7 @@ export function createGameplayInteractions({
     return habitat;
   }
 
-  function resetRuntimeState() {
-    nextWoodDropId = 1;
-  }
+  function resetRuntimeState() {}
 
   function advanceQuest(storyState, message) {
     storyState.questIndex = Math.min(storyState.questIndex + 1, STORY_QUESTS.length - 1);
@@ -976,7 +972,14 @@ export function createGameplayInteractions({
       resourceNodes,
       storyState
     );
-    let nearestTarget = nearbyHarvestTarget;
+    const waterGunTreeChallengeActive = Boolean(
+      canPurifyGround &&
+      nearbyHarvestTarget?.palm &&
+      storyState?.flags?.bulbasaurStrawBedChallengeAvailable &&
+      !storyState.flags.bulbasaurStrawBedChallengeComplete &&
+      !storyState.flags.strawBedRecipeUnlocked
+    );
+    let nearestTarget = nearbyHarvestTarget?.palm ? null : nearbyHarvestTarget;
 
     if (
       storyState?.flags?.logChairReceived &&
@@ -1048,6 +1051,10 @@ export function createGameplayInteractions({
       }
     }
 
+    if (waterGunTreeChallengeActive) {
+      return nearbyHarvestTarget;
+    }
+
     const nearbyLeafageTarget = canUseLeafage ?
       findNearbyLeafageGroundCell({
         playerPosition,
@@ -1094,11 +1101,16 @@ export function createGameplayInteractions({
     leppaBerryDrops = [],
     timburrEncounter = null,
     charmanderEncounter = null,
+    bulbasaurEncounter = null,
     onNpcInteractionStart = () => {}
   }) {
     const getInteractionTargetPosition = (target) => {
       if (!target) {
         return null;
+      }
+
+      if (Array.isArray(target.position)) {
+        return target.position;
       }
 
       const groundGrassTargetKinds = new Set([
@@ -1154,7 +1166,8 @@ export function createGameplayInteractions({
       leafDen,
       timburrEncounter,
       charmanderEncounter,
-      leppaTree
+      leppaTree,
+      bulbasaurEncounter
     );
     if (!nearbyTarget?.target) {
       pushMissedInteractNotice();
@@ -1649,26 +1662,8 @@ export function createGameplayInteractions({
       }
     }
 
-    const palmStrike = strikeNearbyPalm(
-      playerPosition,
-      palmModel,
-      palmInstances,
-      woodDrops,
-      nextWoodDropId
-    );
-    if (!palmStrike.hit) {
-      pushMissedHarvestNotice({ canPurifyGround, canUseLeafage });
-      return false;
-    }
-
-    missedHarvestAttempts = 0;
-    nextWoodDropId = palmStrike.nextWoodDropId;
-    pushNotice(
-      palmStrike.felled ?
-        "Palmeira derrubada. Pegue os drops de Wood." :
-        `Golpe ${palmStrike.palm.hitCount}/5 na palmeira.`
-    );
-    return true;
+    pushMissedHarvestNotice({ canPurifyGround, canUseLeafage });
+    return false;
   }
 
   return {

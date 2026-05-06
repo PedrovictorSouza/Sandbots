@@ -133,6 +133,7 @@ export async function createCharacterFactory({
       worldHeight = 1.4,
       controller = createStaticController(),
       collisionTest = null,
+      positionTransform = null,
     } = {}) {
       const baseGroundY = position[1] || 0;
       const state = {
@@ -155,6 +156,15 @@ export async function createCharacterFactory({
         return controller?.getIntent?.() || fallback;
       }
 
+      function resolveWorldPosition(nextPosition) {
+        const resolvedPosition = positionTransform?.(nextPosition) || nextPosition;
+        return [
+          Number(resolvedPosition?.[0]) || 0,
+          Number(resolvedPosition?.[1]) || 0,
+          Number(resolvedPosition?.[2]) || 0
+        ];
+      }
+
       return {
         get id() {
           return state.id;
@@ -169,8 +179,8 @@ export async function createCharacterFactory({
             return;
           }
 
-          state.position = [nextPosition[0], nextPosition[1], nextPosition[2]];
-          state.groundY = nextPosition[1] || baseGroundY;
+          state.position = resolveWorldPosition(nextPosition);
+          state.groundY = state.position[1] || baseGroundY;
           state.verticalVelocity = 0;
         },
 
@@ -224,18 +234,19 @@ export async function createCharacterFactory({
             state.position[2] + movement[2] * state.currentSpeed * deltaTime,
           ];
 
+          const resolvedNextPosition = resolveWorldPosition(nextPosition);
           const collision = normalizeCollisionResult(
-            collisionTest ? collisionTest(nextPosition, state.id) : false
+            collisionTest ? collisionTest(resolvedNextPosition, state.id) : false
           );
           if (!collision.blocked) {
             if (collision.landingY !== null && state.verticalVelocity <= 0.8) {
-              nextPosition[1] = collision.landingY;
+              resolvedNextPosition[1] = collision.landingY;
               state.groundY = collision.landingY;
               state.verticalVelocity = 0;
             } else if (collision.landingY === null && state.groundY > baseGroundY) {
               state.groundY = baseGroundY;
             }
-            state.position = nextPosition;
+            state.position = resolvedNextPosition;
           }
 
           state.facing = intent.facing || state.facing;

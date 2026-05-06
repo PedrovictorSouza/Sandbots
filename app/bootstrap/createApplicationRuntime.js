@@ -657,7 +657,8 @@ export function createApplicationRuntime({
       gameSession.leafDen,
       gameSession.timburrEncounter,
       gameSession.charmanderEncounter,
-      gameSession.leppaTree
+      gameSession.leppaTree,
+      gameSession.bulbasaurEncounter
     );
 
     const target = nearbyInteractable?.target;
@@ -700,8 +701,10 @@ export function createApplicationRuntime({
     }
 
     const activeQuest = getActiveQuest(storyState);
+    const activeSystemQuest = questSystem?.getActiveQuest?.();
 
     return (
+      activeSystemQuest?.id === "chopper-first-habitat-report" ||
       activeQuest?.id === "meetTangrowth" ||
       (
         storyState.flags.tallGrassDiscovered &&
@@ -710,6 +713,11 @@ export function createApplicationRuntime({
       (
         storyState.flags.tangrowthLogChairRequestAvailable &&
         !storyState.flags.logChairReceived
+      ) ||
+      (
+        storyState.flags.campfireCrafted &&
+        storyState.flags.campfireSelectedForTangrowth &&
+        !storyState.flags.campfireSpatOut
       ) ||
       (
         storyState.flags.tangrowthHouseTalkAvailable &&
@@ -2068,6 +2076,7 @@ export function createApplicationRuntime({
     loopConfig: {
       camera: engine.camera,
       mount: dom.renderFrame,
+      fpsPanel: dom.fpsPanel,
       worldCanvas: dom.worldCanvas,
       worldRenderer: engine.worldRenderer,
       worldSpeech: uiRuntime.worldSpeech,

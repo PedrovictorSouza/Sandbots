@@ -7,6 +7,7 @@ export function resolveDomElements(documentRef = document) {
     status: documentRef.getElementById("status"),
     mount: documentRef.getElementById("game-stage"),
     renderFrame: documentRef.getElementById("render-frame"),
+    fpsPanel: documentRef.getElementById("fps-panel"),
     jitterSlider: documentRef.getElementById("jitter-slider"),
     jitterValue: documentRef.getElementById("jitter-value"),
     warmOverlay: documentRef.getElementById("warm-overlay"),

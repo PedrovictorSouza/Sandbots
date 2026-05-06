@@ -32,11 +32,20 @@ const SCENE_VERTEX_SOURCE = `
   uniform vec3 uLocalPivot;
   uniform float uSwayStrength;
   uniform float uJitterAmount;
+  uniform vec3 uWorldCurvatureOrigin;
+  uniform float uWorldCurvatureStrength;
+  uniform float uWorldCurvatureMaxDrop;
   uniform vec2 uPixelSnap;
   uniform float uTime;
 
   varying vec2 vTexCoord;
   varying vec3 vWorldNormal;
+
+  vec3 applyWorldCurvature(vec3 world) {
+    vec2 delta = world.xz - uWorldCurvatureOrigin.xz;
+    float drop = min(dot(delta, delta) * uWorldCurvatureStrength, uWorldCurvatureMaxDrop);
+    return vec3(world.x, world.y - drop, world.z);
+  }
 
   void main() {
     vec3 local = aPosition * uModelScale + uModelOffset;
@@ -100,10 +109,11 @@ const SCENE_VERTEX_SOURCE = `
       normal.y,
       normal.x * sine + normal.z * cosine
     ));
-    vec4 clip = uViewProjection * vec4(world, 1.0);
+    vec3 curvedWorld = applyWorldCurvature(world);
+    vec4 clip = uViewProjection * vec4(curvedWorld, 1.0);
 
     float phase = uTime * 3.5 + world.x * 1.7 + world.y * 2.3 + world.z * 1.1;
-    vec2 jitter = vec2(sin(phase), cos(phase * 0.83)) * (0.008 * uJitterAmount);
+    vec2 jitter = vec2(sin(phase), cos(phase * 0.83)) * (0.0072 * uJitterAmount);
 
     clip.xy += jitter * clip.w;
     vec2 snapped = floor((clip.xy / clip.w) * uPixelSnap + 0.5) / uPixelSnap;
@@ -155,9 +165,18 @@ const SPRITE_VERTEX_SOURCE = `
   uniform vec3 uQuadUp;
   uniform vec4 uUvRect;
   uniform float uSpriteRotation;
+  uniform vec3 uWorldCurvatureOrigin;
+  uniform float uWorldCurvatureStrength;
+  uniform float uWorldCurvatureMaxDrop;
   uniform vec2 uPixelSnap;
 
   varying vec2 vTexCoord;
+
+  vec3 applyWorldCurvature(vec3 world) {
+    vec2 delta = world.xz - uWorldCurvatureOrigin.xz;
+    float drop = min(dot(delta, delta) * uWorldCurvatureStrength, uWorldCurvatureMaxDrop);
+    return vec3(world.x, world.y - drop, world.z);
+  }
 
   void main() {
     float rotationSine = sin(uSpriteRotation);
@@ -166,8 +185,9 @@ const SPRITE_VERTEX_SOURCE = `
       aCorner.x * rotationCosine - aCorner.y * rotationSine,
       aCorner.x * rotationSine + aCorner.y * rotationCosine
     );
+    vec3 curvedWorldPosition = applyWorldCurvature(uWorldPosition);
     vec3 world =
-      uWorldPosition +
+      curvedWorldPosition +
       uQuadRight * (rotatedCorner.x * uSpriteSize.x) +
       uQuadUp * (rotatedCorner.y * uSpriteSize.y);
 
@@ -376,6 +396,9 @@ export function createWorldRenderingResources(gl) {
     localPivot: gl.getUniformLocation(program, "uLocalPivot"),
     swayStrength: gl.getUniformLocation(program, "uSwayStrength"),
     jitterAmount: gl.getUniformLocation(program, "uJitterAmount"),
+    worldCurvatureOrigin: gl.getUniformLocation(program, "uWorldCurvatureOrigin"),
+    worldCurvatureStrength: gl.getUniformLocation(program, "uWorldCurvatureStrength"),
+    worldCurvatureMaxDrop: gl.getUniformLocation(program, "uWorldCurvatureMaxDrop"),
     pixelSnap: gl.getUniformLocation(program, "uPixelSnap"),
     time: gl.getUniformLocation(program, "uTime"),
     texture: gl.getUniformLocation(program, "uTexture"),
@@ -396,6 +419,9 @@ export function createWorldRenderingResources(gl) {
     uvRect: gl.getUniformLocation(spriteProgram, "uUvRect"),
     spriteRotation: gl.getUniformLocation(spriteProgram, "uSpriteRotation"),
     spriteAlpha: gl.getUniformLocation(spriteProgram, "uSpriteAlpha"),
+    worldCurvatureOrigin: gl.getUniformLocation(spriteProgram, "uWorldCurvatureOrigin"),
+    worldCurvatureStrength: gl.getUniformLocation(spriteProgram, "uWorldCurvatureStrength"),
+    worldCurvatureMaxDrop: gl.getUniformLocation(spriteProgram, "uWorldCurvatureMaxDrop"),
     pixelSnap: gl.getUniformLocation(spriteProgram, "uPixelSnap"),
     spriteTexture: gl.getUniformLocation(spriteProgram, "uSpriteTexture")
   };

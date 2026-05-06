@@ -163,7 +163,7 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="water-dry-tall-grass"');
   });
 
-  it("prioritizes Bulbasaur's request over the background habitat note", () => {
+  it("renders the first companion request in the request log after habitat discovery", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -585,7 +585,7 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="leaf-den-kit"');
   });
 
-  it("renders the Building the Leaf Den task through placement and construction", () => {
+  it("renders Leaf Den repair material requirements through placement and construction", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -606,7 +606,9 @@ describe("createQuestLog", () => {
     expect(questLog.renderChecklistHtml(storyState)).toContain("Place the Leaf Den Kit");
 
     storyState.flags.leafDenKitPlaced = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Gather 3 Sturdy Sticks and 3 Leaves");
+    const materialChecklistHtml = questLog.renderChecklistHtml(storyState);
+    expect(materialChecklistHtml).toContain("Gather 3 Sturdy Sticks and 3 Leaves");
+    expect(materialChecklistHtml).toContain("lead Timburr and Charmander");
 
     storyState.flags.leafDenConstructionStarted = true;
     expect(questLog.renderChecklistHtml(storyState)).toContain("few real-world hours");
@@ -619,7 +621,7 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="build-leaf-den"');
   });
 
-  it("renders the Leaf Den furniture task through interior placement and Timburr turn-in", () => {
+  it("renders the helper-character Leaf Den furniture request through Timburr turn-in", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -634,7 +636,10 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Enter the Leaf Den");
+    const availableChecklistHtml = questLog.renderChecklistHtml(storyState);
+    const availableLogHtml = questLog.renderLogHtml(storyState);
+    expect(availableChecklistHtml).toContain("Enter the Leaf Den");
+    expect(availableLogHtml).toContain('data-task-id="leaf-den-furniture"');
 
     storyState.flags.leafDenInteriorEntered = true;
     storyState.flags.leafDenFurniturePlacedCount = 2;

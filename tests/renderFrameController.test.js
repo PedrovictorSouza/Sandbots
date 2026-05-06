@@ -63,6 +63,30 @@ describe("createRenderFrameController", () => {
     expect(frameElement.style.getPropertyValue("--game-scale")).toBe("2");
   });
 
+  it("scales down to keep the fixed stage inside smaller browser viewports", () => {
+    const frameElement = document.createElement("div");
+    const controller = createRenderFrameController({
+      frameElement,
+      windowRef: {
+        innerWidth: 1280,
+        innerHeight: 720
+      }
+    });
+
+    const frame = controller.sync();
+
+    expect(frame).toMatchObject({
+      width: 1600,
+      height: 900
+    });
+    expect(frame.gameScale).toBeCloseTo(0.8);
+    expect(frame.renderScale).toBeCloseTo(0.8);
+    expect(frame.safeScale).toBeCloseTo(0.8);
+    expect(frame.sceneScale).toBeCloseTo(0.8);
+    expect(frameElement.style.getPropertyValue("--game-scale")).toBe("0.8");
+    expect(frameElement.style.getPropertyValue("--render-frame-scale")).toBe("0.8");
+  });
+
   it("uses the expected integer scale for common 16:9 viewports", () => {
     const cases = [
       { width: 1920, height: 1080, scale: 1 },

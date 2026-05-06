@@ -1,3 +1,15 @@
+import { shouldDrawSceneInstance } from "./renderCulling.js";
+import { WORLD_LIMIT } from "../gameplayContent.js";
+import {
+  createWrappedWorldTopology,
+  WORLD_WRAP_AXIS_X,
+  WORLD_WRAP_AXIS_Z
+} from "../world/worldTopology.js";
+import {
+  WORLD_CURVATURE_CONFIG,
+  resolveWorldCurvatureOrigin
+} from "./worldCurvature.js";
+
 export function createWorldRenderer({
   gl,
   worldCanvas,
@@ -22,6 +34,18 @@ export function createWorldRenderer({
   const GROUND_HIGHLIGHT_TEXTURE_SIZE = 32;
   const GROUND_HIGHLIGHT_SELECTED_SCALE = 1.05;
   const GROUND_HIGHLIGHT_MARKED_SCALE = 0.98;
+  const worldCurvatureOrigin = new Float32Array(3);
+  const worldRenderTopology = createWrappedWorldTopology({
+    id: "small-island-render-wrap",
+    limit: WORLD_LIMIT,
+    axes: [WORLD_WRAP_AXIS_X, WORLD_WRAP_AXIS_Z]
+  });
+  const renderInstanceOffset = new Float32Array(3);
+  const spriteRenderPosition = new Float32Array(3);
+  const wrappedCullingOptions = {
+    getPlanarDistanceSquared: worldRenderTopology.getPlanarDistanceSquared
+  };
+  let spritePassCameraTarget = null;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -126,10 +150,26 @@ export function createWorldRenderer({
     gl.useProgram(program);
     gl.uniformMatrix4fv(uniforms.viewProjection, false, viewProjection);
     gl.uniform1f(uniforms.jitterAmount, jitterState.amount);
+    syncWorldCurvatureUniforms(uniforms);
     syncPixelSnap();
     gl.uniform2fv(uniforms.pixelSnap, pixelSnap);
     gl.uniform1f(uniforms.time, performance.now() * 0.001);
     gl.uniform1i(uniforms.texture, 0);
+  }
+
+  function syncWorldCurvatureUniforms(targetUniforms) {
+    const cameraTarget = camera.getPose?.()?.target || [0, 0, 0];
+    const origin = resolveWorldCurvatureOrigin(cameraTarget);
+    worldCurvatureOrigin[0] = origin[0];
+    worldCurvatureOrigin[1] = origin[1];
+    worldCurvatureOrigin[2] = origin[2];
+
+    gl.uniform3fv(targetUniforms.worldCurvatureOrigin, worldCurvatureOrigin);
+    gl.uniform1f(
+      targetUniforms.worldCurvatureStrength,
+      WORLD_CURVATURE_CONFIG.enabled ? WORLD_CURVATURE_CONFIG.strength : 0
+    );
+    gl.uniform1f(targetUniforms.worldCurvatureMaxDrop, WORLD_CURVATURE_CONFIG.maxDrop);
   }
 
   function getSkyOrientation() {
@@ -194,7 +234,7 @@ export function createWorldRenderer({
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, primitive.indexBuffer);
   }
 
-  function drawSceneObject(sceneObject) {
+  function drawSceneObject(sceneObject, cameraTarget = null) {
     gl.uniform3fv(uniforms.modelOffset, sceneObject.model.offset);
     gl.uniform1f(uniforms.modelScale, sceneObject.model.scale);
     gl.uniform1f(uniforms.modelHeight, sceneObject.model.size[1]);
@@ -207,7 +247,16 @@ export function createWorldRenderer({
         continue;
       }
 
-      gl.uniform3fv(uniforms.instanceOffset, instance.offset);
+      if (!shouldDrawSceneInstance(instance, sceneObject, cameraTarget, wrappedCullingOptions)) {
+        continue;
+      }
+
+      const instanceOffset = worldRenderTopology.getRenderPosition(
+        instance.offset,
+        cameraTarget,
+        renderInstanceOffset
+      );
+      gl.uniform3fv(uniforms.instanceOffset, instanceOffset);
       gl.uniform1f(uniforms.instanceScale, instance.scale);
       gl.uniform1f(uniforms.instanceYaw, instance.yaw || 0);
       gl.uniform1f(uniforms.instancePitch, instance.pitch || 0);
@@ -265,17 +314,19 @@ export function createWorldRenderer({
         texture
       },
       instances
-    });
+    }, camera.getPose?.()?.target || null);
   }
 
   function prepareSpritePass(viewProjection) {
     const { right: quadRight, up: quadUp } = camera.getBillboardAxes();
+    spritePassCameraTarget = camera.getPose?.()?.target || null;
 
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(spriteProgram);
     gl.uniformMatrix4fv(spriteUniforms.viewProjection, false, viewProjection);
+    syncWorldCurvatureUniforms(spriteUniforms);
     syncPixelSnap();
     gl.uniform2fv(spriteUniforms.pixelSnap, pixelSnap);
     gl.uniform3fv(spriteUniforms.quadRight, quadRight);
@@ -294,9 +345,15 @@ export function createWorldRenderer({
   }
 
   function drawSpriteQuad(texture, position, size, uvRect, { alpha = 1, rotation = 0 } = {}) {
+    const renderPosition = worldRenderTopology.getRenderPosition(
+      position,
+      spritePassCameraTarget,
+      spriteRenderPosition
+    );
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.uniform3fv(spriteUniforms.worldPosition, position);
+    gl.uniform3fv(spriteUniforms.worldPosition, renderPosition);
     gl.uniform2fv(spriteUniforms.spriteSize, size);
     gl.uniform4fv(spriteUniforms.uvRect, uvRect);
     gl.uniform1f(spriteUniforms.spriteRotation, rotation || 0);
@@ -338,9 +395,10 @@ export function createWorldRenderer({
         return;
       }
       configureScenePass(viewProjection);
+      const cameraTarget = camera.getPose?.()?.target || null;
 
       for (const sceneObject of sceneObjects) {
-        drawSceneObject(sceneObject);
+        drawSceneObject(sceneObject, cameraTarget);
       }
     },
 

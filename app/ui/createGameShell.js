@@ -6,11 +6,12 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
   <section class="pause-overlay" id="pause-overlay" hidden aria-label="Pause screen">
     <div class="pause-overlay__label">PAUSE</div>
   </section>
-  <div class="render-frame" id="render-frame">
+  <div class="render-frame" id="render-frame" data-crt-filter="on">
         <canvas id="viewport" class="layer" width="426" height="240"></canvas>
         <div id="warm-overlay" aria-hidden="true"></div>
         <canvas id="sprite-layer" class="layer" width="426" height="240"></canvas>
         <div class="ui-layer" id="ui-layer">
+          <div class="fps-panel" id="fps-panel" aria-live="off">FPS --</div>
           <div class="scene-transition-veil" id="scene-transition-veil" hidden aria-hidden="true"></div>
           <section class="skill-learn-overlay" id="skill-learn-overlay" hidden aria-label="Skill learned"></section>
           <section class="cinematic-overlay" id="cinematic-overlay" hidden aria-label="Act two cinematic"></section>
@@ -245,16 +246,6 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
           <aside class="bag-onboarding-panel" aria-label="Bag onboarding">
             <div class="bag-onboarding-panel__title" id="bag-onboarding-title"></div>
             <div class="bag-onboarding-panel__body" id="bag-onboarding-body"></div>
-          </aside>
-          <aside class="bag-details-panel" aria-label="Bag details">
-            <div class="bag-details-panel__header">
-              <div class="bag-details-panel__item">
-                <span class="bag-details-panel__icon" id="bag-details-icon" aria-hidden="true"></span>
-                <span class="bag-details-panel__name" id="bag-details-name"></span>
-              </div>
-              <span class="bag-details-panel__count" id="bag-details-count"></span>
-            </div>
-            <div class="bag-details-panel__body" id="bag-details-description"></div>
           </aside>
           <div class="hud" id="hud-panel">
             <section class="hud-current-action" id="hud-current-action" data-action-kind="neutral" aria-live="polite" aria-label="Current action">

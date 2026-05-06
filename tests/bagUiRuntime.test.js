@@ -74,12 +74,11 @@ function createRuntime({
 }
 
 describe("createBagUiRuntime", () => {
-  it("shows onboarding once and restores quest visibility after details close", () => {
+  it("shows onboarding once and restores quest visibility when the bag is inspected", () => {
     const {
       bagDetails,
       bagOnboarding,
       gameplayUiVisibility,
-      itemDefs,
       runtime,
       storyState
     } = createRuntime();
@@ -96,10 +95,11 @@ describe("createBagUiRuntime", () => {
 
     runtime.inspect();
 
-    expect(bagDetails.setItem).toHaveBeenCalledWith(itemDefs.wood, 1);
+    expect(bagDetails.setItem).not.toHaveBeenCalled();
     expect(gameplayUiVisibility.isSectionVisible("bagOnboarding")).toBe(false);
-    expect(gameplayUiVisibility.isSectionVisible("bagDetails")).toBe(true);
-    expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(false);
+    expect(gameplayUiVisibility.isSectionVisible("bagDetails")).toBe(false);
+    expect(gameplayUiVisibility.isSectionVisible("inventory")).toBe(true);
+    expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(true);
 
     runtime.inspect();
 
@@ -107,8 +107,8 @@ describe("createBagUiRuntime", () => {
     expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(true);
   });
 
-  it("uses the first available detail item when no selection is active", () => {
-    const { bagDetails, itemDefs, runtime } = createRuntime({
+  it("tracks the first available bag item without opening a details panel", () => {
+    const { bagDetails, runtime } = createRuntime({
       inventory: {
         wood: 0,
         berry: 2
@@ -117,10 +117,12 @@ describe("createBagUiRuntime", () => {
 
     runtime.inspect();
 
-    expect(bagDetails.setItem).toHaveBeenCalledWith(itemDefs.berry, 2);
+    expect(runtime.getSelectedItemId()).toBe("berry");
+    expect(runtime.isDetailsOpen()).toBe(false);
+    expect(bagDetails.setItem).not.toHaveBeenCalled();
   });
 
-  it("uses field-use priority when choosing the first detail item", () => {
+  it("uses field-use priority when choosing the tracked bag item", () => {
     const bagDetails = {
       setItem: vi.fn()
     };
@@ -155,11 +157,13 @@ describe("createBagUiRuntime", () => {
 
     runtime.inspect();
 
-    expect(bagDetails.setItem).toHaveBeenCalledWith(itemDefs.campfire, 1);
+    expect(runtime.getSelectedItemId()).toBe("campfire");
+    expect(runtime.isDetailsOpen()).toBe(false);
+    expect(bagDetails.setItem).not.toHaveBeenCalled();
   });
 
-  it("refreshes details when a collected item becomes selected while details are open", () => {
-    const { bagDetails, itemDefs, runtime, storyState } = createRuntime({
+  it("updates the tracked bag item when a new eligible item is collected", () => {
+    const { bagDetails, runtime, storyState } = createRuntime({
       storyState: {
         flags: {
           bagOnboardingSeen: true
@@ -170,7 +174,9 @@ describe("createBagUiRuntime", () => {
     runtime.inspect();
     runtime.handleItemCollected("berry", storyState);
 
-    expect(bagDetails.setItem).toHaveBeenLastCalledWith(itemDefs.berry, 1);
+    expect(runtime.getSelectedItemId()).toBe("berry");
+    expect(runtime.isDetailsOpen()).toBe(false);
+    expect(bagDetails.setItem).not.toHaveBeenCalled();
   });
 
   it("reports the selected detail item", () => {

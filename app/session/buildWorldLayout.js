@@ -13,7 +13,9 @@ import {
   PALM_INSTANCE_LAYOUT,
   LEPPA_TREE_POSITION,
   RUINED_POKEMON_CENTER_LAYOUT,
+  RUINED_POKEMON_CENTER_POSITION,
   RESOURCE_NODE_DEFS,
+  WORKBENCH_POSITION,
   GROUND_FLOWER_LAYOUT,
   GROUND_GRASS_LAYOUT,
   WORLD_LIMIT
@@ -67,6 +69,66 @@ function buildElevatedTerrainSafeZones() {
       position: [barrier.position[0], barrier.position[2]],
       radius: barrier.radius + 3
     }))
+  ];
+}
+
+function createBuildingCollider(id, position, size, surfaceY, offset = [0, 0], padding = 0.12) {
+  return {
+    id,
+    position: [
+      Number((position[0] + offset[0]).toFixed(4)),
+      0,
+      Number((position[2] + offset[1]).toFixed(4))
+    ],
+    size,
+    surfaceY,
+    blocksPlayer: true,
+    padding
+  };
+}
+
+function buildBuildingColliders() {
+  return [
+    createBuildingCollider(
+      "pokemon-center-workshop-solid-collider",
+      RUINED_POKEMON_CENTER_POSITION,
+      [7.6, 3.2, 6.2],
+      3.2,
+      [0, 0.15],
+      0.18
+    ),
+    createBuildingCollider(
+      "workbench-solid-collider",
+      WORKBENCH_POSITION,
+      [7.9, 3.0, 4.5],
+      3,
+      [0, 0.95],
+      0.08
+    ),
+    createBuildingCollider(
+      "workbench-left-side-solid-collider",
+      WORKBENCH_POSITION,
+      [2.1, 3.0, 2.6],
+      3,
+      [-2.95, -2.75],
+      0.08
+    ),
+    createBuildingCollider(
+      "workbench-right-side-solid-collider",
+      WORKBENCH_POSITION,
+      [2.1, 3.0, 2.6],
+      3,
+      [2.95, -2.75],
+      0.08
+    ),
+    createBuildingCollider(
+      "workbench-ramp-collider",
+      WORKBENCH_POSITION,
+      [3.6, 0.16, 2.2],
+      0.16,
+      [0, -3.0],
+      0.04
+    )
   ];
 }
 
@@ -131,7 +193,10 @@ export function buildWorldLayout(session, assets) {
     safeZones: buildElevatedTerrainSafeZones()
   });
   session.elevatedTerrainInstances = elevatedTerrain.instances;
-  session.elevatedTerrainColliders = elevatedTerrain.colliders;
+  session.elevatedTerrainColliders = [
+    ...elevatedTerrain.colliders,
+    ...buildBuildingColliders()
+  ];
   session.groundDeadInstances.push(...session.elevatedTerrainInstances);
 
   session.groundPurifiedInstances = [];

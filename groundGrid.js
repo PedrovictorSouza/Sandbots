@@ -1,9 +1,68 @@
+import { createSpatialHashIndex } from "./world/spatialHash.js";
+
 export const GROUND_TILE_INSTANCE_SCALE = 0.375;
 export const GROUND_CELL_INTERACT_RADIUS_FACTOR = 0.82;
 export const DEAD_PATCH_STATE = "dead";
 export const ALIVE_PATCH_STATE = "alive";
 export const DEAD_GRASS_STATE = DEAD_PATCH_STATE;
 export const GREEN_GRASS_STATE = ALIVE_PATCH_STATE;
+
+const GROUND_CELL_INDEX_MIN_SIZE = 128;
+const groundCellIndexCache = new WeakMap();
+
+function getMaxTileSpan(groundInstances) {
+  return groundInstances.reduce((maxTileSpan, groundCell) => {
+    return Math.max(maxTileSpan, Number(groundCell?.tileSpan) || 0);
+  }, 0);
+}
+
+export function createGroundCellSpatialIndex(groundInstances) {
+  if (!Array.isArray(groundInstances)) {
+    return null;
+  }
+
+  const maxTileSpan = getMaxTileSpan(groundInstances);
+  const cellSize = Math.max(4, maxTileSpan * 4);
+  const index = createSpatialHashIndex(groundInstances, { cellSize });
+
+  return {
+    ...index,
+    maxTileSpan,
+    maxInteractDistance: maxTileSpan * GROUND_CELL_INTERACT_RADIUS_FACTOR
+  };
+}
+
+function getCachedGroundCellSpatialIndex(groundInstances) {
+  if (!Array.isArray(groundInstances) || groundInstances.length < GROUND_CELL_INDEX_MIN_SIZE) {
+    return null;
+  }
+
+  const cached = groundCellIndexCache.get(groundInstances);
+  if (cached?.length === groundInstances.length) {
+    return cached.index;
+  }
+
+  const index = createGroundCellSpatialIndex(groundInstances);
+  groundCellIndexCache.set(groundInstances, {
+    length: groundInstances.length,
+    index
+  });
+
+  return index;
+}
+
+function getGroundCellCandidates(playerPosition, groundInstances, maxDistanceFactor, spatialIndex) {
+  const index = spatialIndex || getCachedGroundCellSpatialIndex(groundInstances);
+
+  if (!index) {
+    return groundInstances;
+  }
+
+  return index.queryRadius(
+    playerPosition,
+    Math.max(index.maxInteractDistance, (index.maxTileSpan || 0) * maxDistanceFactor)
+  );
+}
 
 function buildGroundPatches({
   groundInstances,
@@ -162,12 +221,19 @@ export function buildGroundFlowerPatches({
 export function findNearbyGroundCell(
   playerPosition,
   groundInstances,
-  maxDistanceFactor = GROUND_CELL_INTERACT_RADIUS_FACTOR
+  maxDistanceFactor = GROUND_CELL_INTERACT_RADIUS_FACTOR,
+  spatialIndex = null
 ) {
   let nearestGroundCell = null;
   let nearestDistance = Infinity;
+  const candidates = getGroundCellCandidates(
+    playerPosition,
+    groundInstances,
+    maxDistanceFactor,
+    spatialIndex
+  );
 
-  for (const groundCell of groundInstances) {
+  for (const groundCell of candidates) {
     if (groundCell.active === false) {
       continue;
     }

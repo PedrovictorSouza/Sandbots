@@ -73,6 +73,128 @@ describe("createQuestSystem", () => {
     expect(questSystem.getQuest("learn-to-move").status).toBe("completed");
   });
 
+  it("makes the first mentor interaction available only after the movement task", () => {
+    const questSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: createMemoryStorage()
+    });
+
+    const lockedMentorQuest = questSystem.getQuest("wake-guide");
+    expect(lockedMentorQuest.status).toBe(QUEST_STATUS.LOCKED);
+    expect(lockedMentorQuest.objectives[0]).toEqual(expect.objectContaining({
+      type: QUEST_EVENT.TALK,
+      targetId: "tangrowth",
+      required: 1,
+      current: 0
+    }));
+
+    questSystem.emit({ type: QUEST_EVENT.TALK, targetId: "tangrowth" });
+    expect(questSystem.getActiveQuest().id).toBe("learn-to-move");
+    expect(questSystem.getQuest("wake-guide").status).toBe(QUEST_STATUS.LOCKED);
+
+    questSystem.emit({ type: QUEST_EVENT.MOVE, targetId: "player" });
+    const activeQuest = questSystem.getActiveQuest();
+
+    expect(activeQuest).toEqual(expect.objectContaining({
+      id: "wake-guide",
+      giverId: "chopper",
+      status: QUEST_STATUS.ACTIVE
+    }));
+    expect(activeQuest.objectives[0]).toEqual(expect.objectContaining({
+      type: QUEST_EVENT.TALK,
+      targetId: "tangrowth",
+      required: 1,
+      current: 0
+    }));
+  });
+
+  it("unlocks the first restoration ability when Water Gun is learned", () => {
+    const questSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: createMemoryStorage()
+    });
+
+    questSystem.activateQuest("open-the-water-route");
+    expect(questSystem.hasUnlocked("water-restoration")).toBe(false);
+
+    const result = questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
+
+    expect(result.completedQuestIds).toEqual(["open-the-water-route"]);
+    expect(questSystem.getQuest("open-the-water-route").status).toBe(QUEST_STATUS.COMPLETED);
+    expect(questSystem.hasUnlocked("water-restoration")).toBe(true);
+    expect(questSystem.getActiveQuest().id).toBe("water-dry-grass");
+  });
+
+  it("does not duplicate the first restoration ability reward", () => {
+    const questSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: createMemoryStorage()
+    });
+
+    questSystem.activateQuest("open-the-water-route");
+    questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
+    questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
+
+    const state = questSystem.getState();
+    expect(state.unlocked.filter((unlockId) => unlockId === "water-restoration")).toHaveLength(1);
+    expect(state.completedQuestIds.filter((questId) => questId === "open-the-water-route")).toHaveLength(1);
+  });
+
+  it("reveals the first companion discovery after the first habitat restoration", () => {
+    const questSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: createMemoryStorage()
+    });
+
+    questSystem.activateQuest("open-the-water-route");
+    questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
+
+    const firstHabitatQuest = questSystem.getActiveQuest();
+    expect(firstHabitatQuest).toEqual(expect.objectContaining({
+      id: "water-dry-grass",
+      giverId: "leaf-helper"
+    }));
+    expect(firstHabitatQuest.objectives[0]).toEqual(expect.objectContaining({
+      type: QUEST_EVENT.BUILD,
+      targetId: "revived-grass",
+      required: 10,
+      current: 0
+    }));
+
+    questSystem.emit({ type: QUEST_EVENT.BUILD, targetId: "revived-grass", amount: 10 });
+    const discoveryQuest = questSystem.getActiveQuest();
+
+    expect(questSystem.hasUnlocked("dry-grass-request-complete")).toBe(true);
+    expect(discoveryQuest).toEqual(expect.objectContaining({
+      id: "inspect-rustling-grass",
+      giverId: "leaf-helper",
+      status: QUEST_STATUS.ACTIVE
+    }));
+    expect(discoveryQuest.objectives[0]).toEqual(expect.objectContaining({
+      type: QUEST_EVENT.TALK,
+      targetId: "leaf-helper",
+      required: 1,
+      current: 0
+    }));
+  });
+
+  it("completes the first home objective when the leafy home patch is placed", () => {
+    const questSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: createMemoryStorage()
+    });
+
+    questSystem.activateQuest("grow-a-home-patch");
+    expect(questSystem.hasUnlocked("first-helper-home")).toBe(false);
+
+    const result = questSystem.emit({ type: QUEST_EVENT.PLACE, targetId: "leafy-home-patch" });
+
+    expect(result.completedQuestIds).toEqual(["grow-a-home-patch"]);
+    expect(questSystem.getQuest("grow-a-home-patch").status).toBe(QUEST_STATUS.COMPLETED);
+    expect(questSystem.hasUnlocked("first-helper-home")).toBe(true);
+    expect(questSystem.getActiveQuest().id).toBe("chopper-first-habitat-report");
+  });
+
   it("does not replay future onboarding events into tasks that become active later", () => {
     const questSystem = createQuestSystem({
       quests: SMALL_ISLAND_QUESTS,

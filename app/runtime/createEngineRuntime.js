@@ -51,6 +51,9 @@ export function createEngineRuntime({
     frameElement: renderFrameElement,
     windowRef
   });
+  const initialFrame = renderFrame.sync();
+  stageRuntime.syncUiScale(initialFrame);
+
   const gl = worldCanvas.getContext("webgl", {
     antialias: false,
     alpha: false,

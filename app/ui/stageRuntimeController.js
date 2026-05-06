@@ -12,6 +12,24 @@ const FIXED_UI_LAYOUT = Object.freeze({
   guideScale: 1
 });
 
+function formatScale(value) {
+  return Number(value).toFixed(3).replace(/\.?0+$/, "");
+}
+
+function normalizeStageScale(value) {
+  const scale = Number(value);
+
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return 1;
+  }
+
+  if (scale < 1) {
+    return scale;
+  }
+
+  return Math.max(1, Math.floor(scale));
+}
+
 export function createStageRuntimeController({
   rootStyle,
   jitterValueElement,
@@ -19,10 +37,11 @@ export function createStageRuntimeController({
 }) {
   return {
     syncUiScale(frame = {}) {
-      const gameScale = Math.max(1, Math.floor(Number(frame.gameScale) || Number(frame.renderScale) || 1));
+      const gameScale = normalizeStageScale(frame.gameScale || frame.renderScale || 1);
+      const formattedGameScale = formatScale(gameScale);
 
-      rootStyle.setProperty("--game-scale", `${gameScale}`);
-      rootStyle.setProperty("--console-display-scale", `${gameScale}`);
+      rootStyle.setProperty("--game-scale", formattedGameScale);
+      rootStyle.setProperty("--console-display-scale", formattedGameScale);
       rootStyle.setProperty("--ui-gap", `${FIXED_UI_LAYOUT.gap}px`);
       rootStyle.setProperty("--hud-width", `${FIXED_UI_LAYOUT.hudWidth}px`);
       rootStyle.setProperty("--status-width", `${FIXED_UI_LAYOUT.statusWidth}px`);
@@ -34,7 +53,7 @@ export function createStageRuntimeController({
       rootStyle.setProperty("--guide-scale", `${FIXED_UI_LAYOUT.guideScale}`);
       rootStyle.setProperty("--ui-stage-width", `${FIXED_UI_LAYOUT.uiStageWidth}px`);
       rootStyle.setProperty("--ui-stage-height", `${FIXED_UI_LAYOUT.uiStageHeight}px`);
-      rootStyle.setProperty("--ui-stage-scale", `${gameScale}`);
+      rootStyle.setProperty("--ui-stage-scale", formattedGameScale);
     },
 
     syncJitterUi(jitterAmount) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCampfirePlacement,
+  createCollisionChecker,
   buildLeafDenKitPlacement,
   buildLogChairPlacement,
   buildNearbyPrompt,
@@ -114,6 +115,68 @@ describe("findNearbyInteractable", () => {
       },
       distance: expect.any(Number)
     });
+  });
+
+  it("uses Bulbasaur's visible encounter position for mission interaction", () => {
+    const storyState = {
+      flags: {
+        bulbasaurRevealed: true,
+        bulbasaurDryGrassMissionAccepted: false,
+        restoredGrassCount: 4,
+        rustlingGrassCellId: "ground-3-1"
+      }
+    };
+    const grassPatches = [
+      {
+        id: "grass-3",
+        cellId: "ground-3-1",
+        position: [8.4, 0.02, -4.2],
+        state: "alive"
+      }
+    ];
+    const bulbasaurEncounter = {
+      visible: true,
+      position: [12.2, 0.02, -2.1]
+    };
+
+    const resultNearBulbasaur = findNearbyInteractable(
+      [12.4, 0, -2.2],
+      [],
+      [],
+      storyState,
+      grassPatches,
+      null,
+      null,
+      null,
+      null,
+      null,
+      bulbasaurEncounter
+    );
+    const resultNearGrass = findNearbyInteractable(
+      [8.1, 0, -3.9],
+      [],
+      [],
+      storyState,
+      grassPatches,
+      null,
+      null,
+      null,
+      null,
+      null,
+      bulbasaurEncounter
+    );
+
+    expect(resultNearBulbasaur).toEqual({
+      target: {
+        kind: "bulbasaurMission",
+        id: "bulbasaurDryGrassMission",
+        label: "Talk to Bulbasaur",
+        cellId: "ground-3-1",
+        position: [12.2, 0.02, -2.1]
+      },
+      distance: expect.any(Number)
+    });
+    expect(resultNearGrass).toBeNull();
   });
 
   it("still detects Bulbasaur mission interaction if enough grass was watered before accepting it", () => {
@@ -570,7 +633,7 @@ describe("findNearbyInteractable", () => {
       storyState: {
         flags: {}
       }
-    })).toBe("[A / E / X] Leaf Den Kit • Start construction");
+    })).toBe("[E / X] Leaf Den Kit • Start construction");
   });
 
   it("detects the completed Leaf Den as an entrance", () => {
@@ -612,7 +675,7 @@ describe("findNearbyInteractable", () => {
         title: "Furnitures inside Leaf Den",
         actionLabel: "Enter"
       }
-    })).toBe("[A / E / X] Leaf Den • Enter");
+    })).toBe("[E / X] Leaf Den • Enter");
   });
 
   it("detects Timburr as the Leaf Den furniture request turn-in", () => {
@@ -741,7 +804,7 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Interact"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("[A / E / X] Workbench • Workbench");
+    })).toBe("[E / X] Workbench • Workbench");
   });
 
   it("describes the Leafage grow action in the nearby prompt", () => {
@@ -799,5 +862,74 @@ describe("findNearbyInteractable", () => {
       },
       getItemLabel: (itemId) => itemId
     })).toBe("[Enter] Mark dry ground for Squirtle • 1 queued");
+  });
+});
+
+describe("createCollisionChecker", () => {
+  it("keeps terrain collision behavior with many far colliders", () => {
+    const colliders = Array.from({ length: 600 }, (_, index) => ({
+      id: `far-${index}`,
+      position: [80 + index * 2, 0, 80],
+      size: [1, 1, 1],
+      surfaceY: 1,
+      blocksPlayer: true
+    }));
+    colliders.push({
+      id: "near-platform",
+      position: [2, 0, 2],
+      size: [4, 1, 4],
+      surfaceY: 1,
+      blocksPlayer: true
+    });
+    const isBlocked = createCollisionChecker(
+      { size: [1, 1, 1] },
+      { size: [1, 1, 1] },
+      [],
+      () => [],
+      () => colliders,
+      2000
+    );
+
+    expect(isBlocked([2, 0, 2])).toBe(true);
+    expect(isBlocked([2, 1, 2])).toEqual({
+      blocked: false,
+      landingY: 1
+    });
+    expect(isBlocked([30, 0, 30])).toBe(false);
+  });
+
+  it("blocks solid building footprints while allowing low ramp colliders", () => {
+    const colliders = [
+      {
+        id: "building-solid",
+        position: [5, 0, 0],
+        size: [4, 3, 4],
+        surfaceY: 3,
+        blocksPlayer: true,
+        padding: 0
+      },
+      {
+        id: "building-ramp",
+        position: [-5, 0, 0],
+        size: [2, 0.16, 2],
+        surfaceY: 0.16,
+        blocksPlayer: true,
+        padding: 0
+      }
+    ];
+    const isBlocked = createCollisionChecker(
+      { size: [1, 1, 1] },
+      { size: [1, 1, 1] },
+      [],
+      () => [],
+      () => colliders,
+      2000
+    );
+
+    expect(isBlocked([5, 0, 0])).toBe(true);
+    expect(isBlocked([-5, 0, 0])).toEqual({
+      blocked: false,
+      landingY: 0.16
+    });
   });
 });

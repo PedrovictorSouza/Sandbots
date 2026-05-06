@@ -4044,10 +4044,10 @@
 
       .inventory {
         position: absolute;
-        left: 50%;
+        left: var(--ui-gap);
         bottom: var(--ui-gap);
-        transform: translateX(-50%) scale(var(--hud-scale));
-        transform-origin: center bottom;
+        transform: scale(var(--hud-scale));
+        transform-origin: left bottom;
         display: grid;
         gap: 10px;
         padding: 14px;
@@ -4056,7 +4056,7 @@
         box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
         backdrop-filter: blur(6px);
         z-index: 2;
-        width: calc(min(var(--inventory-width), calc(100% - var(--ui-gap) * 2)) / var(--hud-scale));
+        width: calc((100% - var(--ui-gap) * 2) / var(--hud-scale));
       }
 
       .inventory strong {

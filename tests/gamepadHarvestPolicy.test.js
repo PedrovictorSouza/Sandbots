@@ -34,5 +34,9 @@ describe("gamepad harvest policy", () => {
       source: "gamepadPrimary",
       activeHarvestTarget: { groundCell: { id: "dry-ground" } }
     })).toBe(true);
+    expect(shouldGamepadSourceHarvestTarget({
+      source: "gamepadPrimary",
+      activeHarvestTarget: { palm: { id: "tree" } }
+    })).toBe(true);
   });
 });

@@ -24,7 +24,7 @@ describe("createGameplayCameraDirector", () => {
     const cameraOrbit = {
       sync: vi.fn()
     };
-    const playerPosition = [8.4, 0, -3.2];
+    const playerPosition = ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION;
     const ship = {
       visible: false,
       position: null,

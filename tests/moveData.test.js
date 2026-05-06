@@ -63,6 +63,13 @@ describe("small island move data", () => {
   });
 
   it("uses first-use guidance while a learned move has not succeeded yet", () => {
+    expect(getSmallIslandMoveById("water-gun")).toMatchObject({
+      abilityId: "waterGun",
+      learnedFromNpcId: "stranded-helper",
+      unlockId: "waterGun",
+      inputHint: "RT / Enter near target",
+      effects: ["restore-dry-plants", "restore-dry-terrain", "water-crops"]
+    });
     expect(getSmallIslandMoveById("water-gun").firstUseCompleteFlags).toEqual([
       "firstGrassRestored"
     ]);

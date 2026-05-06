@@ -54,7 +54,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "revitalizes dried up terrain",
       "waters crops"
     ],
-    notes: "First formal companion field move. It teaches the player that Pokemon powers change terrain."
+    notes: "First formal companion field move. It teaches the player that Pokemon powers change terrain.",
+    narrativePurpose: "Shows that care can reverse drought and make damaged ground useful again."
   },
   {
     id: "bulbasaur-leafage",
@@ -86,7 +87,8 @@ export const COMPANION_ABILITIES = deepFreeze([
     worldEffects: [
       "creates patches of tall grass"
     ],
-    notes: "Second formal companion field move. It turns restored terrain into habitat."
+    notes: "Second formal companion field move. It turns restored terrain into habitat.",
+    narrativePurpose: "Turns restored ground into a social invitation for habitats and companions."
   },
   {
     id: "scyther-cut",
@@ -116,7 +118,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "cuts lumber",
       "gathers materials"
     ],
-    notes: "Planned material-gathering and route-clearing move."
+    notes: "Planned material-gathering and route-clearing move.",
+    narrativePurpose: "Turns overgrowth into building material without making cleanup feel like destruction."
   },
   {
     id: "hitmonchan-rock-smash",
@@ -144,7 +147,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "destroys blocks of terrain",
       "gathers materials"
     ],
-    notes: "Planned terrain destruction and stone/material collection move."
+    notes: "Planned terrain destruction and stone/material collection move.",
+    narrativePurpose: "Lets the ridge repair story transform blocked stone into useful community resources."
   },
   {
     id: "drilbur-rototiller",
@@ -174,7 +178,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "moves flower beds",
       "moves crops"
     ],
-    notes: "Planned farming and habitat-arrangement move."
+    notes: "Planned farming and habitat-arrangement move.",
+    narrativePurpose: "Makes cultivation and habitat arrangement part of long-term island care."
   },
   {
     id: "magikarp-jump",
@@ -204,7 +209,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "traverses islands",
       "traverses mountains"
     ],
-    notes: "Planned traversal move. The player can jump now, but this records the formal learned-move source."
+    notes: "Planned traversal move. The player can jump now, but this records the formal learned-move source.",
+    narrativePurpose: "Frames vertical traversal as confidence earned from helping isolated places reconnect."
   },
   {
     id: "machoke-strength",
@@ -234,7 +240,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "pulls objects",
       "moves heavy objects into specific locations"
     ],
-    notes: "Planned puzzle and route-clearing move."
+    notes: "Planned puzzle and route-clearing move.",
+    narrativePurpose: "Makes heavy repairs collaborative by turning blocked routes into placement puzzles."
   },
   {
     id: "paldean-wooper-suck",
@@ -265,7 +272,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "spits liquids elsewhere",
       "creates new water sources"
     ],
-    notes: "Planned liquid relocation move."
+    notes: "Planned liquid relocation move.",
+    narrativePurpose: "Lets water problems become routing choices instead of static blockers."
   },
   {
     id: "charmander-ember",
@@ -299,7 +307,8 @@ export const COMPANION_ABILITIES = deepFreeze([
       "lights campfires",
       "enables fire-based habitat interactions"
     ],
-    notes: "This captures the intended fire ability slot before it becomes a formal player field move."
+    notes: "This captures the intended fire ability slot before it becomes a formal player field move.",
+    narrativePurpose: "Uses warmth to turn shelter and gathering places into emotional recovery beats."
   }
 ]);
 

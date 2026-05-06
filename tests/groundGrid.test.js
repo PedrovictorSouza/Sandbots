@@ -4,6 +4,7 @@ import {
   buildGroundGrassPatches,
   buildGroundFlowerPatches,
   buildGroundGridInstances,
+  createGroundCellSpatialIndex,
   DEAD_PATCH_STATE,
   DEAD_GRASS_STATE,
   findNearbyGroundCell,
@@ -64,6 +65,37 @@ describe("buildGroundGridInstances", () => {
         id: instances[0].id
       })
     }));
+  });
+
+  it("finds the same nearby cell through the spatial index while checking fewer candidates", () => {
+    const instances = buildGroundGridInstances({
+      worldLimit: 32,
+      tileFootprint: 3.8,
+      tileHeight: 3.8,
+    });
+    const playerPosition = [instances[44].offset[0] + 0.1, 0, instances[44].offset[2] + 0.1];
+    const index = createGroundCellSpatialIndex(instances);
+    const linearResult = findNearbyGroundCell(playerPosition, instances);
+    const indexedResult = findNearbyGroundCell(playerPosition, instances, undefined, index);
+    const candidates = index.queryRadius(playerPosition, index.maxInteractDistance);
+
+    expect(indexedResult).toEqual(linearResult);
+    expect(candidates.length).toBeLessThan(instances.length);
+  });
+
+  it("keeps custom interaction radii equivalent when using the spatial index", () => {
+    const instances = buildGroundGridInstances({
+      worldLimit: 32,
+      tileFootprint: 3.8,
+      tileHeight: 3.8,
+    });
+    const target = instances[80];
+    const playerPosition = [target.offset[0] + target.tileSpan * 1.4, 0, target.offset[2]];
+    const index = createGroundCellSpatialIndex(instances);
+
+    expect(findNearbyGroundCell(playerPosition, instances, 1.5, index)).toEqual(
+      findNearbyGroundCell(playerPosition, instances, 1.5)
+    );
   });
 
   it("moves a corrupted cell into the purified ground layer", () => {

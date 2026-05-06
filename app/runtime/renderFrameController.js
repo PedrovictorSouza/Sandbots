@@ -15,13 +15,27 @@ function calculateGameScale(viewport, width, height) {
   const scaleX = viewport.width / width;
   const scaleY = viewport.height / height;
 
-  return Math.max(1, Math.floor(Math.min(scaleX, scaleY)));
+  return normalizeGameScale(Math.min(scaleX, scaleY));
+}
+
+function normalizeGameScale(value) {
+  const scale = Number(value);
+
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return 1;
+  }
+
+  if (scale < 1) {
+    return scale;
+  }
+
+  return Math.max(1, Math.floor(scale));
 }
 
 function normalizeFrame(frame, mode, viewport) {
   const width = Math.max(1, Math.round(Number(frame?.width) || 1));
   const height = Math.max(1, Math.round(Number(frame?.height) || 1));
-  const gameScale = Math.max(1, Math.floor(Number(frame?.gameScale) || calculateGameScale(viewport, width, height)));
+  const gameScale = normalizeGameScale(frame?.gameScale || calculateGameScale(viewport, width, height));
 
   return {
     mode,

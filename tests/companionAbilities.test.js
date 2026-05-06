@@ -73,7 +73,15 @@ describe("companion ability registry", () => {
       expect(ability.unlock?.when).toBeTruthy();
       expect(ability.targets.length).toBeGreaterThan(0);
       expect(ability.worldEffects.length).toBeGreaterThan(0);
+      expect(ability.narrativePurpose).toBeTruthy();
     }
+  });
+
+  it("explains why current and planned abilities matter narratively", () => {
+    expect(getCompanionAbilityByAbilityId("waterGun")?.narrativePurpose).toContain("reverse drought");
+    expect(getCompanionAbilityByAbilityId("leafage")?.narrativePurpose).toContain("social invitation");
+    expect(getCompanionAbilityByAbilityId("rockSmash")?.narrativePurpose).toContain("ridge repair story");
+    expect(getCompanionAbilityByAbilityId("ember")?.narrativePurpose).toContain("emotional recovery");
   });
 
   it("exposes the registry as immutable shared content", () => {

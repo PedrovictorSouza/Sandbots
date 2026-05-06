@@ -320,7 +320,7 @@ export const INVENTORY_ORDER = [
   "burrowRepairKit",
 ];
 
-export const WORLD_LIMIT = 72;
+export const WORLD_LIMIT = 144;
 
 const HABITAT_TILE_STEP = 1.425;
 
@@ -357,7 +357,7 @@ export const GROUND_FLOWER_LAYOUT = [
 
 export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
 export const LEPPA_TREE_DROP_OFFSET = [0.82, 0.02, 0.48];
-export const WORKBENCH_POSITION = [15.2, 0.02, -1.6];
+export const WORKBENCH_POSITION = [38.0, 0.02, -17.0];
 export const WORKBENCH_INTERACT_DISTANCE = 2.8;
 export const RUINED_POKEMON_CENTER_POSITION = [25.4, 0, 12.6];
 export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [22.7, 0.02, 10.8];
@@ -420,6 +420,38 @@ export const WORLD_REGIONS = [
     minX: -72,
     maxX: -40,
     minZ: 30,
+    maxZ: 72,
+  },
+  {
+    id: "outer-north-ridge",
+    label: "Outer North Ridge",
+    minX: -144,
+    maxX: 144,
+    minZ: -144,
+    maxZ: -72,
+  },
+  {
+    id: "outer-east-steppe",
+    label: "Outer East Steppe",
+    minX: 72,
+    maxX: 144,
+    minZ: -72,
+    maxZ: 144,
+  },
+  {
+    id: "outer-south-marsh",
+    label: "Outer South Marsh",
+    minX: -144,
+    maxX: 72,
+    minZ: 72,
+    maxZ: 144,
+  },
+  {
+    id: "outer-west-plateau",
+    label: "Outer West Plateau",
+    minX: -144,
+    maxX: -72,
+    minZ: -72,
     maxZ: 72,
   },
 ];
@@ -693,10 +725,10 @@ export const STORY_QUESTS = [
     storyBeat:
       "The first repair is small on purpose. Aunty teaches that survival begins with tight loops and simple materials.",
     onboarding:
-      "Press Space near palms and flax patches to harvest. Watch the mission panel counts, then use E at the Workbench to craft.",
+      "Press Enter near palms and flax patches to harvest. Watch the mission panel counts, then use E at the Workbench to craft.",
     leadNpcId: "aunty",
     reward: "Bridge Kit",
-    actionLabel: "Space + E",
+    actionLabel: "Enter + E",
     requirements: {
       wood: 4,
       flaxFiber: 2,

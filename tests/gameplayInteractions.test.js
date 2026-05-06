@@ -101,6 +101,56 @@ describe("createGameplayInteractions", () => {
     );
   });
 
+  it("opens Chopper's first habitat report from the active system quest", () => {
+    let onComplete = null;
+    const startDialogue = vi.fn(({ onComplete: nextOnComplete }) => {
+      onComplete = nextOnComplete;
+      return true;
+    });
+    const questSystem = {
+      getActiveQuest: vi.fn(() => ({
+        id: "chopper-first-habitat-report"
+      })),
+      emit: vi.fn()
+    };
+    const interactions = createInteractions({
+      startDialogue,
+      questSystem,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "npc",
+          id: "tangrowth",
+          label: "Tangrowth"
+        },
+        distance: 1.2
+      }))
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: {
+        questIndex: 1,
+        flags: {}
+      },
+      inventory: {}
+    });
+
+    expect(result).toBe(true);
+    expect(startDialogue).toHaveBeenCalledWith({
+      targetId: "tangrowth",
+      dialogueId: "firstHabitatReport",
+      onComplete: expect.any(Function)
+    });
+
+    onComplete();
+    expect(questSystem.emit).toHaveBeenCalledWith({
+      type: "TALK",
+      targetId: "chopper-first-habitat-report"
+    });
+  });
+
   it("escalates repeated empty interactions into a valid input hint", () => {
     const pushNotice = vi.fn();
     const interactions = createInteractions({
@@ -250,6 +300,51 @@ describe("createGameplayInteractions", () => {
       groundDeadInstances,
       groundPurifiedInstances
     );
+  });
+
+  it("ignores palm strike while equipped field moves are active", () => {
+    const palm = {
+      id: "palm-0"
+    };
+    const leafageCell = {
+      id: "ground-leafage-0",
+      offset: [0, 0, 0],
+      tileSpan: 1.425
+    };
+    const strikeNearbyPalm = vi.fn(() => ({
+      hit: true,
+      felled: false,
+      palm: {
+        ...palm,
+        hitCount: 1
+      },
+      nextWoodDropId: 1
+    }));
+    const interactions = createInteractions({
+      findNearbyHarvestTarget: vi.fn(() => ({
+        palm,
+        distance: 0.9
+      })),
+      strikeNearbyPalm
+    });
+    const groundGrassPatches = [];
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: {},
+      palmInstances: [palm],
+      resourceNodes: [],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundPurifiedInstances: [leafageCell],
+      groundGrassPatches,
+      canUseLeafage: true
+    });
+
+    expect(result).toBe(true);
+    expect(strikeNearbyPalm).not.toHaveBeenCalled();
+    expect(groundGrassPatches).toHaveLength(1);
   });
 
   it("emits a ground-item callback when harvesting a resource node", () => {
@@ -1641,8 +1736,14 @@ describe("createGameplayInteractions", () => {
 
   it("requests log chair placement from the contextual action", () => {
     const onLogChairPlacementRequested = vi.fn();
+    const strikeNearbyPalm = vi.fn();
     const interactions = createInteractions({
       onLogChairPlacementRequested,
+      findNearbyHarvestTarget: vi.fn(() => ({
+        palm: { id: "palm-0" },
+        distance: 0.8
+      })),
+      strikeNearbyPalm,
       pushNotice: vi.fn()
     });
     const playerPosition = [3, 0, 3];
@@ -1670,6 +1771,7 @@ describe("createGameplayInteractions", () => {
     expect(onLogChairPlacementRequested).toHaveBeenCalledWith({
       playerPosition
     });
+    expect(strikeNearbyPalm).not.toHaveBeenCalled();
   });
 
   it("requests sitting when the player interacts with the placed log chair", () => {

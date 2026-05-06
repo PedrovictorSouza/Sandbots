@@ -68,6 +68,35 @@ describe("chopperNpcActor", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
+  it("adds a low-gravity visual hop without changing Chopper's logical landing", () => {
+    const npcActor = createNpcActor([0, 0, 0]);
+    const chopperActor = createChopperNpcActor({ npcActor });
+
+    startChopperNpcFlight(chopperActor, {
+      targetPosition: [0, 0, 4],
+      duration: 1
+    });
+
+    updateChopperNpcActor(chopperActor, {
+      deltaTime: 0.25,
+      storyState: { flags: {} },
+      isNpcActive: () => true
+    });
+
+    expect(npcActor.character.getPosition()[1]).toBe(0);
+    expect(chopperActor.flightLift).toBeGreaterThan(0.6);
+    expect(chopperActor.flightLift).toBeLessThan(0.95);
+
+    updateChopperNpcActor(chopperActor, {
+      deltaTime: 0.75,
+      storyState: { flags: {} },
+      isNpcActive: () => true
+    });
+
+    expect(npcActor.character.getPosition()).toEqual([0, 0, 4]);
+    expect(chopperActor.flightLift).toBe(0);
+  });
+
   it("patrols within the early gameplay area after Bulbasaur is met", () => {
     const npcActor = createNpcActor([12.4, 0.02, -8.4]);
     const chopperActor = createChopperNpcActor({ npcActor });
@@ -92,5 +121,26 @@ describe("chopperNpcActor", () => {
     }
 
     expect(npcActor.character.getPosition()).not.toEqual([12.4, 0.02, -8.4]);
+  });
+
+  it("moves toward the Pokemon Center guide position when the guide is active", () => {
+    const npcActor = createNpcActor([0, 0, 0]);
+    const chopperActor = createChopperNpcActor({ npcActor });
+    const storyState = {
+      flags: {
+        pokemonCenterGuideStarted: true
+      }
+    };
+
+    updateChopperNpcActor(chopperActor, {
+      deltaTime: 0.5,
+      storyState,
+      guidePosition: [10, 0.02, 0],
+      isNpcActive: () => true
+    });
+
+    expect(npcActor.character.getPosition()[0]).toBeGreaterThan(0);
+    expect(npcActor.character.getPosition()[0]).toBeLessThan(10);
+    expect(chopperActor.scriptedFlight).toBeNull();
   });
 });

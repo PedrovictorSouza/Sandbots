@@ -7,13 +7,19 @@ import {
 } from "../../actTwoSceneConfig.js";
 
 import {
-  DYNAMIC_BARRIERS
+  DYNAMIC_BARRIERS,
+  WORLD_LIMIT
 } from "../../gameplayContent.js";
 
 import {
   createCollisionChecker,
   createKeyboardController
 } from "../../world/islandWorld.js";
+import {
+  createWrappedWorldTopology,
+  WORLD_WRAP_AXIS_X,
+  WORLD_WRAP_AXIS_Z
+} from "../../world/worldTopology.js";
 import { getGameplayOpeningShipDynamicBarrier } from "./gameplayOpeningShip.js";
 
 export function configurePlayerSpawner(
@@ -32,6 +38,11 @@ export function configurePlayerSpawner(
   }
 ) {
   const { houseModel, palmModel, characterFactory } = assets;
+  const playerWorldTopology = createWrappedWorldTopology({
+    id: "small-island-surface-wrap",
+    limit: WORLD_LIMIT,
+    axes: [WORLD_WRAP_AXIS_X, WORLD_WRAP_AXIS_Z]
+  });
 
   const collisionTest = createCollisionChecker(
     houseModel,
@@ -65,7 +76,8 @@ export function configurePlayerSpawner(
       speed: 5.1,
       worldHeight: 1.55,
       controller: keyboardController,
-      collisionTest
+      collisionTest,
+      positionTransform: playerWorldTopology.wrapPosition
     });
     session.playerCharacter.renderCharacter = false;
 

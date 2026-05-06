@@ -6,6 +6,7 @@ import {
   TIMBURR_POKEDEX_ENTRY_ID
 } from "../pokedexEntries.js";
 import { createStoryBeatSystem } from "../app/story/createStoryBeatSystem.js";
+import { getRecipeById } from "../gameplayContent.js";
 import {
   FIELD_TASK_IDS,
   STORY_BEAT_EFFECT,
@@ -209,11 +210,21 @@ describe("createStoryBeatSystem", () => {
     expect(pushNotice).toHaveBeenCalledWith("You sat on the Log Chair.", undefined);
   });
 
-  it("marks Workbench recipes and Campfire creation beats", () => {
+  it("unlocks the first Workbench recipe and marks Campfire creation beats", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
     });
+    const starterRecipe = getRecipeById("campfire");
+
+    expect(starterRecipe).toEqual(expect.objectContaining({
+      id: "campfire",
+      stationId: "workbench",
+      ingredients: {
+        wood: 3
+      }
+    }));
+    expect(storyState.flags.workbenchDiyRecipesReceived).toBeUndefined();
 
     system.playDialogue(STORY_BEAT_IDS.WORKBENCH_DIY_RECIPES);
     openConversation.mock.results[0].value.complete();
@@ -261,16 +272,22 @@ describe("createStoryBeatSystem", () => {
     expect(pushNotice).toHaveBeenCalledWith("Charmander lit the Campfire.", undefined);
   });
 
-  it("inspects the ruined Pokemon Center and unlocks Challenges from the PC", () => {
+  it("keeps ruined Pokemon Center discovery separate from Challenges unlock", () => {
     const pushNotice = vi.fn();
     const { openConversation, pokedexRuntime, storyState, system, trackFieldTask } = createSystem({
       pushNotice
     });
 
+    expect(storyState.flags.challengesUnlocked).toBeUndefined();
+    expect(storyState.flags.boulderChallengeAvailable).toBeUndefined();
+
     system.playDialogue(STORY_BEAT_IDS.RUINED_POKEMON_CENTER_INSPECTED);
     openConversation.mock.results[0].value.complete();
 
     expect(storyState.flags.ruinedPokemonCenterInspected).toBe(true);
+    expect(storyState.flags.challengesUnlocked).toBeUndefined();
+    expect(storyState.flags.boulderChallengeAvailable).toBeUndefined();
+    expect(trackFieldTask).not.toHaveBeenCalled();
     expect(pushNotice).toHaveBeenCalledWith(
       "You inspected the ruined Pokemon Center.",
       undefined
@@ -425,11 +442,14 @@ describe("createStoryBeatSystem", () => {
     expect(pushNotice).toHaveBeenCalledWith("You purchased a Leaf Den Kit.", undefined);
   });
 
-  it("marks Leaf Den construction start and completion beats", () => {
+  it("sets the Leaf Den hub repair completion flag after construction", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
     });
+
+    expect(storyState.flags.leafDenBuilt).toBeUndefined();
+    expect(storyState.flags.leafDenFurnitureRequestAvailable).toBeUndefined();
 
     system.playDialogue(STORY_BEAT_IDS.LEAF_DEN_CONSTRUCTION_STARTED);
     openConversation.mock.results[0].value.complete();

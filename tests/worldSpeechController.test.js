@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createWorldSpeechController } from "../app/ui/worldSpeechController.js";
 
 describe("createWorldSpeechController", () => {
@@ -30,6 +30,38 @@ describe("createWorldSpeechController", () => {
     expect(speech?.style.left).toBe("128px");
     expect(speech?.style.top).toBe("72px");
     expect(speech?.style.opacity).toBe("1");
+  });
+
+  it("projects speech from the curved visual position", () => {
+    const mount = document.createElement("div");
+    const controller = createWorldSpeechController({ mount });
+    const project = vi.fn(() => ({
+      x: 128,
+      y: 72,
+      depth: 0.4
+    }));
+    const camera = {
+      getPose() {
+        return {
+          target: [10, 1, -6]
+        };
+      },
+      project
+    };
+
+    controller.show({
+      text: "Look over here.",
+      worldPosition: [20, 3, -6]
+    });
+    controller.update(camera, 426, 240);
+
+    expect(project).toHaveBeenCalledTimes(1);
+    const [projectedPosition, width, height] = project.mock.calls[0];
+    expect(projectedPosition[0]).toBe(20);
+    expect(projectedPosition[1]).toBeCloseTo(5.245);
+    expect(projectedPosition[2]).toBe(-6);
+    expect(width).toBe(426);
+    expect(height).toBe(240);
   });
 
   it("hides the speech layer when requested", () => {

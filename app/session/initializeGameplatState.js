@@ -2,6 +2,28 @@ import { createInitialInventory } from "../../gameplayContent.js";
 import { createStoryState } from "../../story/progression.js";
 import { createResourceNodes } from "../../world/islandWorld.js";
 
+const STARTING_WOOD_DROP_SIZE = 0.78;
+const STARTING_WOOD_PICKUP_RADIUS = 0.64;
+const STARTING_WOOD_DROP_POSITIONS = Object.freeze([
+  [7.25, 0.02, -2.1],
+  [9.15, 0.02, -4.6],
+  [10.9, 0.02, -1.95],
+  [12.35, 0.02, -4.9],
+  [13.9, 0.02, -2.4],
+  [15.75, 0.02, -4.0]
+]);
+
+function createStartingWoodDrops() {
+  return STARTING_WOOD_DROP_POSITIONS.map((position, index) => ({
+    id: `starting-wood-${index + 1}`,
+    position: [...position],
+    size: [STARTING_WOOD_DROP_SIZE, STARTING_WOOD_DROP_SIZE],
+    uvRect: [0, 0, 1, 1],
+    pickupRadius: STARTING_WOOD_PICKUP_RADIUS,
+    collected: false
+  }));
+}
+
 export function initializeGameplayState(
   session,
   {
@@ -13,7 +35,7 @@ export function initializeGameplayState(
     renderMissionCards
   }
 ) {
-  session.woodDrops = [];
+  session.woodDrops = createStartingWoodDrops();
   session.leppaBerryDrops = [];
   session.logChair = null;
   session.leafDen = null;

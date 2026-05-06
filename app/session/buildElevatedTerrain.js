@@ -13,7 +13,22 @@ const ELEVATED_TERRAIN_HILLS = Object.freeze([
   { id: "far-west-crown", center: [-62, -10], radius: 4, height: 5 },
   { id: "southwest-valley-wall", center: [-48, 54], radius: 5, height: 4 },
   { id: "southeast-valley-wall", center: [42, 52], radius: 5, height: 4 },
-  { id: "distant-north-wall", center: [0, -62], radius: 7, height: 3 }
+  { id: "distant-north-wall", center: [0, -62], radius: 7, height: 3 },
+  { id: "outer-northwest-massif", center: [-104, -100], radius: 12, height: 6, cellStep: 2 },
+  { id: "outer-northwest-ridge", center: [-128, -74], radius: 10, height: 5, cellStep: 2 },
+  { id: "outer-north-deep-wall", center: [-52, -118], radius: 11, height: 6, cellStep: 2 },
+  { id: "outer-northeast-massif", center: [96, -104], radius: 12, height: 6, cellStep: 2 },
+  { id: "outer-northeast-ridge", center: [124, -74], radius: 10, height: 5, cellStep: 2 },
+  { id: "outer-east-steppe", center: [112, 18], radius: 11, height: 5, cellStep: 2 },
+  { id: "outer-east-butte", center: [132, 62], radius: 10, height: 5, cellStep: 2 },
+  { id: "outer-southeast-massif", center: [96, 108], radius: 12, height: 5, cellStep: 2 },
+  { id: "outer-southeast-ridge", center: [42, 122], radius: 10, height: 4, cellStep: 2 },
+  { id: "outer-south-spine", center: [-20, 126], radius: 14, height: 6, cellStep: 2 },
+  { id: "outer-southwest-massif", center: [-104, 106], radius: 12, height: 5, cellStep: 2 },
+  { id: "outer-southwest-ridge", center: [-132, 70], radius: 10, height: 5, cellStep: 2 },
+  { id: "outer-west-plateau", center: [-118, 18], radius: 11, height: 5, cellStep: 2 },
+  { id: "outer-west-crown", center: [-130, -34], radius: 8, height: 6 },
+  { id: "outer-north-mid-wall", center: [8, -112], radius: 9, height: 5 }
 ]);
 
 function distance2d(a, b) {
@@ -52,13 +67,17 @@ export function buildElevatedTerrain({
     };
   }
 
-  const scaledHeight = tileHeight * tileScale;
   const instances = [];
   const colliders = [];
 
   for (const hill of ELEVATED_TERRAIN_HILLS) {
-    for (let x = -hill.radius; x <= hill.radius; x += 1) {
-      for (let z = -hill.radius; z <= hill.radius; z += 1) {
+    const cellStep = Math.max(1, hill.cellStep || 1);
+    const cellScale = tileScale * cellStep;
+    const cellHeight = tileHeight * cellScale;
+    const cellSpan = tileSpan * cellStep;
+
+    for (let x = -hill.radius; x <= hill.radius; x += cellStep) {
+      for (let z = -hill.radius; z <= hill.radius; z += cellStep) {
         const stackHeight = getHeightForCell(x, z, hill);
 
         if (stackHeight <= 0) {
@@ -73,15 +92,18 @@ export function buildElevatedTerrain({
         }
 
         for (let layer = 1; layer <= stackHeight; layer += 1) {
-          const surfaceY = layer * scaledHeight;
+          const surfaceY = layer * cellHeight;
           const isTopLayer = layer === stackHeight;
           const instance = {
             id: `elevated-${hill.id}-${x + hill.radius}-${z + hill.radius}-${layer}`,
-            offset: [worldX, Number((surfaceY - scaledHeight).toFixed(4)), worldZ],
-            scale: tileScale,
+            offset: [worldX, Number((surfaceY - cellHeight).toFixed(4)), worldZ],
+            scale: cellScale,
             surfaceY,
-            tileSpan,
+            tileSpan: cellSpan,
             purifiable: isTopLayer,
+            terrainHillCenter: [...hill.center],
+            terrainHillCellStep: cellStep,
+            terrainHillRadius: hill.radius,
             terrainLayer: layer,
             terrainStackHeight: stackHeight,
             yaw: ((x + z + layer) & 3) * (Math.PI * 0.5)
@@ -91,7 +113,7 @@ export function buildElevatedTerrain({
           colliders.push({
             id: `${instance.id}-collider`,
             position: [...instance.offset],
-            size: [tileSpan, scaledHeight, tileSpan],
+            size: [cellSpan, cellHeight, cellSpan],
             surfaceY,
             blocksPlayer: true
           });

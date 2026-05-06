@@ -1,3 +1,8 @@
+import {
+  curveWorldPosition,
+  resolveWorldCurvatureOrigin
+} from "../../rendering/worldCurvature.js";
+
 export function createWorldSpeechController({ mount } = {}) {
   if (!(mount instanceof HTMLElement)) {
     throw new Error("World speech controller requires a valid mount element.");
@@ -134,11 +139,14 @@ export function createWorldSpeechController({ mount } = {}) {
     anchorHeight,
     speechElement
   }) {
+    const cameraTarget = camera.getPose?.()?.target || [0, 0, 0];
+    const curvatureOrigin = resolveWorldCurvatureOrigin(cameraTarget);
+    const curvedWorldPosition = curveWorldPosition(worldPosition, curvatureOrigin);
     const projected = camera.project(
       [
-        worldPosition[0],
-        worldPosition[1] + anchorHeight,
-        worldPosition[2]
+        curvedWorldPosition[0],
+        curvedWorldPosition[1] + anchorHeight,
+        curvedWorldPosition[2]
       ],
       viewportWidth,
       viewportHeight

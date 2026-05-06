@@ -4,10 +4,13 @@ const CHOPPER_NPC_YAW = 0.65;
 const CHOPPER_NPC_MODEL_FACE_YAW_OFFSET = Math.PI;
 const CHOPPER_NPC_PROPELLER_SPEED = 26;
 const CHOPPER_NPC_PROPELLER_PIVOT = [0.125, 2, 0];
-const CHOPPER_NPC_FLIGHT_LIFT = 0.78;
+const CHOPPER_NPC_FLIGHT_LIFT = 0.92;
+const CHOPPER_NPC_MOON_HOP_HANG = 0.24;
 const CHOPPER_PATROL_SPEED = 1.85;
+const CHOPPER_GUIDE_SPEED = 4.6;
 const CHOPPER_PATROL_PAUSE_DURATION = 1.35;
 const CHOPPER_PATROL_ARRIVE_DISTANCE = 0.22;
+const CHOPPER_GUIDE_ARRIVE_DISTANCE = 0.18;
 const CHOPPER_PATROL_RADIUS_MULTIPLIER = 3;
 const CHOPPER_PATROL_CENTER = [12.84, 0.02, -8.14];
 const CHOPPER_PATROL_BASE_POINTS = Object.freeze([
@@ -42,6 +45,17 @@ function setNpcPosition(npcActor, position) {
 
 function easeOutCubic(value) {
   return 1 - Math.pow(1 - value, 3);
+}
+
+function getMoonGravityFlightLift(progress) {
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+  const arc = Math.sin(clampedProgress * Math.PI);
+  const floatArc = Math.pow(Math.max(0, arc), 0.58);
+
+  return (
+    arc * (1 - CHOPPER_NPC_MOON_HOP_HANG) +
+    floatArc * CHOPPER_NPC_MOON_HOP_HANG
+  ) * CHOPPER_NPC_FLIGHT_LIFT;
 }
 
 function getYawToward(fromPosition, toPosition) {
@@ -195,6 +209,42 @@ function updatePatrol(actor, deltaTime, storyState) {
   setNpcPosition(actor.npcActor, nextPosition);
 }
 
+function updateGuide(actor, deltaTime, storyState, guidePosition) {
+  if (
+    !storyState?.flags?.pokemonCenterGuideStarted ||
+    storyState.flags.ruinedPokemonCenterInspected ||
+    actor.scriptedFlight ||
+    !actor.active ||
+    !Array.isArray(guidePosition)
+  ) {
+    return false;
+  }
+
+  const currentPosition = getNpcPosition(actor.npcActor);
+  const deltaX = guidePosition[0] - currentPosition[0];
+  const deltaZ = guidePosition[2] - currentPosition[2];
+  const distance = Math.hypot(deltaX, deltaZ);
+
+  if (distance <= CHOPPER_GUIDE_ARRIVE_DISTANCE) {
+    setNpcPosition(actor.npcActor, [...guidePosition]);
+    actor.npcActor.faceYaw = getYawToward(currentPosition, guidePosition);
+    return true;
+  }
+
+  const step = Math.min(distance, CHOPPER_GUIDE_SPEED * deltaTime);
+  const directionX = deltaX / distance;
+  const directionZ = deltaZ / distance;
+  const nextPosition = [
+    currentPosition[0] + directionX * step,
+    guidePosition[1],
+    currentPosition[2] + directionZ * step
+  ];
+
+  actor.npcActor.faceYaw = getYawToward(currentPosition, guidePosition);
+  setNpcPosition(actor.npcActor, nextPosition);
+  return true;
+}
+
 export function startChopperNpcFlight(actor, {
   targetPosition,
   duration = 0.95,
@@ -233,7 +283,7 @@ function updateScriptedFlight(actor, deltaTime) {
     flight.startPosition[2] + (flight.targetPosition[2] - flight.startPosition[2]) * easedProgress
   ];
 
-  actor.flightLift = Math.sin(progress * Math.PI) * CHOPPER_NPC_FLIGHT_LIFT;
+  actor.flightLift = getMoonGravityFlightLift(progress);
   actor.npcActor.faceYaw = getYawToward(nextPosition, flight.targetPosition);
   setNpcPosition(actor.npcActor, nextPosition);
 
@@ -253,7 +303,8 @@ function updateScriptedFlight(actor, deltaTime) {
 export function updateChopperNpcActor(actor, {
   deltaTime = 0,
   storyState,
-  isNpcActive
+  isNpcActive,
+  guidePosition = null
 } = {}) {
   if (!actor) {
     return;
@@ -266,6 +317,7 @@ export function updateChopperNpcActor(actor, {
   actor.active = typeof isNpcActive === "function" ?
     isNpcActive(actor.npcActor, storyState) :
     true;
+  updateGuide(actor, deltaTime, storyState, guidePosition);
   updatePatrol(actor, deltaTime, storyState);
 
   const time = actor.elapsed;

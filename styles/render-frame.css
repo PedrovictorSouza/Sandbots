@@ -5,6 +5,15 @@
   --render-frame-scale: 1;
   --console-display-scale: 1;
   --scene-scale: 1;
+  --crt-scanline-opacity: 0.1445;
+  --crt-rgb-mask-opacity: 0.0935;
+  --crt-sweep-opacity: 0.153;
+  --crt-flicker-opacity: 0.03825;
+  --crt-vignette-opacity: 0.17;
+  --crt-scanline-size: 5px;
+  --crt-pixel-blend-blur: 0.2975px;
+  --crt-pixel-blend-contrast: 1.068;
+  --crt-pixel-blend-saturate: 1.068;
 }
 
 .game-stage {
@@ -23,6 +32,53 @@
   height: 100%;
   overflow: hidden;
   isolation: isolate;
+}
+
+.render-frame[data-crt-filter="on"]::before,
+.render-frame[data-crt-filter="on"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.render-frame[data-crt-filter="on"]::before {
+  background-image:
+    linear-gradient(
+      rgba(18, 16, 16, 0) 50%,
+      rgba(0, 0, 0, var(--crt-scanline-opacity)) 50%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 0, 0, var(--crt-rgb-mask-opacity)),
+      rgba(0, 255, 0, calc(var(--crt-rgb-mask-opacity) * 0.34)),
+      rgba(0, 0, 255, var(--crt-rgb-mask-opacity))
+    );
+  background-size: 100% var(--crt-scanline-size), 3px 100%;
+  mix-blend-mode: multiply;
+  animation: crt-frame-flicker 0.15s infinite steps(2, end);
+}
+
+.render-frame[data-crt-filter="on"]::after {
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(255, 255, 255, 0) 56%,
+      rgba(0, 0, 0, var(--crt-vignette-opacity)) 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 38%,
+      rgba(255, 255, 255, var(--crt-sweep-opacity)) 43%,
+      transparent 50%,
+      transparent 100%
+    );
+  background-size: 100% 100%, 100% 280%;
+  background-position: center, 0 100%;
+  mix-blend-mode: screen;
+  animation: crt-sweep 12s linear infinite;
 }
 
 .pause-overlay {
@@ -97,6 +153,13 @@
   z-index: 0;
 }
 
+.render-frame[data-crt-filter="on"] #viewport {
+  filter:
+    blur(var(--crt-pixel-blend-blur))
+    contrast(var(--crt-pixel-blend-contrast))
+    saturate(var(--crt-pixel-blend-saturate));
+}
+
 #warm-overlay {
   position: absolute;
   left: 50%;
@@ -116,4 +179,56 @@
 
 #sprite-layer {
   display: none;
+}
+
+@keyframes crt-frame-flicker {
+  0% {
+    opacity: 0.92;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.96;
+  }
+}
+
+@keyframes crt-sweep {
+  0%,
+  24% {
+    background-position: center, 0 122%;
+    opacity: 0;
+  }
+
+  28% {
+    opacity: 1;
+  }
+
+  55% {
+    opacity: 0.82;
+  }
+
+  60%,
+  100% {
+    background-position: center, 0 -122%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .render-frame[data-crt-filter="on"]::before,
+  .render-frame[data-crt-filter="on"]::after {
+    animation: none;
+  }
+
+  .render-frame[data-crt-filter="on"]::after {
+    background:
+      radial-gradient(
+        ellipse at center,
+        rgba(255, 255, 255, 0) 56%,
+        rgba(0, 0, 0, var(--crt-vignette-opacity)) 100%
+      );
+  }
 }

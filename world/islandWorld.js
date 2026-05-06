@@ -8,6 +8,7 @@ import {
   formatActiveMoveGuidanceByAbilityId,
   formatMoveTargetPromptByAbilityId
 } from "../app/sandbox/moveData.js";
+import { createSpatialHashIndex } from "./spatialHash.js";
 
 const WOOD_DROP_HEIGHT = 0.78;
 const WOOD_PICKUP_RADIUS = 0.64;
@@ -23,6 +24,9 @@ const PALM_SHAKE_DURATION = 0.42;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_STRAW_BED_TREE_TARGET_COUNT = 5;
 const BULBASAUR_STRAW_BED_STICK_TARGET_COUNT = 10;
+const TERRAIN_COLLIDER_INDEX_MIN_SIZE = 128;
+const TERRAIN_COLLIDER_INDEX_CELL_SIZE = 8;
+const terrainColliderIndexCache = new WeakMap();
 
 export function createFacingStaticController(facing) {
   return {
@@ -67,6 +71,40 @@ function isInsideColliderFootprint(x, z, collider) {
     Math.abs(x - collider.position[0]) < halfX + padding &&
     Math.abs(z - collider.position[2]) < halfZ + padding
   );
+}
+
+function getTerrainColliderBounds(collider) {
+  const halfX = (collider.size?.[0] || 0) * 0.5 + (collider.padding ?? 0.42);
+  const halfZ = (collider.size?.[2] || 0) * 0.5 + (collider.padding ?? 0.42);
+
+  return {
+    minX: collider.position[0] - halfX,
+    maxX: collider.position[0] + halfX,
+    minZ: collider.position[2] - halfZ,
+    maxZ: collider.position[2] + halfZ
+  };
+}
+
+function getTerrainColliderCandidates(position, colliders) {
+  if (!Array.isArray(colliders) || colliders.length < TERRAIN_COLLIDER_INDEX_MIN_SIZE) {
+    return colliders || [];
+  }
+
+  const cached = terrainColliderIndexCache.get(colliders);
+  let index = cached?.length === colliders.length ? cached.index : null;
+
+  if (!index) {
+    index = createSpatialHashIndex(colliders, {
+      cellSize: TERRAIN_COLLIDER_INDEX_CELL_SIZE,
+      getBounds: getTerrainColliderBounds
+    });
+    terrainColliderIndexCache.set(colliders, {
+      length: colliders.length,
+      index
+    });
+  }
+
+  return index.queryPoint(position);
 }
 
 function overlapsTreeSpacing(treeModel, placed, candidate) {
@@ -662,7 +700,8 @@ export function findNearbyInteractable(
   leafDen = null,
   timburrEncounter = null,
   charmanderEncounter = null,
-  leppaTree = null
+  leppaTree = null,
+  bulbasaurEncounter = null
 ) {
   let nearest = null;
   let nearestDistance = Infinity;
@@ -735,6 +774,41 @@ export function findNearbyInteractable(
       }
     }
   }
+
+  const bulbasaurGrassPatch = rustlingGrassCellId ?
+    groundGrassPatches.find((groundGrassPatch) => {
+      return (
+        groundGrassPatch.cellId === rustlingGrassCellId &&
+        groundGrassPatch.state === "alive"
+      );
+    }) :
+    null;
+  const bulbasaurEncounterPosition =
+    bulbasaurEncounter?.visible && Array.isArray(bulbasaurEncounter.position) ?
+      bulbasaurEncounter.position :
+      null;
+  const bulbasaurInteractionPosition =
+    bulbasaurEncounterPosition || bulbasaurGrassPatch?.position || null;
+  const createBulbasaurTarget = (target) => {
+    return bulbasaurEncounterPosition ?
+      { ...target, position: [...bulbasaurEncounterPosition] } :
+      target;
+  };
+  const setNearbyBulbasaurTarget = (target) => {
+    if (!bulbasaurInteractionPosition) {
+      return;
+    }
+
+    const distance = Math.hypot(
+      playerPosition[0] - bulbasaurInteractionPosition[0],
+      playerPosition[2] - bulbasaurInteractionPosition[2]
+    );
+
+    if (distance <= 1.85 && distance < nearestDistance) {
+      nearest = createBulbasaurTarget(target);
+      nearestDistance = distance;
+    }
+  };
 
   const charmanderRustlingGrassCellId = storyState?.flags?.charmanderRustlingGrassCellId;
   const charmanderRustlingGrassActive =
@@ -813,29 +887,12 @@ export function findNearbyInteractable(
     Boolean(rustlingGrassCellId);
 
   if (bulbasaurMissionActive || bulbasaurRequestReady) {
-    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
-      return (
-        groundGrassPatch.cellId === rustlingGrassCellId &&
-        groundGrassPatch.state === "alive"
-      );
+    setNearbyBulbasaurTarget({
+      kind: bulbasaurRequestReady ? "bulbasaurRequestComplete" : "bulbasaurMission",
+      id: bulbasaurRequestReady ? "bulbasaurLeafageReward" : "bulbasaurDryGrassMission",
+      label: "Talk to Bulbasaur",
+      cellId: rustlingGrassCellId
     });
-
-    if (bulbasaurGrassPatch) {
-      const distance = Math.hypot(
-        playerPosition[0] - bulbasaurGrassPatch.position[0],
-        playerPosition[2] - bulbasaurGrassPatch.position[2]
-      );
-
-      if (distance <= 1.85 && distance < nearestDistance) {
-        nearest = {
-          kind: bulbasaurRequestReady ? "bulbasaurRequestComplete" : "bulbasaurMission",
-          id: bulbasaurRequestReady ? "bulbasaurLeafageReward" : "bulbasaurDryGrassMission",
-          label: "Talk to Bulbasaur",
-          cellId: bulbasaurGrassPatch.cellId
-        };
-        nearestDistance = distance;
-      }
-    }
   }
 
   const leppaGiftReady =
@@ -846,29 +903,12 @@ export function findNearbyInteractable(
     Boolean(rustlingGrassCellId);
 
   if (leppaGiftReady) {
-    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
-      return (
-        groundGrassPatch.cellId === rustlingGrassCellId &&
-        groundGrassPatch.state === "alive"
-      );
+    setNearbyBulbasaurTarget({
+      kind: "leppaBerryGift",
+      id: "bulbasaur",
+      label: "Look at this!",
+      cellId: rustlingGrassCellId
     });
-
-    if (bulbasaurGrassPatch) {
-      const distance = Math.hypot(
-        playerPosition[0] - bulbasaurGrassPatch.position[0],
-        playerPosition[2] - bulbasaurGrassPatch.position[2]
-      );
-
-      if (distance <= 1.85 && distance < nearestDistance) {
-        nearest = {
-          kind: "leppaBerryGift",
-          id: "bulbasaur",
-          label: "Look at this!",
-          cellId: bulbasaurGrassPatch.cellId
-        };
-        nearestDistance = distance;
-      }
-    }
   }
 
   const nearbyLeppaTree = findNearbyLeppaTree(playerPosition, leppaTree, storyState);
@@ -891,29 +931,12 @@ export function findNearbyInteractable(
     Boolean(rustlingGrassCellId);
 
   if (bulbasaurStrawBedRecipeReady) {
-    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
-      return (
-        groundGrassPatch.cellId === rustlingGrassCellId &&
-        groundGrassPatch.state === "alive"
-      );
+    setNearbyBulbasaurTarget({
+      kind: "bulbasaurStrawBedRecipe",
+      id: "bulbasaurStrawBedRecipe",
+      label: "Do you need anything?",
+      cellId: rustlingGrassCellId
     });
-
-    if (bulbasaurGrassPatch) {
-      const distance = Math.hypot(
-        playerPosition[0] - bulbasaurGrassPatch.position[0],
-        playerPosition[2] - bulbasaurGrassPatch.position[2]
-      );
-
-      if (distance <= 1.85 && distance < nearestDistance) {
-        nearest = {
-          kind: "bulbasaurStrawBedRecipe",
-          id: "bulbasaurStrawBedRecipe",
-          label: "Do you need anything?",
-          cellId: bulbasaurGrassPatch.cellId
-        };
-        nearestDistance = distance;
-      }
-    }
   }
 
   const bulbasaurStrawBedCompleteReady =
@@ -923,29 +946,12 @@ export function findNearbyInteractable(
     Boolean(rustlingGrassCellId);
 
   if (bulbasaurStrawBedCompleteReady) {
-    const bulbasaurGrassPatch = groundGrassPatches.find((groundGrassPatch) => {
-      return (
-        groundGrassPatch.cellId === rustlingGrassCellId &&
-        groundGrassPatch.state === "alive"
-      );
+    setNearbyBulbasaurTarget({
+      kind: "bulbasaurStrawBedComplete",
+      id: "bulbasaurStrawBedComplete",
+      label: "Talk to Bulbasaur",
+      cellId: rustlingGrassCellId
     });
-
-    if (bulbasaurGrassPatch) {
-      const distance = Math.hypot(
-        playerPosition[0] - bulbasaurGrassPatch.position[0],
-        playerPosition[2] - bulbasaurGrassPatch.position[2]
-      );
-
-      if (distance <= 1.85 && distance < nearestDistance) {
-        nearest = {
-          kind: "bulbasaurStrawBedComplete",
-          id: "bulbasaurStrawBedComplete",
-          label: "Talk to Bulbasaur",
-          cellId: bulbasaurGrassPatch.cellId
-        };
-        nearestDistance = distance;
-      }
-    }
   }
 
   const nearbyLogChair = findNearbyLogChair(playerPosition, logChair, storyState);
@@ -1064,6 +1070,8 @@ export function buildNearbyPrompt({
   activeMoveId = null,
   pendingWaterGunCount = 0
 }) {
+  const interactPromptPrefix = "[E / X]";
+
   if (transientMessage) {
     return transientMessage;
   }
@@ -1094,45 +1102,45 @@ export function buildNearbyPrompt({
     interactTarget?.target?.id === "tangrowth" &&
     quest?.id === "spit-out-campfire"
   ) {
-    return `[A / E / X] ${interactTarget.target.label} • Spit out Campfire`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • Spit out Campfire`;
   }
 
   if (interactTarget?.target?.id === "ruinedPokemonCenter") {
-    return `[A / E / X] ${interactTarget.target.label} • Inspect`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • Inspect`;
   }
 
   if (interactTarget?.target?.id === "pokemonCenterPc") {
-    return `[A / E / X] ${interactTarget.target.label} • Check PC`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • Check PC`;
   }
 
   if (interactTarget?.target?.kind === "leafDenConstruction") {
     return storyState?.flags?.leafDenConstructionStarted ?
-      `[A / E / X] ${interactTarget.target.label} • Check construction` :
-      `[A / E / X] ${interactTarget.target.label} • Start construction`;
+      `${interactPromptPrefix} ${interactTarget.target.label} • Check construction` :
+      `${interactPromptPrefix} ${interactTarget.target.label} • Start construction`;
   }
 
   if (interactTarget?.target?.kind === "leafDenEntrance") {
-    return `[A / E / X] ${interactTarget.target.label} • Enter`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • Enter`;
   }
 
   if (interactTarget?.target?.kind === "timburrLeafDenFurnitureComplete") {
-    return `[A / E / X] ${interactTarget.target.label} • Complete request`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • Complete request`;
   }
 
   if (interactTarget?.target?.kind === "charmanderCelebrationRequest") {
-    return `[A / E / X] ${interactTarget.target.label} • Celebration`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • Celebration`;
   }
 
   if (interactTarget?.target?.kind === "logChairSeat") {
-    return `[A / E / X] ${interactTarget.target.label} • ${quest.title}`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • ${quest.title}`;
   }
 
   if (interactTarget?.target?.kind === "station") {
-    return `[A / E / X] ${interactTarget.target.label} • ${quest.title}`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • ${quest.title}`;
   }
 
   if (interactTarget?.target) {
-    return `[A / E / X] ${interactTarget.target.label} • ${quest.title}`;
+    return `${interactPromptPrefix} ${interactTarget.target.label} • ${quest.title}`;
   }
 
   if (harvestTarget?.resourceNode) {
@@ -1265,7 +1273,9 @@ export function createCollisionChecker(
       return true;
     }
 
-    const terrainCollider = getTerrainColliders().reduce((highestCollider, collider) => {
+    const terrainColliders = getTerrainColliders();
+    const terrainColliderCandidates = getTerrainColliderCandidates(nextPosition, terrainColliders);
+    const terrainCollider = terrainColliderCandidates.reduce((highestCollider, collider) => {
       if (!collider?.blocksPlayer || !isInsideColliderFootprint(x, z, collider)) {
         return highestCollider;
       }
