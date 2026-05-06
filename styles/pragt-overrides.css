@@ -522,7 +522,7 @@
 }
 
 .act-two-tutorial__speech {
-  transform: translate(-50%, -100%) scale(var(--overlay-scale));
+  transform: translate(-50%, -100%) scale(calc(var(--overlay-scale) * 0.5));
   transform-origin: bottom center;
   transition: opacity 120ms steps(2, end);
 }
