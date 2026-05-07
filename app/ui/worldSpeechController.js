@@ -3,6 +3,11 @@ import {
   resolveWorldCurvatureOrigin
 } from "../../rendering/worldCurvature.js";
 
+const LARGE_TASK_POP_MESSAGES = new Set([
+  "YOU TOOK YOUR FIRST STEPS!",
+  "YOU RESTORED THE TALL GRASS!"
+]);
+
 export function createWorldSpeechController({ mount } = {}) {
   if (!(mount instanceof HTMLElement)) {
     throw new Error("World speech controller requires a valid mount element.");
@@ -95,7 +100,7 @@ export function createWorldSpeechController({ mount } = {}) {
     state.taskPopWorldPosition = worldPosition ? [...worldPosition] : [0, 0, 0];
     taskPop.bubble.textContent = message;
     taskPop.speech.dataset.taskPopSize =
-      message === "YOU TOOK YOUR FIRST STEPS!" ? "large" : "default";
+      LARGE_TASK_POP_MESSAGES.has(message.toUpperCase()) ? "large" : "default";
     taskPop.speech.hidden = false;
     layer.hidden = false;
 

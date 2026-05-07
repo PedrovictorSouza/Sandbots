@@ -34,6 +34,8 @@ export function createWorldRenderer({
   const GROUND_HIGHLIGHT_TEXTURE_SIZE = 32;
   const GROUND_HIGHLIGHT_SELECTED_SCALE = 1.05;
   const GROUND_HIGHLIGHT_MARKED_SCALE = 0.98;
+  const GROUND_HIGHLIGHT_ACTION_PULSE_SCALE = 1.12;
+  const GROUND_HIGHLIGHT_ACTION_PULSE_SCALE_RANGE = 0.46;
   const worldCurvatureOrigin = new Float32Array(3);
   const worldRenderTopology = createWrappedWorldTopology({
     id: "small-island-render-wrap",
@@ -120,10 +122,15 @@ export function createWorldRenderer({
     texture: null,
     primitives: [groundHighlightPrimitive]
   };
-  const selectedGroundHighlightTexture = createGroundHighlightTexture({
+  const selectedWaterGroundHighlightTexture = createGroundHighlightTexture({
     fill: [124, 231, 255, 28],
     border: [158, 248, 255, 220],
     outerBorder: [7, 23, 36, 210]
+  });
+  const selectedLeafGroundHighlightTexture = createGroundHighlightTexture({
+    fill: [91, 238, 132, 34],
+    border: [126, 255, 165, 228],
+    outerBorder: [8, 40, 20, 212]
   });
   const markedGroundHighlightTexture = createGroundHighlightTexture({
     fill: [255, 212, 71, 72],
@@ -330,6 +337,12 @@ export function createWorldRenderer({
     }, camera.getPose?.()?.target || null);
   }
 
+  function getSelectedGroundHighlightTexture(groundCell) {
+    return groundCell?.highlightAbilityId === "leafage" ?
+      selectedLeafGroundHighlightTexture :
+      selectedWaterGroundHighlightTexture;
+  }
+
   function prepareSpritePass(viewProjection) {
     const { right: quadRight, up: quadUp } = camera.getBillboardAxes();
     spritePassCameraTarget = camera.getPose?.()?.target || null;
@@ -418,12 +431,22 @@ export function createWorldRenderer({
     drawGroundCellHighlight(viewProjection, {
       visible = false,
       groundCell = null,
-      markedGroundCells = []
+      markedGroundCells = [],
+      actionPulseGroundCell = null,
+      actionPulsePhase = 0,
+      actionPulseAbilityId = null
     } = {}) {
       const markedCells = (markedGroundCells || []).filter(Boolean);
       const selectedCells = visible && groundCell ? [groundCell] : [];
+      const actionPulseCell = actionPulseGroundCell ?
+        {
+          ...actionPulseGroundCell,
+          highlightAbilityId: actionPulseAbilityId || actionPulseGroundCell.highlightAbilityId
+        } :
+        null;
+      const actionPulseCells = actionPulseCell ? [actionPulseCell] : [];
 
-      if (!viewProjection || (!markedCells.length && !selectedCells.length)) {
+      if (!viewProjection || (!markedCells.length && !selectedCells.length && !actionPulseCells.length)) {
         return;
       }
 
@@ -436,7 +459,13 @@ export function createWorldRenderer({
         GROUND_HIGHLIGHT_MARKED_SCALE
       );
       drawGroundHighlightCells(
-        selectedGroundHighlightTexture,
+        getSelectedGroundHighlightTexture(actionPulseCell),
+        actionPulseCells,
+        GROUND_HIGHLIGHT_ACTION_PULSE_SCALE +
+          Math.max(0, Math.min(1, actionPulsePhase)) * GROUND_HIGHLIGHT_ACTION_PULSE_SCALE_RANGE
+      );
+      drawGroundHighlightCells(
+        getSelectedGroundHighlightTexture(groundCell),
         selectedCells,
         GROUND_HIGHLIGHT_SELECTED_SCALE
       );

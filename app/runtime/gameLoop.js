@@ -1,6 +1,7 @@
 import { createFrameSnapshotController } from "./frameSnapshotController.js";
 import { createCameraZoomPresetController } from "./cameraZoomPresetController.js";
 import { updatePlayerDustParticles } from "../session/playerDustParticles.js";
+import { ACT_TWO_PLAYER_SPEED } from "../session/configurePlayerSpawner.js";
 import {
   getNatureRevivalBillboards,
   getNatureRevivalScale,
@@ -17,11 +18,16 @@ import {
   getGameplayOpeningShipSceneObjects
 } from "../session/gameplayOpeningShip.js";
 import {
+  LOG_CHAIR_ITEM_ID,
   RUINED_POKEMON_CENTER_GUIDE_POSITION,
   WORKBENCH_INTERACT_DISTANCE,
   WORKBENCH_POSITION
 } from "../../gameplayContent.js";
-import { getLeppaTreeSurroundingGroundCells } from "../../world/islandWorld.js";
+import {
+  BULBASAUR_TALK_INTERACT_DISTANCE,
+  buildLogChairPlacement,
+  getLeppaTreeSurroundingGroundCells
+} from "../../world/islandWorld.js";
 import {
   BULBASAUR_IDLE_PATROL_RADIUS,
   SQUIRTLE_IDLE_PATROL_RADIUS
@@ -35,6 +41,7 @@ const SHIP_FALL_SFX_URL = new URL("../soundFx/cartoon-fall.mp3", import.meta.url
 const WOOD_GRAB_SFX_URL = new URL("../soundFx/grab.mp3", import.meta.url).href;
 const INSTANCE_OBJECT_SFX_URL = new URL("../soundFx/instance-object.mp3", import.meta.url).href;
 const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 1500;
+const LOG_CHAIR_PLACEMENT_PREVIEW_ALPHA = 0.42;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
 const BULBASAUR_WORKBENCH_GUIDE_SPEED = 2.4;
@@ -42,6 +49,8 @@ const BULBASAUR_WORKBENCH_GUIDE_WAYPOINT_DISTANCE = 0.08;
 const BULBASAUR_WORKBENCH_GUIDE_RAMP_COLLIDER_ID = "workbench-ramp-collider";
 const BULBASAUR_WORKBENCH_GUIDE_RAMP_APPROACH_MARGIN = 0.92;
 const BULBASAUR_WORKBENCH_GUIDE_SIDE_APPROACH_MARGIN = 1.22;
+const CHOPPER_BULBASAUR_REPAIR_BOX_INVESTIGATION_OFFSET = [-1.12, 0, -0.86];
+const CHOPPER_BULBASAUR_REPAIR_BOX_SPEECH = "What is this?";
 const BEE_FIELD_FLOWER_GROUP_ID = "water-gun-flower-field-0";
 const BEE_FIELD_REPAIR_BOX_LOCKED_ALPHA = 0.5;
 const BEE_FIELD_BEE_COUNT = 10;
@@ -51,15 +60,17 @@ const BEE_FIELD_BEE_PATROL_RADIUS_Z = 4.3;
 const BEE_FIELD_BEE_BASE_HEIGHT = 1.04;
 const BEE_FIELD_BEE_BOB_HEIGHT = 0.22;
 const BEE_MODEL_FACE_YAW_OFFSET = Math.PI;
-const CHARMANDER_FOLLOW_SPEED = 2.65;
+const CHARMANDER_FOLLOW_SPEED = ACT_TWO_PLAYER_SPEED;
 const CHARMANDER_FOLLOW_DISTANCE = 1.28;
 const CHARMANDER_CAMPFIRE_LIGHT_DISTANCE = 1.9;
-const TIMBURR_FOLLOW_SPEED = 2.45;
+const TIMBURR_FOLLOW_SPEED = ACT_TWO_PLAYER_SPEED;
 const TIMBURR_FOLLOW_DISTANCE = 1.62;
-const SQUIRTLE_FOLLOW_SPEED = 2.65;
+const SQUIRTLE_FOLLOW_SPEED = ACT_TWO_PLAYER_SPEED;
 const SQUIRTLE_FOLLOW_DISTANCE = 1.18;
-const BULBASAUR_FOLLOW_SPEED = 2.45;
+const BULBASAUR_FOLLOW_SPEED = ACT_TWO_PLAYER_SPEED;
 const BULBASAUR_FOLLOW_DISTANCE = 1.46;
+const ACTIVE_MOVE_COMPANION_FOLLOW_DISTANCE = 1.12;
+const INACTIVE_MOVE_COMPANION_FOLLOW_DISTANCE = 2.28;
 const TALL_GRASS_MIN_FOOTPRINT = 1.28;
 const SQUIRTLE_WATER_GUN_SPEED = 4.8;
 const SQUIRTLE_WATER_GUN_STAND_DISTANCE = 1.18;
@@ -76,6 +87,8 @@ const SQUIRTLE_WATER_GUN_SPLASH_RADIUS = 0.86;
 const SQUIRTLE_WATER_GUN_SFX_INTERVAL = 0.3;
 const SQUIRTLE_WATER_GUN_SFX_VOLUME = 0.58;
 const SQUIRTLE_WATER_GUN_USE_COUNT_FLAG = "squirtleWaterGunUseCount";
+const SQUIRTLE_WATER_GUN_BASE_LEVEL = 11;
+const SQUIRTLE_WATER_GUN_USES_PER_LEVEL = 3;
 const SQUIRTLE_WATER_GUN_EVOLUTION_MAX_USES = 24;
 const SQUIRTLE_WATER_GUN_MAX_SPEED_MULTIPLIER = 1.7;
 const SQUIRTLE_WATER_GUN_MIN_SPRAY_DURATION = 0.46;
@@ -100,6 +113,18 @@ const SQUIRTLE_CHARGING_PARTICLE_RADIUS = 0.72;
 const SQUIRTLE_CHARGING_PARTICLE_DURATION = 1.15;
 const WATER_GUN_FIRST_USE_PROMPT_FLAG = "waterGunFirstUsePromptDismissed";
 const WATER_GUN_FIRST_USE_PROMPT_TEXT = "Press LT to use Squirtle";
+const LEAFAGE_SWITCH_PROMPT_TEXT = "Press LT on dry ground, then ← / → to select Bulbasaur";
+const LEAFAGE_USE_PROMPT_TEXT = "Use LT on green ground";
+const LEAFAGE_INVALID_TARGET_PROMPT_TEXT = "CHOOSE SQUIRTLE TO DRY FIRST";
+const LEAFAGE_INVALID_TARGET_PROMPT_DURATION_MS = 1600;
+const GROUND_ACTION_FEEDBACK_DURATION_MS = 520;
+const BULBASAUR_INTERACTION_GIZMO_DOT_COUNT = 36;
+const BULBASAUR_INTERACTION_GIZMO_DOT_SIZE = 0.16;
+const COMPANION_LOST_HINT_INITIAL_DELAY_MS = 5200;
+const COMPANION_LOST_HINT_REPEAT_MS = 13000;
+const COMPANION_LOST_HINT_DURATION_MS = 3400;
+const SQUIRTLE_WATER_GUN_HINT_TEXT = "Press LT to use Water Gun.";
+const BULBASAUR_SWITCH_TO_SQUIRTLE_HINT_TEXT = "Press Left to change to Squirtle.";
 const SQUIRTLE_REASSEMBLY_PART_SCALE = 0.5;
 const SQUIRTLE_MODEL_FACE_YAW_OFFSET = Math.PI;
 const BULBASAUR_MODEL_FACE_YAW_OFFSET = Math.PI;
@@ -116,6 +141,7 @@ const ROBOT_REPAIR_BOX_OPEN_LIFT = 0.18;
 const ROBOT_REPAIR_BOX_OPEN_BACKSTEP = 0.28;
 const BULBASAUR_REVEAL_BOX_DURATION = 1.15;
 const BULBASAUR_REVEAL_VISIBLE_PROGRESS = 0.56;
+const BULBASAUR_REVEAL_FLASH_PEAK_OPACITY = 0.86;
 const REPAIR_BOX_PROMPT_DISTANCE = 2.8;
 const REPAIR_BOX_ACTIVE_TINT = Object.freeze([0.38, 1.72, 0.42]);
 const REPAIR_BOX_ACTIVE_TINT_STRENGTH = 0.68;
@@ -352,6 +378,38 @@ function clamp01(value) {
 function easeOutCubic(value) {
   const progress = clamp01(value);
   return 1 - Math.pow(1 - progress, 3);
+}
+
+export function resolveCompanionFollowDistance({
+  companionId,
+  activeMoveId,
+  defaultDistance
+} = {}) {
+  if (activeMoveId === "waterGun") {
+    if (companionId === "squirtle") {
+      return ACTIVE_MOVE_COMPANION_FOLLOW_DISTANCE;
+    }
+
+    if (companionId === "bulbasaur") {
+      return INACTIVE_MOVE_COMPANION_FOLLOW_DISTANCE;
+    }
+  }
+
+  if (activeMoveId === "leafage") {
+    if (companionId === "bulbasaur") {
+      return ACTIVE_MOVE_COMPANION_FOLLOW_DISTANCE;
+    }
+
+    if (companionId === "squirtle") {
+      return INACTIVE_MOVE_COMPANION_FOLLOW_DISTANCE;
+    }
+  }
+
+  return defaultDistance;
+}
+
+export function resolveCompanionFollowSpeed() {
+  return ACT_TWO_PLAYER_SPEED;
 }
 
 function lerp(start, end, progress) {
@@ -599,6 +657,13 @@ export function startGameLoop({
   const woodCollectPopEffects = [];
   let repairBoxElapsed = 0;
   let waterGunSfxBurstUntilSeconds = 0;
+  let repairBoxRevealFlashElement = null;
+  let companionLostHintKey = null;
+  let companionLostHintNextAt = 0;
+  let companionLostHintActiveUntil = 0;
+  let companionLostHintActive = null;
+  let leafageInvalidTargetPromptUntil = 0;
+  let groundActionFeedback = null;
   let cameraDebugElement = null;
   const cameraDebugErrors = [];
 
@@ -623,6 +688,36 @@ export function startGameLoop({
       waterGunSfxBurstUntilSeconds,
       nowSeconds + duration
     );
+  }
+
+  function triggerGroundActionFeedback(groundCell, abilityId, now) {
+    if (!groundCell) {
+      return;
+    }
+
+    groundActionFeedback = {
+      groundCell,
+      abilityId,
+      startedAt: now,
+      expiresAt: now + GROUND_ACTION_FEEDBACK_DURATION_MS
+    };
+  }
+
+  function getGroundActionFeedback(now) {
+    if (!groundActionFeedback || groundActionFeedback.expiresAt <= now) {
+      groundActionFeedback = null;
+      return null;
+    }
+
+    const progress = clamp01(
+      (now - groundActionFeedback.startedAt) / GROUND_ACTION_FEEDBACK_DURATION_MS
+    );
+
+    return {
+      groundCell: groundActionFeedback.groundCell,
+      abilityId: groundActionFeedback.abilityId,
+      pulsePhase: Math.sin(progress * Math.PI)
+    };
   }
 
   function restoreActiveZoomPresetOnMovement(playerPosition) {
@@ -688,6 +783,103 @@ export function startGameLoop({
     }
 
     cameraDebugElement.textContent = JSON.stringify(debugState, null, 2);
+  }
+
+  function getRepairBoxRevealFlashElement() {
+    if (
+      repairBoxRevealFlashElement ||
+      typeof HTMLElement === "undefined" ||
+      !(mount instanceof HTMLElement) ||
+      typeof document === "undefined"
+    ) {
+      return repairBoxRevealFlashElement;
+    }
+
+    repairBoxRevealFlashElement = document.createElement("div");
+    repairBoxRevealFlashElement.dataset.repairBoxRevealFlash = "true";
+    repairBoxRevealFlashElement.hidden = true;
+    repairBoxRevealFlashElement.style.cssText = [
+      "position:absolute",
+      "inset:0",
+      "z-index:11",
+      "opacity:0",
+      "pointer-events:none",
+      "mix-blend-mode:screen",
+      "will-change:opacity,background",
+      "background:#fff"
+    ].join(";");
+    mount.append(repairBoxRevealFlashElement);
+    return repairBoxRevealFlashElement;
+  }
+
+  function getRepairBoxRevealFlashOrigin(encounter) {
+    const repairBoxPosition = getEncounterRepairBoxPosition(encounter);
+
+    if (!Array.isArray(repairBoxPosition) || !worldCanvas?.width || !worldCanvas?.height) {
+      return "50% 55%";
+    }
+
+    const projected = camera.project(
+      [
+        repairBoxPosition[0],
+        repairBoxPosition[1] + ROBOT_REPAIR_BOX_FLOAT_HEIGHT,
+        repairBoxPosition[2]
+      ],
+      worldCanvas.width,
+      worldCanvas.height
+    );
+
+    if (!projected || projected.depth > 1) {
+      return "50% 55%";
+    }
+
+    const originX = clamp01(projected.x / worldCanvas.width) * 100;
+    const originY = clamp01(projected.y / worldCanvas.height) * 100;
+    return `${originX.toFixed(2)}% ${originY.toFixed(2)}%`;
+  }
+
+  function setRepairBoxRevealFlashOpacity(opacity, encounter) {
+    const normalizedOpacity = clamp01(opacity);
+
+    if (normalizedOpacity <= 0.01) {
+      if (repairBoxRevealFlashElement) {
+        repairBoxRevealFlashElement.hidden = true;
+        repairBoxRevealFlashElement.style.opacity = "0";
+      }
+      return;
+    }
+
+    const element = getRepairBoxRevealFlashElement();
+    if (!element) {
+      return;
+    }
+
+    const origin = getRepairBoxRevealFlashOrigin(encounter);
+    element.hidden = false;
+    element.style.opacity = normalizedOpacity.toFixed(3);
+    element.style.background = [
+      `radial-gradient(circle at ${origin}, rgba(255,255,255,1) 0%, rgba(255,255,255,0.98) 18%, rgba(255,255,255,0.76) 38%, rgba(255,255,255,0.34) 62%, rgba(255,255,255,0) 84%)`,
+      "linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.42))"
+    ].join(",");
+  }
+
+  function updateRepairBoxRevealFlash(opening, encounter) {
+    const flashDuration = Number(opening?.flashDuration || 0);
+    const flashStart = Number(opening?.flashStart || 0);
+
+    if (!opening?.active || flashDuration <= 0) {
+      setRepairBoxRevealFlashOpacity(0);
+      return;
+    }
+
+    const flashProgress = (Number(opening.elapsed || 0) - flashStart) / flashDuration;
+    if (flashProgress < 0 || flashProgress > 1) {
+      setRepairBoxRevealFlashOpacity(0);
+      return;
+    }
+
+    const pulse = Math.sin(clamp01(flashProgress) * Math.PI);
+    setRepairBoxRevealFlashOpacity(pulse * BULBASAUR_REVEAL_FLASH_PEAK_OPACITY, encounter);
   }
 
   function getYawToward(fromPosition, toPosition) {
@@ -813,11 +1005,16 @@ export function startGameLoop({
     }
 
     const openingProgress = getEncounterRepairBoxOpeningProgress(encounter);
+    const revealBoxOpening = encounter.revealBoxOpening;
+    const hideBoxAfterReveal = Boolean(
+      revealBoxOpening?.hideBoxWhenVisible &&
+      revealBoxOpening?.bulbasaurVisible
+    );
 
     syncRepairBoxInstance(
       encounter.repairModuleInstance,
       getEncounterRepairBoxPosition(encounter),
-      openingProgress > 0 || !encounter.visible,
+      !hideBoxAfterReveal && (openingProgress > 0 || !encounter.visible),
       { openingProgress }
     );
   }
@@ -1106,6 +1303,58 @@ export function startGameLoop({
       null;
   }
 
+  function isBulbasaurRepairBoxRustlingActive() {
+    const flags = controls.storyState?.flags || {};
+    const rustlingGrassCellId = flags.rustlingGrassCellId;
+
+    if (
+      !rustlingGrassCellId ||
+      flags.bulbasaurRevealed ||
+      !session.bulbasaurEncounter?.repairModuleInstance?.active
+    ) {
+      return false;
+    }
+
+    return (session.groundGrassPatches || []).some((groundGrassPatch) => {
+      return groundGrassPatch?.cellId === rustlingGrassCellId &&
+        groundGrassPatch.state === "alive";
+    });
+  }
+
+  function getBulbasaurRepairBoxInvestigationTarget() {
+    if (!isBulbasaurRepairBoxRustlingActive()) {
+      return null;
+    }
+
+    const repairBoxPosition = getEncounterRepairBoxPosition(session.bulbasaurEncounter);
+
+    if (!Array.isArray(repairBoxPosition)) {
+      return null;
+    }
+
+    return {
+      position: [
+        repairBoxPosition[0] + CHOPPER_BULBASAUR_REPAIR_BOX_INVESTIGATION_OFFSET[0],
+        repairBoxPosition[1] + CHOPPER_BULBASAUR_REPAIR_BOX_INVESTIGATION_OFFSET[1],
+        repairBoxPosition[2] + CHOPPER_BULBASAUR_REPAIR_BOX_INVESTIGATION_OFFSET[2]
+      ],
+      lookAtPosition: [...repairBoxPosition]
+    };
+  }
+
+  function isPlayerNearWorldPosition(worldPosition, distance) {
+    const playerPosition = session.playerCharacter?.getPosition?.();
+
+    if (!Array.isArray(playerPosition) || !Array.isArray(worldPosition)) {
+      return false;
+    }
+
+    return Math.hypot(
+      playerPosition[0] - worldPosition[0],
+      playerPosition[2] - worldPosition[2]
+    ) <= distance;
+  }
+
   function getRepairBoxPromptPosition(encounter) {
     const basePosition =
       getEncounterRepairBoxPosition(encounter) ||
@@ -1388,7 +1637,7 @@ export function startGameLoop({
     return true;
   }
 
-  function updateSquirtleIdlePatrol(deltaTime, { active }) {
+  function updateSquirtleIdlePatrol(deltaTime, { active, activeMoveId = null }) {
     const squirtle = session.actTwoSquirtle;
     const canMove = Boolean(
       active &&
@@ -1410,7 +1659,11 @@ export function startGameLoop({
       moveGroundCompanionTowardPlayer(squirtle, {
         deltaTime,
         speed: SQUIRTLE_FOLLOW_SPEED,
-        followDistance: SQUIRTLE_FOLLOW_DISTANCE,
+        followDistance: resolveCompanionFollowDistance({
+          companionId: "squirtle",
+          activeMoveId,
+          defaultDistance: SQUIRTLE_FOLLOW_DISTANCE
+        }),
         modelFaceYawOffset: SQUIRTLE_MODEL_FACE_YAW_OFFSET
       });
       syncSquirtleModelInstance();
@@ -1425,7 +1678,7 @@ export function startGameLoop({
     syncSquirtleModelInstance();
   }
 
-  function updateBulbasaurIdlePatrol(deltaTime, { active }) {
+  function updateBulbasaurIdlePatrol(deltaTime, { active, activeMoveId = null }) {
     const encounter = session.bulbasaurEncounter;
     const flags = controls.storyState?.flags || {};
     const workbenchGuideActive =
@@ -1458,7 +1711,11 @@ export function startGameLoop({
       moveGroundCompanionTowardPlayer(encounter, {
         deltaTime,
         speed: BULBASAUR_FOLLOW_SPEED,
-        followDistance: BULBASAUR_FOLLOW_DISTANCE,
+        followDistance: resolveCompanionFollowDistance({
+          companionId: "bulbasaur",
+          activeMoveId,
+          defaultDistance: BULBASAUR_FOLLOW_DISTANCE
+        }),
         modelFaceYawOffset: BULBASAUR_MODEL_FACE_YAW_OFFSET
       });
       syncBulbasaurModelInstance();
@@ -1720,6 +1977,16 @@ export function startGameLoop({
     );
   }
 
+  function getSquirtleWaterGunLevel() {
+    return SQUIRTLE_WATER_GUN_BASE_LEVEL +
+      Math.floor(getSquirtleWaterGunUseCount() / SQUIRTLE_WATER_GUN_USES_PER_LEVEL);
+  }
+
+  function getSquirtleWaterStaminaMax() {
+    return SQUIRTLE_WATER_STAMINA_MAX +
+      Math.max(0, getSquirtleWaterGunLevel() - SQUIRTLE_WATER_GUN_BASE_LEVEL);
+  }
+
   function getSquirtleWaterGunSpeedMultiplier() {
     const progress = clamp01(getSquirtleWaterGunUseCount() / SQUIRTLE_WATER_GUN_EVOLUTION_MAX_USES);
     return 1 + (SQUIRTLE_WATER_GUN_MAX_SPEED_MULTIPLIER - 1) * progress;
@@ -1750,29 +2017,36 @@ export function startGameLoop({
   }
 
   function getSquirtleWaterStaminaState() {
+    const staminaMax = getSquirtleWaterStaminaMax();
+
     if (!session.squirtleWaterStamina) {
       session.squirtleWaterStamina = {
-        current: SQUIRTLE_WATER_STAMINA_MAX,
-        visualCurrent: SQUIRTLE_WATER_STAMINA_MAX,
-        max: SQUIRTLE_WATER_STAMINA_MAX,
+        current: staminaMax,
+        visualCurrent: staminaMax,
+        max: staminaMax,
         charging: false,
         chargeElapsed: 0
       };
     }
 
-    session.squirtleWaterStamina.max = SQUIRTLE_WATER_STAMINA_MAX;
+    const previousMax = Math.max(
+      1,
+      Number(session.squirtleWaterStamina.max || staminaMax)
+    );
+    const maxIncrease = Math.max(0, staminaMax - previousMax);
+    session.squirtleWaterStamina.max = staminaMax;
     session.squirtleWaterStamina.current = Math.min(
-      SQUIRTLE_WATER_STAMINA_MAX,
-      Math.max(0, Number(session.squirtleWaterStamina.current || 0))
+      staminaMax,
+      Math.max(0, Number(session.squirtleWaterStamina.current || 0)) + maxIncrease
     );
     session.squirtleWaterStamina.visualCurrent = Math.min(
-      SQUIRTLE_WATER_STAMINA_MAX,
+      staminaMax,
       Math.max(
         0,
         Number.isFinite(session.squirtleWaterStamina.visualCurrent) ?
           session.squirtleWaterStamina.visualCurrent :
           session.squirtleWaterStamina.current
-      )
+      ) + maxIncrease
     );
     return session.squirtleWaterStamina;
   }
@@ -2222,6 +2496,90 @@ export function startGameLoop({
     return squirtle?.position || squirtle?.modelInstance?.offset || null;
   }
 
+  function resetCompanionLostHintSchedule() {
+    companionLostHintKey = null;
+    companionLostHintNextAt = 0;
+    companionLostHintActiveUntil = 0;
+    companionLostHintActive = null;
+  }
+
+  function resolveWaterGunCompanionLostHint(activeQuest, activeMoveId) {
+    const flags = controls.storyState?.flags || {};
+    const restoredGrassCount = Number(flags.restoredGrassCount || 0);
+    const activeDryGrassQuest = activeQuest?.id === "water-dry-grass";
+    const activeBulbasaurDryGrassRequest =
+      flags.bulbasaurDryGrassMissionAccepted &&
+      !flags.bulbasaurDryGrassMissionComplete &&
+      restoredGrassCount < BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT;
+    const needsWaterGun =
+      controls.playerSkills?.waterGun &&
+      (
+        activeDryGrassQuest ||
+        activeBulbasaurDryGrassRequest
+      );
+
+    if (!needsWaterGun) {
+      return null;
+    }
+
+    if (activeMoveId === "leafage" && Array.isArray(session.bulbasaurEncounter?.position)) {
+      return {
+        key: "bulbasaur-switch-to-squirtle",
+        text: BULBASAUR_SWITCH_TO_SQUIRTLE_HINT_TEXT,
+        worldPosition: session.bulbasaurEncounter.position
+      };
+    }
+
+    const squirtlePosition = getSquirtleWorldPosition();
+
+    if (!Array.isArray(squirtlePosition)) {
+      return null;
+    }
+
+    return {
+      key: "squirtle-use-water-gun",
+      text: SQUIRTLE_WATER_GUN_HINT_TEXT,
+      worldPosition: squirtlePosition
+    };
+  }
+
+  function getPeriodicCompanionLostHint({
+    activeQuest,
+    activeMoveId,
+    now
+  }) {
+    const hint = resolveWaterGunCompanionLostHint(activeQuest, activeMoveId);
+
+    if (!hint) {
+      resetCompanionLostHintSchedule();
+      return null;
+    }
+
+    if (hint.key !== companionLostHintKey) {
+      companionLostHintKey = hint.key;
+      companionLostHintNextAt = now + COMPANION_LOST_HINT_INITIAL_DELAY_MS;
+      companionLostHintActiveUntil = 0;
+      companionLostHintActive = null;
+      return null;
+    }
+
+    if (companionLostHintActive && now < companionLostHintActiveUntil) {
+      return {
+        ...companionLostHintActive,
+        worldPosition: hint.worldPosition
+      };
+    }
+
+    if (now < companionLostHintNextAt) {
+      return null;
+    }
+
+    companionLostHintActive = hint;
+    companionLostHintActiveUntil = now + COMPANION_LOST_HINT_DURATION_MS;
+    companionLostHintNextAt = now + COMPANION_LOST_HINT_REPEAT_MS;
+    return hint;
+  }
+
   function getSquirtleStaminaBillboards(fillTexture, uvRect) {
     const position = getSquirtleWorldPosition();
     if (!Array.isArray(position) || !fillTexture) {
@@ -2442,21 +2800,27 @@ export function startGameLoop({
     const opening = encounter?.revealBoxOpening;
 
     if (!opening?.active) {
+      setRepairBoxRevealFlashOpacity(0);
       return false;
     }
 
     if (!Array.isArray(encounter.repairPosition)) {
       opening.active = false;
+      setRepairBoxRevealFlashOpacity(0);
       return false;
     }
 
     opening.duration = Number(opening.duration || BULBASAUR_REVEAL_BOX_DURATION);
     opening.elapsed = Math.min(opening.duration, Number(opening.elapsed || 0) + deltaTime);
     const progress = clamp01(opening.elapsed / opening.duration);
+    updateRepairBoxRevealFlash(opening, encounter);
 
     if (progress >= BULBASAUR_REVEAL_VISIBLE_PROGRESS && !opening.bulbasaurVisible) {
       revealBulbasaurAtRepairPosition(encounter);
       opening.bulbasaurVisible = true;
+      if (opening.hideBoxWhenVisible && encounter.repairModuleInstance) {
+        encounter.repairModuleInstance.active = false;
+      }
     }
 
     if (progress >= 1) {
@@ -2468,6 +2832,7 @@ export function startGameLoop({
       const onComplete = opening.onComplete;
       opening.onComplete = null;
       encounter.revealBoxOpening = null;
+      setRepairBoxRevealFlashOpacity(0);
       syncBulbasaurModelInstance();
       if (typeof onComplete === "function") {
         onComplete();
@@ -2935,6 +3300,34 @@ export function startGameLoop({
     });
   }
 
+  function getBulbasaurInteractionRadiusGizmoBillboards(encounter, texture, uvRect, now) {
+    if (!encounter?.visible || !Array.isArray(encounter.position) || !texture) {
+      return [];
+    }
+
+    const [centerX, centerY, centerZ] = encounter.position;
+    const time = now * 0.001;
+
+    return Array.from({ length: BULBASAUR_INTERACTION_GIZMO_DOT_COUNT }, (_, index) => {
+      const angle = (index / BULBASAUR_INTERACTION_GIZMO_DOT_COUNT) * Math.PI * 2;
+      const pulse = 0.82 + Math.sin(time * 4 + index * 0.71) * 0.18;
+      const size = BULBASAUR_INTERACTION_GIZMO_DOT_SIZE * pulse;
+
+      return {
+        texture,
+        position: [
+          centerX + Math.cos(angle) * BULBASAUR_TALK_INTERACT_DISTANCE,
+          centerY + 0.14,
+          centerZ + Math.sin(angle) * BULBASAUR_TALK_INTERACT_DISTANCE
+        ],
+        size: [size, size],
+        uvRect,
+        alpha: 0.74,
+        rotation: angle + time * 0.25
+      };
+    });
+  }
+
   function getRustlingGrassParticleBillboards(groundGrassPatch, texture, now, uvRect) {
     if (!texture) {
       return [];
@@ -3301,6 +3694,39 @@ export function startGameLoop({
         isWaterGunTreeTarget(primaryActionTarget) ||
         (leafageEquipped && primaryActionTarget?.leafageGroundCell)
       );
+      const primaryActionWantsFieldMove =
+        harvestRequestSource === "gamepadPrimary" ||
+        harvestRequestSource === "keyboardPrimary";
+      const leafageAutoWaterGunTarget =
+        leafageEquipped &&
+        primaryActionWantsFieldMove &&
+        controls.playerSkills?.waterGun &&
+        !primaryActionPlacementTarget &&
+        !primaryActionTarget?.leafageGroundCell ?
+          gameplay.findNearbyActionTarget({
+            playerPosition,
+            palmModel: session.palmModel,
+            palmInstances: session.palmInstances,
+            resourceNodes: session.resourceNodes,
+            leppaTree: session.leppaTree,
+            leafDen: session.leafDen,
+            storyState: controls.storyState,
+            inventory: controls.inventory,
+            groundDeadInstances: session.groundDeadInstances,
+            groundPurifiedInstances: session.groundPurifiedInstances,
+            groundGrassPatches: session.groundGrassPatches,
+            groundFlowerPatches: session.groundFlowerPatches,
+            canPurifyGround: true,
+            canUseLeafage: false
+          }) :
+          null;
+      const primaryActionInvalidLeafageUse = Boolean(
+        leafageEquipped &&
+        primaryActionWantsFieldMove &&
+        !primaryActionPlacementTarget &&
+        !primaryActionTarget?.leafageGroundCell &&
+        !leafageAutoWaterGunTarget?.groundCell
+      );
       if (
         waterGunEquipped &&
         (
@@ -3313,7 +3739,9 @@ export function startGameLoop({
       const primaryInteractTarget =
         !dialogueActive &&
         !primaryActionIsPlacement &&
-        !primaryActionIsMove ?
+        !primaryActionIsMove &&
+        !leafageAutoWaterGunTarget?.groundCell &&
+        !primaryActionInvalidLeafageUse ?
           gameplay.findNearbyInteractable(
             playerPosition,
             session.npcActors,
@@ -3329,12 +3757,32 @@ export function startGameLoop({
           ) :
           null;
 
-      if (primaryActionPlacementBlocked) {
+      if (leafageAutoWaterGunTarget?.groundCell) {
+        leafageInvalidTargetPromptUntil = 0;
+        controls.setActiveMoveId?.("waterGun");
+        controls.storyState.flags[WATER_GUN_FIRST_USE_PROMPT_FLAG] = true;
+        triggerGroundActionFeedback(leafageAutoWaterGunTarget.groundCell, "waterGun", now);
+        const squirtleWaterGunResult = startSquirtleWaterGunAction({
+          groundCell: leafageAutoWaterGunTarget.groundCell,
+          playerPosition
+        });
+
+        if (squirtleWaterGunResult === "unavailable") {
+          triggerWaterGunSfxBurst();
+          performHarvestAction(playerPosition, {
+            useWaterGun: true,
+            forcedHarvestTarget: leafageAutoWaterGunTarget
+          });
+        }
+      } else if (primaryActionInvalidLeafageUse) {
+        leafageInvalidTargetPromptUntil = now + LEAFAGE_INVALID_TARGET_PROMPT_DURATION_MS;
+      } else if (primaryActionPlacementBlocked) {
         // The trigger is reserved for the selected move. Placements use Enter or gamepad X.
       } else if (primaryActionIsPlacement) {
         performHarvestAction(playerPosition);
       } else if (primaryActionIsMove && !dialogueActive) {
         if (waterGunEquipped && primaryActionTarget?.groundCell) {
+          triggerGroundActionFeedback(primaryActionTarget.groundCell, "waterGun", now);
           const squirtleWaterGunResult = startSquirtleWaterGunAction({
             groundCell: primaryActionTarget.groundCell,
             playerPosition
@@ -3356,6 +3804,8 @@ export function startGameLoop({
             });
           }
         } else if (leafageEquipped && primaryActionTarget?.leafageGroundCell) {
+          leafageInvalidTargetPromptUntil = 0;
+          triggerGroundActionFeedback(primaryActionTarget.leafageGroundCell, "leafage", now);
           const bulbasaurLeafageResult = startBulbasaurLeafageAction({
             groundCell: primaryActionTarget.leafageGroundCell,
             playerPosition
@@ -3444,6 +3894,14 @@ export function startGameLoop({
           groundCell: waterGunTarget.groundCell,
           playerPosition
         });
+
+        if (
+          squirtleWaterGunResult === "started" ||
+          squirtleWaterGunResult === "queued" ||
+          squirtleWaterGunResult === "unavailable"
+        ) {
+          triggerGroundActionFeedback(waterGunTarget.groundCell, "waterGun", now);
+        }
 
         if (squirtleWaterGunResult === "unavailable") {
           triggerWaterGunSfxBurst();
@@ -3561,11 +4019,14 @@ export function startGameLoop({
     gameplay.syncLeppaTreeState?.(session.leppaTree, controls.storyState);
     updateLeppaTreeDance(now);
     updateLeppaTreeMusicNotes(deltaTime);
+    const chopperBulbasaurRepairBoxInvestigationTarget =
+      getBulbasaurRepairBoxInvestigationTarget();
     updateChopperNpcActor(session.chopperNpcActor, {
       deltaTime,
       storyState: controls.storyState,
       isNpcActive: rendering.isNpcActive,
-      guidePosition: RUINED_POKEMON_CENTER_GUIDE_POSITION
+      guidePosition: RUINED_POKEMON_CENTER_GUIDE_POSITION,
+      investigationTarget: chopperBulbasaurRepairBoxInvestigationTarget
     });
     updateBulbasaurEncounter(deltaTime);
     updateCharmanderEncounter(deltaTime);
@@ -3593,10 +4054,12 @@ export function startGameLoop({
       !scriptedInteractionActive
     );
     updateSquirtleIdlePatrol(deltaTime, {
-      active: robotIdlePatrolActive
+      active: robotIdlePatrolActive,
+      activeMoveId
     });
     updateBulbasaurIdlePatrol(deltaTime, {
-      active: robotIdlePatrolActive
+      active: robotIdlePatrolActive,
+      activeMoveId
     });
 
     if (cinematicActive) {
@@ -3786,6 +4249,12 @@ export function startGameLoop({
       highlightedGroundCell && highlightedGroundCell === invalidMoveGroundCell ?
         "invalid" :
         "valid";
+    const highlightedGroundCellAbilityId =
+      leafageEquipped ?
+        "leafage" :
+        waterGunEquipped ?
+          "waterGun" :
+          null;
     const nearbyInteractable =
       session.playerCharacter &&
       !gameplayOpeningCameraActive &&
@@ -3883,6 +4352,7 @@ export function startGameLoop({
       !scriptedInteractionActive &&
       !gameplayDialogue.isActive() &&
       Boolean(highlightedGroundCell);
+    const groundActionFeedbackFrame = getGroundActionFeedback(now);
 
     if (
       !gameplayOpeningCameraActive &&
@@ -3970,6 +4440,21 @@ export function startGameLoop({
       controls.storyState.flags.charmanderCelebrationSuggested &&
       !controls.storyState.flags.charmanderCelebrationComplete &&
       tangrowthPosition;
+    const shouldShowChopperBulbasaurRepairBoxSpeech =
+      !shouldShowTangrowthSpeech &&
+      !shouldShowTangrowthLogChairSpeech &&
+      !shouldShowTangrowthCampfireSpeech &&
+      !shouldShowTangrowthPokemonCenterSpeech &&
+      !shouldShowTangrowthHouseSpeech &&
+      !shouldShowTangrowthCelebrationSpeech &&
+      canShowWorldSpaceUi &&
+      session.playerCharacter &&
+      chopperBulbasaurRepairBoxInvestigationTarget &&
+      tangrowthPosition &&
+      !isPlayerNearWorldPosition(
+        chopperBulbasaurRepairBoxInvestigationTarget.lookAtPosition,
+        REPAIR_BOX_PROMPT_DISTANCE
+      );
     const shouldShowBulbasaurMissionSpeech =
       !shouldShowTangrowthSpeech &&
       !shouldShowTangrowthLogChairSpeech &&
@@ -3977,6 +4462,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowChopperBulbasaurRepairBoxSpeech &&
       canShowWorldSpaceUi &&
       Boolean(session.bulbasaurEncounter?.visible) &&
       Boolean(session.bulbasaurEncounter?.position) &&
@@ -3990,6 +4476,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowChopperBulbasaurRepairBoxSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
       canShowWorldSpaceUi &&
       Boolean(session.bulbasaurEncounter?.visible) &&
@@ -4003,6 +4490,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowChopperBulbasaurRepairBoxSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
       canShowWorldSpaceUi &&
@@ -4022,6 +4510,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowChopperBulbasaurRepairBoxSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
       !shouldShowBulbasaurRequestReadySpeech &&
@@ -4051,6 +4540,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowChopperBulbasaurRepairBoxSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
       !shouldShowBulbasaurRequestReadySpeech &&
@@ -4066,6 +4556,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowChopperBulbasaurRepairBoxSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
       !shouldShowBulbasaurRequestReadySpeech &&
@@ -4082,6 +4573,7 @@ export function startGameLoop({
       !shouldShowTangrowthPokemonCenterSpeech &&
       !shouldShowTangrowthHouseSpeech &&
       !shouldShowTangrowthCelebrationSpeech &&
+      !shouldShowChopperBulbasaurRepairBoxSpeech &&
       !shouldShowBulbasaurMissionSpeech &&
       !shouldShowBulbasaurWorkbenchGuideSpeech &&
       !shouldShowBulbasaurRequestReadySpeech &&
@@ -4107,17 +4599,22 @@ export function startGameLoop({
       activeMoveId === "waterGun" &&
       !controls.storyState.flags[WATER_GUN_FIRST_USE_PROMPT_FLAG] &&
       !controls.isPrimaryActionActive?.();
+    const shouldShowLeafageFirstUsePrompt =
+      canShowWorldSpaceUi &&
+      session.playerCharacter &&
+      controls.playerSkills?.leafage &&
+      !controls.storyState.flags.leafageTallGrassCount &&
+      !controls.storyState.flags.leafageTallGrassHabitatCreated &&
+      !controls.isPrimaryActionActive?.();
     const squirtleChargingPosition = getSquirtleWorldPosition();
     const shouldShowSquirtleChargingPrompt =
       canShowWorldSpaceUi &&
       isSquirtleWaterCharging() &&
       Array.isArray(squirtleChargingPosition);
-    const shouldShowCharacterWorldPrompt =
+    const shouldShowInvalidLeafageUsePrompt =
       canShowWorldSpaceUi &&
-      !shouldShowRepairBoxPrompt &&
       session.playerCharacter &&
-      nearbyInteractable?.target &&
-      controls.shouldBagButtonInteract?.();
+      leafageInvalidTargetPromptUntil > now;
     const shouldShowTransientWorldPrompt =
       canShowWorldSpaceUi &&
       session.playerCharacter &&
@@ -4158,6 +4655,12 @@ export function startGameLoop({
     if (shouldShowTangrowthCelebrationSpeech) {
       nextFrame.worldSpeech.visible = true;
       nextFrame.worldSpeech.text = "Bring Charmander here.";
+      nextFrame.worldSpeech.worldPosition = tangrowthPosition;
+    }
+
+    if (shouldShowChopperBulbasaurRepairBoxSpeech) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = CHOPPER_BULBASAUR_REPAIR_BOX_SPEECH;
       nextFrame.worldSpeech.worldPosition = tangrowthPosition;
     }
 
@@ -4205,10 +4708,29 @@ export function startGameLoop({
       nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
     }
 
+    const companionLostHint =
+      !nextFrame.worldSpeech.visible ?
+        getPeriodicCompanionLostHint({
+          activeQuest,
+          activeMoveId,
+          now
+        }) :
+        null;
+
+    if (companionLostHint) {
+      nextFrame.worldSpeech.visible = true;
+      nextFrame.worldSpeech.text = companionLostHint.text;
+      nextFrame.worldSpeech.worldPosition = companionLostHint.worldPosition;
+    }
+
     if (shouldShowSquirtleChargingPrompt) {
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = "charging";
       nextFrame.worldPrompt.worldPosition = squirtleChargingPosition;
+    } else if (shouldShowInvalidLeafageUsePrompt) {
+      nextFrame.worldPrompt.visible = true;
+      nextFrame.worldPrompt.text = LEAFAGE_INVALID_TARGET_PROMPT_TEXT;
+      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
     } else if (shouldShowTransientWorldPrompt) {
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = transientNoticeRoute.worldPromptMessage;
@@ -4217,13 +4739,13 @@ export function startGameLoop({
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = nearbyRepairBoxPrompt.text;
       nextFrame.worldPrompt.worldPosition = nearbyRepairBoxPrompt.worldPosition;
+    } else if (shouldShowLeafageFirstUsePrompt) {
+      nextFrame.worldPrompt.visible = true;
+      nextFrame.worldPrompt.text = leafageEquipped ? LEAFAGE_USE_PROMPT_TEXT : LEAFAGE_SWITCH_PROMPT_TEXT;
+      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
     } else if (shouldShowWaterGunFirstUsePrompt) {
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = WATER_GUN_FIRST_USE_PROMPT_TEXT;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
-    } else if (shouldShowCharacterWorldPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = "Press X";
       nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
     }
 
@@ -4231,7 +4753,8 @@ export function startGameLoop({
       nextFrame.groundCellHighlight.visible = true;
       nextFrame.groundCellHighlight.groundCell = {
         ...highlightedGroundCell,
-        highlightTargetState: highlightedGroundCellTargetState
+        highlightTargetState: highlightedGroundCellTargetState,
+        highlightAbilityId: highlightedGroundCellAbilityId
       };
     }
 
@@ -4239,6 +4762,16 @@ export function startGameLoop({
       nextFrame.groundCellHighlight.visible = true;
       nextFrame.groundCellHighlight.markedGroundCells.push(...markedActionGroundCells);
       nextFrame.groundCellHighlight.pulsePhase = markedGroundCellPulsePhase;
+    }
+
+    if (groundActionFeedbackFrame) {
+      nextFrame.groundCellHighlight.visible = true;
+      nextFrame.groundCellHighlight.actionPulseGroundCell = {
+        ...groundActionFeedbackFrame.groundCell,
+        highlightAbilityId: groundActionFeedbackFrame.abilityId
+      };
+      nextFrame.groundCellHighlight.actionPulsePhase = groundActionFeedbackFrame.pulsePhase;
+      nextFrame.groundCellHighlight.actionPulseAbilityId = groundActionFeedbackFrame.abilityId;
     }
 
     const questCompletionPop = gameplay.getQuestCompletionPop?.();
@@ -4442,6 +4975,22 @@ export function startGameLoop({
       flashTexture: session.gameplayOpeningShipFlashTexture,
       fullUvRect: rendering.fullUvRect
     });
+    if (
+      session.playerCharacter &&
+      session.logChairTexture &&
+      controls.storyState.flags.logChairReceived &&
+      !controls.storyState.flags.logChairPlaced &&
+      (controls.inventory?.[LOG_CHAIR_ITEM_ID] || 0) > 0
+    ) {
+      const logChairPreview = buildLogChairPlacement(session.playerCharacter.getPosition());
+      nextFrame.render.genericBillboards.push({
+        texture: session.logChairTexture,
+        position: logChairPreview.position,
+        size: logChairPreview.size,
+        uvRect: rendering.fullUvRect,
+        alpha: LOG_CHAIR_PLACEMENT_PREVIEW_ALPHA
+      });
+    }
     if (session.logChair && controls.storyState.flags.logChairPlaced) {
       nextFrame.render.genericBillboards.push({
         texture: session.logChairTexture,
@@ -4564,13 +5113,14 @@ export function startGameLoop({
         isSquirtleWaterCharging()
       );
     }
+    const squirtleWaterStamina = getSquirtleWaterStaminaState();
     const shouldShowSquirtleStamina =
       controls.playerSkills?.waterGun &&
       (
         activeMoveId === "waterGun" ||
         session.squirtleWaterGunAction ||
         isSquirtleWaterCharging() ||
-        getSquirtleWaterStaminaState().current < SQUIRTLE_WATER_STAMINA_MAX
+        squirtleWaterStamina.current < squirtleWaterStamina.max
       );
     if (shouldShowSquirtleStamina) {
       nextFrame.render.genericBillboards.push(
@@ -4602,6 +5152,14 @@ export function startGameLoop({
         uvRect: rendering.fullUvRect
       });
     }
+    nextFrame.render.genericBillboards.push(
+      ...getBulbasaurInteractionRadiusGizmoBillboards(
+        session.bulbasaurEncounter,
+        session.natureRevivalSparkTexture,
+        rendering.fullUvRect,
+        now
+      )
+    );
     nextFrame.render.genericBillboards.push({
       texture: session.charmanderEncounter?.visible ? session.charmanderEncounter.texture : null,
       position: session.charmanderEncounter?.visible ? session.charmanderEncounter.position : null,

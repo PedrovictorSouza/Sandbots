@@ -167,14 +167,13 @@ describe("createGameHudController", () => {
     expect(companionHudElement?.dataset.companionId).toBe("squirtle");
     expect(
       companionHudElement
-        ?.querySelector(".active-companion-hud__portrait--primary .active-companion-hud__portrait-image")
+        ?.querySelector(".active-companion-hud__portrait-image")
         ?.getAttribute("src")
     ).toContain("Robot-1-thumb.png");
-    expect(
-      companionHudElement
-        ?.querySelector(".active-companion-hud__portrait--secondary .active-companion-hud__portrait-image")
-        ?.getAttribute("src")
-    ).toContain("Robot-2-thumb.png");
+    expect(companionHudElement?.querySelectorAll(".active-companion-hud__portrait-image")).toHaveLength(1);
+    expect(companionHudElement?.querySelectorAll(".active-companion-hud__switch-button")).toHaveLength(2);
+    expect(companionHudElement?.textContent).toContain("D←");
+    expect(companionHudElement?.textContent).toContain("D→");
     expect(companionHudElement?.textContent).toContain("Water");
     expect(companionHudElement?.textContent).toContain("Squirtle");
     expect(companionHudElement?.textContent).toContain("mark dry ground");
@@ -195,14 +194,10 @@ describe("createGameHudController", () => {
     expect(companionHudElement?.dataset.companionId).toBe("bulbasaur");
     expect(
       companionHudElement
-        ?.querySelector(".active-companion-hud__portrait--primary .active-companion-hud__portrait-image")
+        ?.querySelector(".active-companion-hud__portrait-image")
         ?.getAttribute("src")
     ).toContain("Robot-2-thumb.png");
-    expect(
-      companionHudElement
-        ?.querySelector(".active-companion-hud__portrait--secondary .active-companion-hud__portrait-image")
-        ?.getAttribute("src")
-    ).toContain("Robot-1-thumb.png");
+    expect(companionHudElement?.querySelectorAll(".active-companion-hud__portrait-image")).toHaveLength(1);
     expect(companionHudElement?.textContent).toContain("Leaf");
     expect(companionHudElement?.textContent).toContain("Bulbasaur");
     expect(companionHudElement?.textContent).toContain("restored ground");

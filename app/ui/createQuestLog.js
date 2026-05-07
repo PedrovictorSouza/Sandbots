@@ -83,6 +83,10 @@ function getHudObjectives(quest) {
 function getDerivedTrackedTaskIds(storyState = {}) {
   const flags = storyState.flags || {};
   const derivedTaskIds = [];
+  const dryGrassTaskDone = isTrackedTaskDone(
+    storyState,
+    SMALL_ISLAND_FIELD_TASKS[FIELD_TASK_IDS.WATER_DRY_TALL_GRASS]
+  );
   const openingLeppaTreeRequestPending =
     flags.bulbasaurRevealed &&
     flags.squirtleLeppaRequestAvailable &&
@@ -98,12 +102,12 @@ function getDerivedTrackedTaskIds(storyState = {}) {
     derivedTaskIds.push(FIELD_TASK_IDS.BULBASAUR_DRY_GRASS_REQUEST);
   } else if (
     flags.bulbasaurDryGrassMissionAccepted &&
-    !flags.bulbasaurDryGrassMissionComplete
+    !dryGrassTaskDone
   ) {
     derivedTaskIds.push(FIELD_TASK_IDS.WATER_DRY_TALL_GRASS);
   } else if (
     flags.bulbasaurDryGrassMissionAccepted &&
-    flags.bulbasaurDryGrassMissionComplete &&
+    dryGrassTaskDone &&
     !flags.bulbasaurDryGrassRequestTurnedIn
   ) {
     derivedTaskIds.push(FIELD_TASK_IDS.BULBASAUR_LEAFAGE_REWARD);
@@ -149,7 +153,10 @@ function getTrackedTaskEntries(storyState = {}) {
 }
 
 function isTrackedTaskDone(storyState = {}, task) {
-  return Boolean(task?.completeFlag && storyState.flags?.[task.completeFlag]);
+  return Boolean(
+    (typeof task?.isComplete === "function" && task.isComplete(storyState)) ||
+    (task?.completeFlag && storyState.flags?.[task.completeFlag])
+  );
 }
 
 function getTaskIdSet(taskIds) {

@@ -13,6 +13,7 @@ import { HABITAT_EVENT } from "../app/sandbox/habitatData.js";
 import {
   collectLeppaBerryDrops,
   dropLeppaBerryFromTree,
+  getLeppaTreeSurroundingGroundCells,
   findNearbyLeafDen,
   reviveLeppaTreeFromWateredTiles
 } from "./islandWorld.js";
@@ -80,6 +81,7 @@ export function createGameplayInteractions({
   onLogChairPlacementRequested = () => {},
   onLogChairSitRequested = () => {},
   onWorkbenchRecipesRequested = () => {},
+  onCampfireCraftRequested = () => {},
   onCampfireCrafted = () => {},
   onCampfireSpitOutRequested = () => {},
   onStrawBedCrafted = () => {},
@@ -192,6 +194,50 @@ export function createGameplayInteractions({
 
   function getRestoredGrassHabitat(revivedGrass, groundGrassPatches) {
     return getRestoredPatchHabitat(revivedGrass, groundGrassPatches);
+  }
+
+  function hasGrassPatchForGroundCell(groundCell, groundGrassPatches = []) {
+    if (!groundCell?.id) {
+      return false;
+    }
+
+    return groundGrassPatches.some((patch) => patch?.cellId === groundCell.id);
+  }
+
+  function canWaterGunRestoreEmptyGround(storyState = {}) {
+    const flags = storyState.flags || {};
+    return Boolean(flags.bulbasaurDryGrassMissionComplete) ||
+      Number(flags.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT;
+  }
+
+  function isLeppaTreeWateringGroundCell(groundCell, leppaTree, storyState = {}) {
+    if (
+      !groundCell ||
+      !leppaTree?.position ||
+      !storyState.flags?.squirtleLeppaRequestAvailable ||
+      storyState.flags.leppaTreeRevived ||
+      storyState.flags.leppaBerryGiftComplete
+    ) {
+      return false;
+    }
+
+    return getLeppaTreeSurroundingGroundCells(leppaTree, [groundCell]).length > 0;
+  }
+
+  function canWaterGunTargetGroundCell(groundCell, groundGrassPatches, storyState, leppaTree = null) {
+    return hasGrassPatchForGroundCell(groundCell, groundGrassPatches) ||
+      canWaterGunRestoreEmptyGround(storyState) ||
+      isLeppaTreeWateringGroundCell(groundCell, leppaTree, storyState);
+  }
+
+  function completeBulbasaurDryGrassMission(storyState) {
+    const flags = storyState.flags || {};
+    if (flags.bulbasaurDryGrassMissionComplete) {
+      return false;
+    }
+
+    flags.bulbasaurDryGrassMissionComplete = true;
+    return true;
   }
 
   function getFirstRestoredGrassHabitat(groundGrassPatches) {
@@ -568,6 +614,37 @@ export function createGameplayInteractions({
     pushNotice(`+${resourceNode.yield} ${getItemLabel(resourceNode.itemId)}`);
   }
 
+  function craftCampfireAtWorkbench({ storyState, inventory } = {}) {
+    const campfireRecipe = placeholderRecipes.campfire;
+
+    if (!storyState?.flags || !inventory || !campfireRecipe) {
+      return false;
+    }
+
+    if (storyState.flags.campfireCrafted) {
+      return false;
+    }
+
+    if (!hasItems(inventory, campfireRecipe.ingredients)) {
+      pushNotice(`Missing: ${formatRequirementSummary(campfireRecipe.ingredients, inventory)}`);
+      return false;
+    }
+
+    consumeItems(inventory, campfireRecipe.ingredients);
+    addItems(inventory, campfireRecipe.output);
+    storyState.flags.campfireCrafted = true;
+    syncInventoryUi(inventory);
+    questSystem?.emit?.({
+      type: QUEST_EVENT.BUILD,
+      targetId: CAMPFIRE_ITEM_ID,
+      amount: 1
+    });
+    onCampfireCrafted({
+      recipe: campfireRecipe
+    });
+    return true;
+  }
+
   function handleStationInteraction(stationId, storyState, inventory) {
     if (
       stationId === "workbench" &&
@@ -590,16 +667,7 @@ export function createGameplayInteractions({
         return false;
       }
 
-      consumeItems(inventory, campfireRecipe.ingredients);
-      addItems(inventory, campfireRecipe.output);
-      storyState.flags.campfireCrafted = true;
-      syncInventoryUi(inventory);
-      questSystem?.emit?.({
-        type: QUEST_EVENT.BUILD,
-        targetId: CAMPFIRE_ITEM_ID,
-        amount: 1
-      });
-      onCampfireCrafted({
+      onCampfireCraftRequested({
         recipe: campfireRecipe
       });
       return true;
@@ -1125,6 +1193,15 @@ export function createGameplayInteractions({
       return nearestTarget;
     }
 
+    if (!canWaterGunTargetGroundCell(
+      nearbyGroundCell.groundCell,
+      groundGrassPatches,
+      storyState,
+      leppaTree
+    )) {
+      return nearestTarget;
+    }
+
     if (!nearestTarget || nearbyGroundCell.distance < nearestTarget.distance) {
       return nearbyGroundCell;
     }
@@ -1316,8 +1393,12 @@ export function createGameplayInteractions({
     if (target.kind === "leppaBerryTree") {
       notifyInteractionStart(target);
 
-      const drop = dropLeppaBerryFromTree(leppaTree, leppaBerryDrops, storyState);
-      if (drop) {
+      const dropAndCollectLeppaBerry = () => {
+        const drop = dropLeppaBerryFromTree(leppaTree, leppaBerryDrops, storyState);
+        if (!drop) {
+          return false;
+        }
+
         const collected = collectLeppaBerryDrops(
           drop.position,
           leppaBerryDrops,
@@ -1331,19 +1412,21 @@ export function createGameplayInteractions({
         } else {
           pushNotice("A Leppa Berry fell from the tree.");
         }
-      }
+
+        return true;
+      };
 
       const opened = startDialogue?.({
         targetId: "leppaTree",
         dialogueId: "revivedTree",
-        onComplete: () => {}
+        onComplete: dropAndCollectLeppaBerry
       });
 
       if (opened) {
         return true;
       }
 
-      if (!drop) {
+      if (!dropAndCollectLeppaBerry()) {
         pushNotice("The tree has already dropped its Leppa Berry.");
         return false;
       }
@@ -1491,6 +1574,22 @@ export function createGameplayInteractions({
       missedHarvestAttempts = 0;
     }
 
+    if (!nearbyHarvestTarget && canPurifyGround) {
+      const blockedGroundCell = findNearbyGroundCell(playerPosition, groundDeadInstances);
+      if (
+        blockedGroundCell?.groundCell &&
+        !canWaterGunTargetGroundCell(
+          blockedGroundCell.groundCell,
+          groundGrassPatches,
+          storyState,
+          leppaTree
+        )
+      ) {
+        pushNotice("Water Gun can only restore dry tall grass right now.");
+        return false;
+      }
+    }
+
     if (nearbyHarvestTarget?.logChairPlacement) {
       onLogChairPlacementRequested({
         playerPosition
@@ -1631,6 +1730,16 @@ export function createGameplayInteractions({
     }
 
     if (nearbyHarvestTarget?.groundCell) {
+      if (!canWaterGunTargetGroundCell(
+        nearbyHarvestTarget.groundCell,
+        groundGrassPatches,
+        storyState,
+        leppaTree
+      )) {
+        pushNotice("Water Gun can only restore dry tall grass right now.");
+        return false;
+      }
+
       const purified = purifyGroundCell(
         nearbyHarvestTarget.groundCell,
         groundDeadInstances,
@@ -1668,7 +1777,7 @@ export function createGameplayInteractions({
             storyState.flags.bulbasaurDryGrassMissionAccepted &&
             storyState.flags.restoredGrassCount >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
           ) {
-            storyState.flags.bulbasaurDryGrassMissionComplete = true;
+            completeBulbasaurDryGrassMission(storyState);
           }
           questSystem?.emit?.({
             type: QUEST_EVENT.BUILD,
@@ -1783,6 +1892,7 @@ export function createGameplayInteractions({
   }
 
   return {
+    craftCampfireAtWorkbench,
     findNearbyActionTarget,
     performHarvestAction,
     performInteractAction,

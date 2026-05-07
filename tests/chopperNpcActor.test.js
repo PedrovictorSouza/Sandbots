@@ -143,4 +143,31 @@ describe("chopperNpcActor", () => {
     expect(npcActor.character.getPosition()[0]).toBeLessThan(10);
     expect(chopperActor.scriptedFlight).toBeNull();
   });
+
+  it("moves to an investigation target before resuming patrol", () => {
+    const npcActor = createNpcActor([12.4, 0.02, -8.4]);
+    const chopperActor = createChopperNpcActor({ npcActor });
+    const storyState = {
+      flags: {
+        chopperPatrolEnabled: true
+      }
+    };
+
+    updateChopperNpcActor(chopperActor, {
+      deltaTime: 0.5,
+      storyState,
+      investigationTarget: {
+        position: [10, 0.02, -6],
+        lookAtPosition: [11, 0.02, -6]
+      },
+      isNpcActive: () => true
+    });
+
+    const position = npcActor.character.getPosition();
+
+    expect(position[0]).toBeLessThan(12.4);
+    expect(position[2]).toBeGreaterThan(-8.4);
+    expect(position[0]).toBeGreaterThan(10);
+    expect(position[2]).toBeLessThan(-6);
+  });
 });

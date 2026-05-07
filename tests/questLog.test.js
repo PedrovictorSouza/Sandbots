@@ -163,6 +163,30 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="water-dry-tall-grass"');
   });
 
+  it("marks Bulbasaur's dry grass task complete when the restored count reaches 10", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const storyState = {
+      flags: {
+        bulbasaurDryGrassMissionAccepted: true,
+        restoredGrassCount: 10,
+        trackedTaskIds: ["water-dry-tall-grass"]
+      }
+    };
+
+    const checklistHtml = questLog.renderChecklistHtml(storyState);
+    const logHtml = questLog.renderLogHtml(storyState);
+
+    expect(checklistHtml).toContain("10/10 restored");
+    expect(checklistHtml).toContain("Return to Bulbasaur");
+    expect(logHtml).toMatch(/data-task-done="true"[\s\S]*data-task-id="water-dry-tall-grass"/);
+  });
+
   it("renders the first companion request in the request log after habitat discovery", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
@@ -471,7 +495,7 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Check the PC inside");
+    expect(checklistHtml).toContain("Check the PC beside");
     expect(logHtml).toContain('data-task-id="ruined-pokemon-center"');
   });
 

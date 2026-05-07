@@ -8,9 +8,11 @@ const CHOPPER_NPC_FLIGHT_LIFT = 0.92;
 const CHOPPER_NPC_MOON_HOP_HANG = 0.24;
 const CHOPPER_PATROL_SPEED = 1.85;
 const CHOPPER_GUIDE_SPEED = 4.6;
+const CHOPPER_INVESTIGATION_SPEED = 3.4;
 const CHOPPER_PATROL_PAUSE_DURATION = 1.35;
 const CHOPPER_PATROL_ARRIVE_DISTANCE = 0.22;
 const CHOPPER_GUIDE_ARRIVE_DISTANCE = 0.18;
+const CHOPPER_INVESTIGATION_ARRIVE_DISTANCE = 0.18;
 const CHOPPER_PATROL_RADIUS_MULTIPLIER = 3;
 const CHOPPER_PATROL_CENTER = [12.84, 0.02, -8.14];
 const CHOPPER_PATROL_BASE_POINTS = Object.freeze([
@@ -245,6 +247,45 @@ function updateGuide(actor, deltaTime, storyState, guidePosition) {
   return true;
 }
 
+function updateInvestigation(actor, deltaTime, investigationTarget) {
+  const targetPosition = investigationTarget?.position;
+  const lookAtPosition = investigationTarget?.lookAtPosition || targetPosition;
+
+  if (
+    actor.scriptedFlight ||
+    !actor.active ||
+    !Array.isArray(targetPosition)
+  ) {
+    return false;
+  }
+
+  const currentPosition = getNpcPosition(actor.npcActor);
+  const deltaX = targetPosition[0] - currentPosition[0];
+  const deltaZ = targetPosition[2] - currentPosition[2];
+  const distance = Math.hypot(deltaX, deltaZ);
+
+  if (distance <= CHOPPER_INVESTIGATION_ARRIVE_DISTANCE) {
+    setNpcPosition(actor.npcActor, [...targetPosition]);
+    if (Array.isArray(lookAtPosition)) {
+      actor.npcActor.faceYaw = getYawToward(targetPosition, lookAtPosition);
+    }
+    return true;
+  }
+
+  const step = Math.min(distance, CHOPPER_INVESTIGATION_SPEED * deltaTime);
+  const directionX = deltaX / distance;
+  const directionZ = deltaZ / distance;
+  const nextPosition = [
+    currentPosition[0] + directionX * step,
+    targetPosition[1],
+    currentPosition[2] + directionZ * step
+  ];
+
+  actor.npcActor.faceYaw = getYawToward(currentPosition, targetPosition);
+  setNpcPosition(actor.npcActor, nextPosition);
+  return true;
+}
+
 export function startChopperNpcFlight(actor, {
   targetPosition,
   duration = 0.95,
@@ -304,7 +345,8 @@ export function updateChopperNpcActor(actor, {
   deltaTime = 0,
   storyState,
   isNpcActive,
-  guidePosition = null
+  guidePosition = null,
+  investigationTarget = null
 } = {}) {
   if (!actor) {
     return;
@@ -317,8 +359,11 @@ export function updateChopperNpcActor(actor, {
   actor.active = typeof isNpcActive === "function" ?
     isNpcActive(actor.npcActor, storyState) :
     true;
-  updateGuide(actor, deltaTime, storyState, guidePosition);
-  updatePatrol(actor, deltaTime, storyState);
+  const investigating = updateInvestigation(actor, deltaTime, investigationTarget);
+  if (!investigating) {
+    updateGuide(actor, deltaTime, storyState, guidePosition);
+    updatePatrol(actor, deltaTime, storyState);
+  }
 
   const time = actor.elapsed;
   syncChopperNpcInstances(actor, {

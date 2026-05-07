@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BULBASAUR_TALK_INTERACT_DISTANCE,
   buildCampfirePlacement,
   createCollisionChecker,
   buildLeafDenKitPlacement,
@@ -19,11 +20,41 @@ import {
 } from "../world/islandWorld.js";
 import {
   LEPPA_BERRY_ITEM_ID,
+  POKEMON_TALK_INTERACT_DISTANCE,
+  RUINED_POKEMON_CENTER_INTERACT_DISTANCE,
+  RUINED_POKEMON_CENTER_POSITION,
   WORKBENCH_INTERACT_DISTANCE,
   WORKBENCH_POSITION
 } from "../gameplayContent.js";
 
 describe("findNearbyInteractable", () => {
+  it("detects an active NPC talk target without requiring the player to touch them", () => {
+    const result = findNearbyInteractable(
+      [POKEMON_TALK_INTERACT_DISTANCE - 0.05, 0, 0],
+      [
+        {
+          id: "tangrowth",
+          label: "Chopper",
+          activeWhen: () => true,
+          character: {
+            getPosition: () => [0, 0.02, 0]
+          }
+        }
+      ],
+      [],
+      { flags: {} }
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "npc",
+        id: "tangrowth",
+        label: "Chopper"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
   it("detects the Workbench from outside its solid collider footprint", () => {
     const result = findNearbyInteractable(
       [WORKBENCH_POSITION[0] + 4.6, 0, WORKBENCH_POSITION[2]],
@@ -46,6 +77,37 @@ describe("findNearbyInteractable", () => {
         kind: "station",
         id: "workbench",
         label: "Workbench"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
+  it("detects the ruined Pokemon Center from outside its solid collider footprint", () => {
+    const result = findNearbyInteractable(
+      [
+        RUINED_POKEMON_CENTER_POSITION[0] + 4.8,
+        0,
+        RUINED_POKEMON_CENTER_POSITION[2]
+      ],
+      [],
+      [
+        {
+          id: "ruinedPokemonCenter",
+          label: "Ruined Pokemon Center",
+          type: "site",
+          position: [...RUINED_POKEMON_CENTER_POSITION],
+          interactDistance: RUINED_POKEMON_CENTER_INTERACT_DISTANCE,
+          activeWhen: () => true
+        }
+      ],
+      { flags: {} }
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "site",
+        id: "ruinedPokemonCenter",
+        label: "Ruined Pokemon Center"
       },
       distance: expect.any(Number)
     });
@@ -83,6 +145,88 @@ describe("findNearbyInteractable", () => {
     });
   });
 
+  it("uses a wider talk reach for revealed Pokemon companions", () => {
+    const result = findNearbyInteractable(
+      [BULBASAUR_TALK_INTERACT_DISTANCE - 0.05, 0, 0],
+      [],
+      [],
+      {
+        flags: {
+          bulbasaurRevealed: true
+        }
+      },
+      [],
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        visible: true,
+        position: [0, 0.02, 0]
+      }
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "pokemonCompanion",
+        id: "bulbasaur",
+        label: "Talk to Bulbasaur",
+        position: [0, 0.02, 0]
+      },
+      distance: expect.any(Number)
+    });
+  });
+
+  it("keeps other Pokemon companion talk reach unchanged", () => {
+    const result = findNearbyInteractable(
+      [POKEMON_TALK_INTERACT_DISTANCE * 2 - 0.05, 0, 0],
+      [],
+      [],
+      {
+        flags: {
+          charmanderRevealed: true
+        }
+      },
+      [],
+      null,
+      null,
+      null,
+      {
+        visible: true,
+        position: [0, 0.02, 0]
+      }
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("does not keep showing a generic talk prompt for Pokemon already following", () => {
+    const result = findNearbyInteractable(
+      [POKEMON_TALK_INTERACT_DISTANCE - 0.05, 0, 0],
+      [],
+      [],
+      {
+        flags: {
+          bulbasaurRevealed: true,
+          bulbasaurFollowing: true
+        }
+      },
+      [],
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        visible: true,
+        position: [0, 0.02, 0]
+      }
+    );
+
+    expect(result).toBeNull();
+  });
+
   it("uses Bulbasaur's dismantled module position for the first repair interaction", () => {
     const storyState = {
       flags: {
@@ -94,7 +238,7 @@ describe("findNearbyInteractable", () => {
       {
         id: "grass-3",
         cellId: "ground-3-1",
-        position: [8.4, 0.02, -4.2],
+        position: [2.1, 0.02, -4.2],
         state: "alive"
       }
     ];
@@ -116,7 +260,7 @@ describe("findNearbyInteractable", () => {
       bulbasaurEncounter
     );
     const resultNearGrass = findNearbyInteractable(
-      [8.1, 0, -3.9],
+      [2.2, 0, -4.1],
       [],
       [],
       storyState,
@@ -306,7 +450,7 @@ describe("findNearbyInteractable", () => {
       {
         id: "grass-3",
         cellId: "ground-3-1",
-        position: [8.4, 0.02, -4.2],
+        position: [2.1, 0.02, -4.2],
         state: "alive"
       }
     ];
@@ -329,7 +473,7 @@ describe("findNearbyInteractable", () => {
       bulbasaurEncounter
     );
     const resultNearGrass = findNearbyInteractable(
-      [8.1, 0, -3.9],
+      [2.2, 0, -4.1],
       [],
       [],
       storyState,

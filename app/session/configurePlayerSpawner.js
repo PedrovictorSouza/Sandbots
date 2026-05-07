@@ -22,6 +22,8 @@ import {
 } from "../../world/worldTopology.js";
 import { getGameplayOpeningShipDynamicBarrier } from "./gameplayOpeningShip.js";
 
+export const ACT_TWO_PLAYER_SPEED = 5.1;
+
 export function configurePlayerSpawner(
   session,
   assets,
@@ -73,7 +75,7 @@ export function configurePlayerSpawner(
     session.playerCharacter = characterFactory.createCharacter({
       id: "player",
       position,
-      speed: 5.1,
+      speed: ACT_TWO_PLAYER_SPEED,
       worldHeight: 1.55,
       controller: keyboardController,
       collisionTest,

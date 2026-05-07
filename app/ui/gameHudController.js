@@ -13,7 +13,6 @@ const ACTIVE_COMPANION_THUMBNAILS = Object.freeze({
   squirtle: new URL("./images/Robot-1-thumb.png", import.meta.url).href,
   bulbasaur: new URL("./images/Robot-2-thumb.png", import.meta.url).href
 });
-const ACTIVE_COMPANION_THUMBNAIL_ORDER = Object.freeze(["squirtle", "bulbasaur"]);
 const INVENTORY_ITEM_IMAGES = Object.freeze({
   wood: new URL("../../Objects/wood.png", import.meta.url).href
 });
@@ -187,33 +186,32 @@ export function createGameHudController({
     return companionHudElement;
   }
 
-  function renderRobotThumbnailImageHtml(companionId, variant) {
+  function renderRobotThumbnailHtml(companionId) {
     const normalizedCompanionId = escapeHtml(companionId || "unknown");
     const thumbnailUrl = ACTIVE_COMPANION_THUMBNAILS[companionId] || ACTIVE_COMPANION_THUMBNAILS.squirtle;
 
     return `
-      <span class="active-companion-hud__portrait active-companion-hud__portrait--${variant}" aria-hidden="true">
-        <img
-          class="active-companion-hud__portrait-image"
-          src="${escapeHtml(thumbnailUrl)}"
-          alt=""
-          data-companion-id="${normalizedCompanionId}"
-          loading="eager"
-          decoding="async"
-        >
-      </span>
-    `;
-  }
-
-  function renderRobotThumbnailHtml(companionId) {
-    const secondaryCompanionId =
-      ACTIVE_COMPANION_THUMBNAIL_ORDER.find((candidateCompanionId) => candidateCompanionId !== companionId) ||
-      "squirtle";
-
-    return `
-      <span class="active-companion-hud__portraits" aria-hidden="true">
-        ${renderRobotThumbnailImageHtml(companionId, "primary")}
-        ${renderRobotThumbnailImageHtml(secondaryCompanionId, "secondary")}
+      <span class="active-companion-hud__portrait-stack" aria-hidden="true">
+        <span class="active-companion-hud__portrait">
+          <img
+            class="active-companion-hud__portrait-image"
+            src="${escapeHtml(thumbnailUrl)}"
+            alt=""
+            data-companion-id="${normalizedCompanionId}"
+            loading="eager"
+            decoding="async"
+          >
+        </span>
+        <span class="active-companion-hud__switch-controls">
+          <span class="active-companion-hud__switch-button">
+            <span class="active-companion-hud__switch-key">←</span>
+            <span class="active-companion-hud__switch-pad">D←</span>
+          </span>
+          <span class="active-companion-hud__switch-button">
+            <span class="active-companion-hud__switch-key">→</span>
+            <span class="active-companion-hud__switch-pad">D→</span>
+          </span>
+        </span>
       </span>
     `;
   }

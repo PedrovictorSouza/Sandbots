@@ -96,6 +96,8 @@ export const STORY_BEAT_EFFECT = Object.freeze({
   CUSTOM: "custom"
 });
 
+const BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET = 10;
+
 export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   [FIELD_TASK_IDS.MAKING_HABITATS]: {
     id: FIELD_TASK_IDS.MAKING_HABITATS,
@@ -120,8 +122,15 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
     id: FIELD_TASK_IDS.WATER_DRY_TALL_GRASS,
     title: "Water dry tall grass",
     description(storyState = {}) {
-      const current = Math.min(10, Number(storyState.flags?.restoredGrassCount || 0));
-      return `Water the dry tall grass for Bulbasaur. ${current}/10 restored.`;
+      const current = Math.min(
+        BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET,
+        Number(storyState.flags?.restoredGrassCount || 0)
+      );
+      return `Water the dry tall grass for Bulbasaur. ${current}/${BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET} restored.`;
+    },
+    isComplete(storyState = {}) {
+      return Number(storyState.flags?.restoredGrassCount || 0) >=
+        BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET;
     },
     completeFlag: "bulbasaurDryGrassMissionComplete"
   },
@@ -270,7 +279,7 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       }
 
       if (flags.ruinedPokemonCenterInspected) {
-        return "Check the PC inside the destroyed Pokemon Center.";
+        return "Check the PC beside the destroyed Pokemon Center.";
       }
 
       if (flags.pokemonCenterGuideStarted) {
@@ -853,7 +862,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Pokedesk",
-        text: "Check the PC inside the ruins."
+        text: "Check the PC beside the ruins."
       }
     ],
     effects: [

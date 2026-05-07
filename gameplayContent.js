@@ -396,9 +396,11 @@ export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
 export const LEPPA_TREE_DROP_OFFSET = [0.82, 0.02, 0.48];
 export const WORKBENCH_POSITION = [38.0, 0.02, -17.0];
 export const WORKBENCH_INTERACT_DISTANCE = 5.4;
+export const POKEMON_TALK_INTERACT_DISTANCE = 3.1;
 export const RUINED_POKEMON_CENTER_POSITION = [25.4, 0, 12.6];
+export const RUINED_POKEMON_CENTER_INTERACT_DISTANCE = 5.4;
 export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [22.7, 0.02, 10.8];
-export const POKEMON_CENTER_PC_POSITION = [26.25, 0.02, 13.65];
+export const POKEMON_CENTER_PC_POSITION = [30.35, 0.02, 13.65];
 export const BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION = [31.2, 0.02, 10.4];
 export const BOULDER_SHADED_TALL_GRASS_RADIUS = 4.6;
 
@@ -1080,7 +1082,7 @@ export const INTERACTABLE_DEFS = [
     type: "site",
     position: [...ACT_TWO_SQUIRTLE_POSITION],
     markerKey: null,
-    interactDistance: 1.85,
+    interactDistance: POKEMON_TALK_INTERACT_DISTANCE,
     activeWhen: (state) => {
       return (
         state.questIndex === 1 ||
@@ -1124,7 +1126,7 @@ export const INTERACTABLE_DEFS = [
     type: "site",
     position: [...RUINED_POKEMON_CENTER_POSITION],
     markerKey: "pokemonCenter",
-    interactDistance: 2.45,
+    interactDistance: RUINED_POKEMON_CENTER_INTERACT_DISTANCE,
     activeWhen: (state) => {
       return Boolean(
         state.flags?.pokemonCenterGuideStarted &&

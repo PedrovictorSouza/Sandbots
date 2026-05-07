@@ -1,6 +1,7 @@
 import {
   LEPPA_BERRY_ITEM_ID,
   LEPPA_TREE_DROP_OFFSET,
+  POKEMON_TALK_INTERACT_DISTANCE,
   RESOURCE_NODE_DEFS,
   WORLD_LIMIT
 } from "../gameplayContent.js";
@@ -19,6 +20,7 @@ const LEPPA_TREE_WATERED_TILE_MIN_RADIUS_FACTOR = 0.35;
 const LEPPA_TREE_WATERED_TILE_MAX_RADIUS_FACTOR = 1.65;
 const LOG_CHAIR_INTERACT_DISTANCE = 2.35;
 const LEAF_DEN_INTERACT_DISTANCE = 2.85;
+export const BULBASAUR_TALK_INTERACT_DISTANCE = POKEMON_TALK_INTERACT_DISTANCE * 2;
 const INTERACTABLE_OBJECT_REACH_MIN = 2.55;
 const PALM_SHAKE_DURATION = 0.42;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
@@ -27,6 +29,11 @@ const BULBASAUR_STRAW_BED_STICK_TARGET_COUNT = 10;
 const TERRAIN_COLLIDER_INDEX_MIN_SIZE = 128;
 const TERRAIN_COLLIDER_INDEX_CELL_SIZE = 8;
 const DEAD_TREE_MODEL_FACE_YAW_OFFSET = 0;
+const POKEMON_FOLLOW_FLAGS = Object.freeze({
+  bulbasaur: "bulbasaurFollowing",
+  charmander: "charmanderFollowing",
+  timburr: "timburrFollowing"
+});
 const LEPPA_TREE_REVIVED_TINT = Object.freeze([1.82, 1.72, 1.24]);
 const LEPPA_TREE_REVIVED_TINT_STRENGTH = 0.76;
 const terrainColliderIndexCache = new WeakMap();
@@ -789,7 +796,7 @@ export function findNearbyInteractable(
     const [x,, z] = npcActor.character.getPosition();
     const distance = Math.hypot(playerPosition[0] - x, playerPosition[2] - z);
 
-    if (distance <= 1.9 && distance < nearestDistance) {
+    if (distance <= POKEMON_TALK_INTERACT_DISTANCE && distance < nearestDistance) {
       nearest = {
         kind: "npc",
         id: npcActor.id,
@@ -842,7 +849,7 @@ export function findNearbyInteractable(
         playerPosition[2] - interactionPosition[2]
       );
 
-      if (distance <= 1.6 && distance < nearestDistance) {
+      if (distance <= BULBASAUR_TALK_INTERACT_DISTANCE && distance < nearestDistance) {
         nearest = {
           kind: "grassEncounter",
           id: "rustlingGrass",
@@ -900,7 +907,7 @@ export function findNearbyInteractable(
       );
     }
 
-    if (distance <= 1.85 && distance < nearestDistance) {
+    if (distance <= BULBASAUR_TALK_INTERACT_DISTANCE && distance < nearestDistance) {
       nearest = createBulbasaurTarget(target);
       nearestDistance = distance;
     }
@@ -926,7 +933,7 @@ export function findNearbyInteractable(
         playerPosition[2] - interactionPosition[2]
       );
 
-      if (distance <= 1.85 && distance < nearestDistance) {
+      if (distance <= POKEMON_TALK_INTERACT_DISTANCE && distance < nearestDistance) {
         nearest = {
           kind: "charmanderGrassEncounter",
           id: "charmanderRustlingGrass",
@@ -958,7 +965,7 @@ export function findNearbyInteractable(
         playerPosition[2] - interactionPosition[2]
       );
 
-      if (distance <= 1.85 && distance < nearestDistance) {
+      if (distance <= POKEMON_TALK_INTERACT_DISTANCE && distance < nearestDistance) {
         nearest = {
           kind: "timburrGrassEncounter",
           id: "timburrRustlingGrass",
@@ -1095,7 +1102,7 @@ export function findNearbyInteractable(
       playerPosition[2] - timburrEncounter.position[2]
     );
 
-    if (distance <= 1.85 && distance < nearestDistance) {
+    if (distance <= POKEMON_TALK_INTERACT_DISTANCE && distance < nearestDistance) {
       nearest = {
         kind: "timburrLeafDenFurnitureComplete",
         id: "timburr",
@@ -1118,7 +1125,7 @@ export function findNearbyInteractable(
       playerPosition[2] - charmanderEncounter.position[2]
     );
 
-    if (distance <= 1.85 && distance < nearestDistance) {
+    if (distance <= POKEMON_TALK_INTERACT_DISTANCE && distance < nearestDistance) {
       nearest = {
         kind: "charmanderCelebrationRequest",
         id: "charmander",
@@ -1131,6 +1138,7 @@ export function findNearbyInteractable(
   const setNearbyCompanionTarget = ({ id, label, encounter, revealedFlag }) => {
     if (
       !storyState?.flags?.[revealedFlag] ||
+      storyState.flags?.[POKEMON_FOLLOW_FLAGS[id]] ||
       !encounter?.visible ||
       !Array.isArray(encounter.position)
     ) {
@@ -1142,7 +1150,11 @@ export function findNearbyInteractable(
       playerPosition[2] - encounter.position[2]
     );
 
-    if (distance <= 1.85 && distance < nearestDistance) {
+    const interactDistance = id === "bulbasaur" ?
+      BULBASAUR_TALK_INTERACT_DISTANCE :
+      POKEMON_TALK_INTERACT_DISTANCE;
+
+    if (distance <= interactDistance && distance < nearestDistance) {
       nearest = {
         kind: "pokemonCompanion",
         id,

@@ -87,4 +87,17 @@ describe("createWorldSpeechController", () => {
 
     expect(Number(layer?.style.zIndex)).toBeLessThan(2);
   });
+
+  it("uses the large task-pop size for the restored tall grass message", () => {
+    const mount = document.createElement("div");
+    const controller = createWorldSpeechController({ mount });
+
+    controller.showTaskPop({
+      text: "YOU RESTORED THE TALL GRASS!",
+      worldPosition: [0, 0, 0]
+    });
+
+    const taskPop = mount.querySelector("[data-world-speech-variant='task-pop']");
+    expect(taskPop?.dataset.taskPopSize).toBe("large");
+  });
 });

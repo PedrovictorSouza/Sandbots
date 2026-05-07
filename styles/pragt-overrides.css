@@ -1274,7 +1274,6 @@
 .active-companion-hud {
   --active-companion-hud-height: 100px;
   --active-companion-portrait-size: calc(var(--active-companion-hud-height) - 8px);
-  --active-companion-secondary-portrait-size: calc(var(--active-companion-portrait-size) * 0.5);
   position: absolute;
   right: calc(var(--ui-gap) + 8px);
   bottom: calc(var(--ui-gap) + 4px);
@@ -1295,19 +1294,20 @@
   display: none;
 }
 
-.active-companion-hud__portraits {
-  position: relative;
+.active-companion-hud__portrait-stack {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 18px;
+  gap: 2px;
   width: var(--active-companion-portrait-size);
   height: var(--active-companion-portrait-size);
   image-rendering: pixelated;
 }
 
 .active-companion-hud__portrait {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: var(--active-companion-portrait-size);
-  height: var(--active-companion-portrait-size);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   border: 3px solid #2b202c;
   background:
@@ -1316,20 +1316,32 @@
   image-rendering: pixelated;
 }
 
-.active-companion-hud__portrait--primary {
-  z-index: 1;
+.active-companion-hud__switch-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  min-height: 0;
 }
 
-.active-companion-hud__portrait--secondary {
-  left: auto;
-  right: 0;
-  top: auto;
-  bottom: 0;
-  z-index: 2;
-  width: var(--active-companion-secondary-portrait-size);
-  height: var(--active-companion-secondary-portrait-size);
-  border-width: 2px;
-  box-shadow: 0 0 0 2px rgba(11, 11, 18, 0.9);
+.active-companion-hud__switch-button {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  height: 18px;
+  border: 2px solid #fff1e8;
+  background: rgba(17, 17, 27, 0.88);
+  color: #fff1e8;
+  font-size: 12px;
+  line-height: 1;
+  text-shadow: none;
+}
+
+.active-companion-hud__switch-pad {
+  color: #8ee8ff;
+  font-size: 9px;
 }
 
 .active-companion-hud__portrait-image {

@@ -240,7 +240,12 @@ describe("createGameplayInteractions", () => {
       palmInstances: [],
       resourceNodes: [],
       inventory: {},
-      storyState: { questIndex: 0, flags: {} },
+      storyState: {
+        questIndex: 0,
+        flags: {
+          bulbasaurDryGrassMissionComplete: true
+        }
+      },
       woodDrops: [],
       groundDeadInstances,
       groundGrassPatches: [],
@@ -256,6 +261,104 @@ describe("createGameplayInteractions", () => {
     );
     expect(reviveGroundGrass).toHaveBeenCalledWith(groundCell, []);
     expect(pushNotice).toHaveBeenCalledWith("Chao purificado.");
+  });
+
+  it("blocks Water Gun on empty dry ground before Bulbasaur's dry grass mission is complete", () => {
+    const groundCell = {
+      id: "ground-empty-early",
+      offset: [0, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0
+    };
+    const pushNotice = vi.fn();
+    const purifyGroundCell = vi.fn(() => true);
+    const interactions = createInteractions({
+      findNearbyGroundCell: vi.fn(() => ({
+        groundCell,
+        distance: 0.28
+      })),
+      purifyGroundCell,
+      pushNotice
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundDeadInstances: [groundCell],
+      groundPurifiedInstances: [],
+      groundGrassPatches: [],
+      canPurifyGround: true,
+      forcedHarvestTarget: {
+        groundCell,
+        distance: 0
+      }
+    });
+
+    expect(result).toBe(false);
+    expect(purifyGroundCell).not.toHaveBeenCalled();
+    expect(pushNotice).toHaveBeenCalledWith(
+      "Water Gun can only restore dry tall grass right now."
+    );
+  });
+
+  it("allows Water Gun on dry grass before Bulbasaur's dry grass mission is complete", () => {
+    const groundCell = {
+      id: "ground-grass-early",
+      offset: [0, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0
+    };
+    const groundDeadInstances = [groundCell];
+    const groundPurifiedInstances = [];
+    const groundGrassPatches = [
+      {
+        id: "dry-grass-early",
+        cellId: groundCell.id,
+        state: "dead"
+      }
+    ];
+    const purifyGroundCell = vi.fn(() => true);
+    const interactions = createInteractions({
+      findNearbyGroundCell: vi.fn(() => ({
+        groundCell,
+        distance: 0.28
+      })),
+      purifyGroundCell,
+      reviveGroundGrass: vi.fn(() => ({
+        id: "dry-grass-early",
+        cellId: groundCell.id,
+        state: "alive"
+      })),
+      pushNotice: vi.fn()
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundDeadInstances,
+      groundPurifiedInstances,
+      groundGrassPatches,
+      canPurifyGround: true
+    });
+
+    expect(result).toBe(true);
+    expect(purifyGroundCell).toHaveBeenCalledWith(
+      groundCell,
+      groundDeadInstances,
+      groundPurifiedInstances
+    );
   });
 
   it("can purify a specific ground cell through a forced harvest target", () => {
@@ -281,7 +384,12 @@ describe("createGameplayInteractions", () => {
       palmInstances: [],
       resourceNodes: [],
       inventory: {},
-      storyState: { questIndex: 0, flags: {} },
+      storyState: {
+        questIndex: 0,
+        flags: {
+          restoredGrassCount: 10
+        }
+      },
       woodDrops: [],
       groundDeadInstances,
       groundGrassPatches: [],
@@ -589,7 +697,8 @@ describe("createGameplayInteractions", () => {
       storyState: {
         questIndex: 0,
         flags: {
-          firstGrassRestored: false
+          firstGrassRestored: false,
+          restoredGrassCount: 10
         }
       },
       woodDrops: [],
@@ -998,7 +1107,7 @@ describe("createGameplayInteractions", () => {
       questIndex: 0,
       flags: {
         firstGrassRestored: true,
-        restoredGrassCount: 1,
+        restoredGrassCount: 10,
         tallGrassDiscovered: false,
         restoredFlowerCount: 1,
         tangrowthFlowerCommentSeen: false
@@ -1056,6 +1165,7 @@ describe("createGameplayInteractions", () => {
     const storyState = {
       questIndex: 0,
       flags: {
+        restoredGrassCount: 10,
         restoredFlowerCount: 3,
         tangrowthFlowerCommentSeen: true
       }
@@ -1696,7 +1806,11 @@ describe("createGameplayInteractions", () => {
   });
 
   it("starts the revived tree dialogue when the tree can talk", () => {
-    const startDialogue = vi.fn(() => true);
+    let completeTreeDialogue = null;
+    const startDialogue = vi.fn(({ onComplete }) => {
+      completeTreeDialogue = onComplete;
+      return true;
+    });
     const interactions = createInteractions({
       startDialogue,
       findNearbyInteractable: vi.fn(() => ({
@@ -1736,6 +1850,13 @@ describe("createGameplayInteractions", () => {
     });
 
     expect(result).toBe(true);
+    expect(inventory.leppaBerry).toBeUndefined();
+    expect(storyState.flags.leppaBerryDropped).toBeUndefined();
+    expect(storyState.flags.leppaBerryCollected).toBeUndefined();
+    expect(leppaBerryDrops).toHaveLength(0);
+    expect(completeTreeDialogue).toEqual(expect.any(Function));
+    completeTreeDialogue();
+
     expect(inventory.leppaBerry).toBe(1);
     expect(storyState.flags.leppaBerryDropped).toBe(true);
     expect(storyState.flags.leppaBerryCollected).toBe(true);
@@ -1913,11 +2034,13 @@ describe("createGameplayInteractions", () => {
     expect(onWorkbenchRecipesRequested).toHaveBeenCalledTimes(1);
   });
 
-  it("crafts a Campfire at the Workbench after recipes are learned", () => {
+  it("requests the Campfire Workbench modal after recipes are learned", () => {
+    const onCampfireCraftRequested = vi.fn();
     const onCampfireCrafted = vi.fn();
     const syncInventoryUi = vi.fn();
     const questSystem = { emit: vi.fn() };
     const interactions = createInteractions({
+      onCampfireCraftRequested,
       onCampfireCrafted,
       placeholderRecipes: PLACEHOLDER_RECIPES,
       addItems,
@@ -1953,6 +2076,50 @@ describe("createGameplayInteractions", () => {
       storyState,
       inventory,
       groundGrassPatches: []
+    });
+
+    expect(result).toBe(true);
+    expect(inventory.wood).toBe(3);
+    expect(inventory[CAMPFIRE_ITEM_ID]).toBeUndefined();
+    expect(storyState.flags.campfireCrafted).toBe(false);
+    expect(syncInventoryUi).not.toHaveBeenCalled();
+    expect(questSystem.emit).not.toHaveBeenCalled();
+    expect(onCampfireCrafted).not.toHaveBeenCalled();
+    expect(onCampfireCraftRequested).toHaveBeenCalledWith({
+      recipe: expect.objectContaining({
+        id: "campfire"
+      })
+    });
+  });
+
+  it("crafts a Campfire only after confirming the Workbench modal", () => {
+    const onCampfireCrafted = vi.fn();
+    const syncInventoryUi = vi.fn();
+    const questSystem = { emit: vi.fn() };
+    const interactions = createInteractions({
+      onCampfireCrafted,
+      placeholderRecipes: PLACEHOLDER_RECIPES,
+      addItems,
+      consumeItems,
+      questSystem,
+      syncInventoryUi,
+      pushNotice: vi.fn()
+    });
+    const inventory = {
+      wood: 3
+    };
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        bulbasaurWorkbenchGuideAvailable: true,
+        workbenchDiyRecipesReceived: true,
+        campfireCrafted: false
+      }
+    };
+
+    const result = interactions.craftCampfireAtWorkbench({
+      storyState,
+      inventory
     });
 
     expect(result).toBe(true);

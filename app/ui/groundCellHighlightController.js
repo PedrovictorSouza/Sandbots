@@ -6,6 +6,12 @@ const GROUND_CELL_TARGET_CUES = Object.freeze({
     outlineFill: "rgba(124, 231, 255, 0.08)",
     outlineStroke: "#9ef8ff"
   },
+  leafage: {
+    haloFill: "rgba(91, 238, 132, 0.13)",
+    haloStroke: "rgba(8, 40, 20, 0.92)",
+    outlineFill: "rgba(91, 238, 132, 0.09)",
+    outlineStroke: "#7effa5"
+  },
   invalid: {
     haloFill: "rgba(255, 211, 122, 0.18)",
     haloStroke: "rgba(84, 48, 0, 0.94)",
@@ -20,6 +26,14 @@ function createSvgElement(tagName) {
 
 function normalizeTargetState(targetState) {
   return targetState === "invalid" ? "invalid" : "valid";
+}
+
+function getGroundCellCueKey(groundCell, targetState) {
+  if (groundCell?.highlightAbilityId === "leafage") {
+    return "leafage";
+  }
+
+  return normalizeTargetState(targetState);
 }
 
 export function createGroundCellHighlightController({ mount } = {}) {
@@ -68,7 +82,9 @@ export function createGroundCellHighlightController({ mount } = {}) {
   };
 
   function applyTargetCue(targetState) {
-    const normalizedTargetState = normalizeTargetState(targetState);
+    const normalizedTargetState = GROUND_CELL_TARGET_CUES[targetState] ?
+      targetState :
+      normalizeTargetState(targetState);
     const cue = GROUND_CELL_TARGET_CUES[normalizedTargetState];
 
     layer.dataset.groundCellTargetState = normalizedTargetState;
@@ -107,7 +123,10 @@ export function createGroundCellHighlightController({ mount } = {}) {
     state.markedGroundCells = filteredMarkedGroundCells;
     state.elevation = elevation;
     state.pulsePhase = pulsePhase;
-    state.targetState = normalizeTargetState(groundCell?.highlightTargetState || targetState);
+    state.targetState = getGroundCellCueKey(
+      groundCell,
+      groundCell?.highlightTargetState || targetState
+    );
     applyTargetCue(state.targetState);
     layer.hidden = false;
   }
@@ -135,7 +154,10 @@ export function createGroundCellHighlightController({ mount } = {}) {
     }
 
     state.groundCell = groundCell;
-    state.targetState = normalizeTargetState(groundCell?.highlightTargetState || state.targetState);
+    state.targetState = getGroundCellCueKey(
+      groundCell,
+      groundCell?.highlightTargetState || state.targetState
+    );
     applyTargetCue(state.targetState);
   }
 

@@ -50,6 +50,8 @@ export function createGameInputController({
   requestMoveCycle = () => {},
   shouldBagButtonInteract = () => false,
   shouldGamepadButtonHarvest = () => false,
+  isWorkbenchModalOpen = () => false,
+  handleWorkbenchModalKeydown = () => false,
   inspectBag = () => {},
   windowRef = null
 }) {
@@ -95,6 +97,16 @@ export function createGameInputController({
     };
   }
 
+  function createJumpButtonEvent() {
+    return {
+      code: GAME_INPUT_BINDINGS.jump.keyboardCode,
+      key: " ",
+      repeat: false,
+      target: null,
+      preventDefault() {}
+    };
+  }
+
   function createPokedexPageButtonEvent(direction) {
     const code = direction < 0 ?
       GAME_INPUT_BINDINGS.previousMove.keyboardCode :
@@ -111,6 +123,7 @@ export function createGameInputController({
 
   function shouldIgnoreLookInput(target) {
     return (
+      isWorkbenchModalOpen() ||
       isPokedexOpen() ||
       sceneDirector.blocksGameplayInput() ||
       isBuilderPanelOpen() ||
@@ -158,6 +171,13 @@ export function createGameInputController({
     const key = event.key.toLowerCase();
     const typingTarget = isTypingTarget(event.target);
     const builderPanelOpen = isBuilderPanelOpen();
+
+    if (!typingTarget && isWorkbenchModalOpen()) {
+      clearGameFlowInput();
+      handleWorkbenchModalKeydown(event);
+      event.preventDefault();
+      return;
+    }
 
     if (isPauseKey(event) && !typingTarget) {
       if (!event.repeat) {
@@ -314,6 +334,12 @@ export function createGameInputController({
       return;
     }
 
+    if (isWorkbenchModalOpen()) {
+      clearGameFlowInput();
+      event.preventDefault();
+      return;
+    }
+
     if (sceneDirector.blocksGameplayInput()) {
       clearGameFlowInput();
       sceneDirector.handleKeyup(event);
@@ -455,6 +481,10 @@ export function createGameInputController({
       nextMoveButtonPressed = nextMoveButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.nextMove.gamepadButton]?.pressed);
 
+      if (isWorkbenchModalOpen()) {
+        continue;
+      }
+
       const moveX = applyDeadzone(Number(gamepad.axes?.[0] || 0));
       const moveY = applyDeadzone(Number(gamepad.axes?.[1] || 0));
       const lookX = applyDeadzone(Number(gamepad.axes?.[2] || 0));
@@ -473,6 +503,31 @@ export function createGameInputController({
       if (moveX !== 0 || moveY !== 0 || lookX !== 0 || lookY !== 0) {
         continue;
       }
+    }
+
+    if (isWorkbenchModalOpen()) {
+      clearGameFlowInput();
+
+      if (bagButtonPressed && !gamepadBagButtonPressed) {
+        handleWorkbenchModalKeydown(createBagButtonEvent());
+      }
+
+      if (jumpButtonPressed && !gamepadJumpButtonPressed) {
+        handleWorkbenchModalKeydown(createJumpButtonEvent());
+      }
+
+      gamepadActionButtonPressed = actionButtonPressed;
+      gamepadRunButtonPressed = runButtonPressed;
+      gamepadJumpButtonPressed = jumpButtonPressed;
+      gamepadCameraZoomButtonPressed = zoomButtonPressed;
+      gamepadPauseButtonPressed = pauseButtonPressed;
+      gamepadPokedexButtonPressed = pokedexButtonPressed;
+      gamepadBagButtonPressed = bagButtonPressed;
+      gamepadFollowerCallButtonPressed = followerCallButtonPressed;
+      gamepadPreviousMoveButtonPressed = previousMoveButtonPressed;
+      gamepadNextMoveButtonPressed = nextMoveButtonPressed;
+      primaryActionPressed = false;
+      return;
     }
 
     if (

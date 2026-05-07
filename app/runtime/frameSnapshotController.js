@@ -27,7 +27,10 @@ function createFrameSnapshot() {
       visible: false,
       groundCell: null,
       markedGroundCells: [],
-      pulsePhase: 0
+      pulsePhase: 0,
+      actionPulseGroundCell: null,
+      actionPulsePhase: 0,
+      actionPulseAbilityId: null
     },
     colliderGizmos: {
       visible: false,
@@ -77,6 +80,9 @@ function resetFrameSnapshot(snapshot) {
   snapshot.groundCellHighlight.groundCell = null;
   snapshot.groundCellHighlight.markedGroundCells.length = 0;
   snapshot.groundCellHighlight.pulsePhase = 0;
+  snapshot.groundCellHighlight.actionPulseGroundCell = null;
+  snapshot.groundCellHighlight.actionPulsePhase = 0;
+  snapshot.groundCellHighlight.actionPulseAbilityId = null;
 
   snapshot.colliderGizmos.visible = false;
   snapshot.colliderGizmos.colliders = [];
@@ -196,11 +202,13 @@ function commitGroundCellHighlight(highlightController, snapshot, previousSnapsh
   }
 
   const hasMarkedGroundCells = snapshot.groundCellHighlight.markedGroundCells.length > 0;
+  const hasActionPulseGroundCell = Boolean(snapshot.groundCellHighlight.actionPulseGroundCell);
   const wasVisible =
     previousSnapshot.groundCellHighlight.visible ||
-    previousSnapshot.groundCellHighlight.markedGroundCells.length > 0;
+    previousSnapshot.groundCellHighlight.markedGroundCells.length > 0 ||
+    Boolean(previousSnapshot.groundCellHighlight.actionPulseGroundCell);
 
-  if (!snapshot.groundCellHighlight.visible && !hasMarkedGroundCells) {
+  if (!snapshot.groundCellHighlight.visible && !hasMarkedGroundCells && !hasActionPulseGroundCell) {
     if (wasVisible) {
       highlightController.hide();
     }
@@ -211,7 +219,10 @@ function commitGroundCellHighlight(highlightController, snapshot, previousSnapsh
     highlightController.setHighlightState({
       groundCell: snapshot.groundCellHighlight.groundCell,
       markedGroundCells: snapshot.groundCellHighlight.markedGroundCells,
-      pulsePhase: snapshot.groundCellHighlight.pulsePhase
+      pulsePhase: snapshot.groundCellHighlight.pulsePhase,
+      actionPulseGroundCell: snapshot.groundCellHighlight.actionPulseGroundCell,
+      actionPulsePhase: snapshot.groundCellHighlight.actionPulsePhase,
+      actionPulseAbilityId: snapshot.groundCellHighlight.actionPulseAbilityId
     });
     return;
   }

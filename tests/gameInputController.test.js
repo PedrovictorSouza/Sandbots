@@ -232,6 +232,57 @@ describe("createGameInputController", () => {
     expect(inspectBag).not.toHaveBeenCalled();
   });
 
+  it("routes keyboard X and B to the open Workbench modal", () => {
+    const handleWorkbenchModalKeydown = vi.fn(() => true);
+    const { controller, inspectBag, requestHarvest } = createController({
+      isWorkbenchModalOpen: () => true,
+      handleWorkbenchModalKeydown
+    });
+    const confirmEvent = createKeyboardEvent("KeyX");
+    const closeEvent = createKeyboardEvent("KeyB");
+
+    controller.handleKeydown(confirmEvent);
+    controller.handleKeydown(closeEvent);
+
+    expect(handleWorkbenchModalKeydown).toHaveBeenNthCalledWith(1, confirmEvent);
+    expect(handleWorkbenchModalKeydown).toHaveBeenNthCalledWith(2, closeEvent);
+    expect(inspectBag).not.toHaveBeenCalled();
+    expect(requestHarvest).not.toHaveBeenCalled();
+    expect(confirmEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(closeEvent.preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes gamepad X and B to the open Workbench modal", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const handleWorkbenchModalKeydown = vi.fn(() => true);
+    const { controller, inspectBag, requestHarvest } = createController({
+      windowRef,
+      isWorkbenchModalOpen: () => true,
+      handleWorkbenchModalKeydown
+    });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.X] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    gamepad.buttons[GAMEPAD_BUTTONS.X] = { pressed: false, value: 0 };
+    controller.updateGamepads(1 / 60);
+    gamepad.buttons[GAMEPAD_BUTTONS.B] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+
+    expect(handleWorkbenchModalKeydown).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      code: "KeyX"
+    }));
+    expect(handleWorkbenchModalKeydown).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      code: "Space"
+    }));
+    expect(inspectBag).not.toHaveBeenCalled();
+    expect(requestHarvest).not.toHaveBeenCalled();
+  });
+
   it("lets the active scene consume the gamepad X button before opening the bag", () => {
     const gamepad = createGamepad();
     const windowRef = {

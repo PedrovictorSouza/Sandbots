@@ -251,12 +251,18 @@ describe("createFrameSnapshotController", () => {
     });
 
     const frame = controller.beginFrame();
+    expect(frame.groundCellHighlight.actionPulseGroundCell).toBeNull();
+    expect(frame.groundCellHighlight.actionPulsePhase).toBe(0);
+
     frame.render.viewProjection = viewProjection;
     frame.render.sceneObjects = [];
     frame.groundCellHighlight.visible = true;
     frame.groundCellHighlight.groundCell = groundCell;
     frame.groundCellHighlight.markedGroundCells.push(markedGroundCell);
     frame.groundCellHighlight.pulsePhase = 0.5;
+    frame.groundCellHighlight.actionPulseGroundCell = groundCell;
+    frame.groundCellHighlight.actionPulsePhase = 0.75;
+    frame.groundCellHighlight.actionPulseAbilityId = "waterGun";
 
     controller.commitFrame();
 

@@ -89,6 +89,10 @@ import { createGameAppController } from "../runtime/gameAppController.js";
 import { shouldGamepadSourceHarvestTarget } from "../runtime/gamepadHarvestPolicy.js";
 import { startGameLoop } from "../runtime/gameLoop.js";
 import { createMusicRuntime, MUSIC_TRACK_IDS } from "../runtime/musicRuntime.js";
+import {
+  PLANET_AMBIENT_INTENSITY,
+  createPlanetAmbientRuntime
+} from "../runtime/planetAmbientRuntime.js";
 import { createUiRuntime } from "../runtime/createUiRuntime.js";
 import { createSceneFlowRuntime } from "../scene/createSceneFlowRuntime.js";
 import {
@@ -182,6 +186,8 @@ const LEPPA_TREE_TASK_CAMERA_ORBIT_ZOOM = 4.45;
 const LEPPA_TREE_TASK_CAMERA_ORBIT_PITCH = 0.34;
 const LEPPA_TREE_TASK_CAMERA_FOCUS_RETRY_MS = 160;
 const LEPPA_TREE_TASK_CAMERA_FOCUS_MAX_WAIT_MS = 8000;
+const SQUIRTLE_DRY_GRASS_FOCUS_LINE_INDEX = 3;
+const SQUIRTLE_DRY_GRASS_CAMERA_FOCUS_HEIGHT = 1.12;
 const LEAF_DEN_KIT_LIFE_COIN_COST = 10;
 const MANUAL_SAVE_STORAGE_KEY = "small-island.manual-save.v1";
 
@@ -207,6 +213,236 @@ function readLocalStorageItem(windowRef, key) {
   } catch {
     return null;
   }
+}
+
+function createWorkbenchModalController({
+  mount,
+  inventory,
+  getItemLabel,
+  formatRequirementSummary,
+  clearGameFlowInput
+}) {
+  let root = null;
+  let recipe = null;
+  let onConfirm = null;
+  let open = false;
+
+  function getDocument() {
+    return mount?.ownerDocument || globalThis.document || null;
+  }
+
+  function applyElementStyles(element, styles) {
+    Object.assign(element.style, styles);
+  }
+
+  function createElement(tagName, className, text = "") {
+    const element = getDocument().createElement(tagName);
+    if (className) {
+      element.className = className;
+    }
+    if (text) {
+      element.textContent = text;
+    }
+    return element;
+  }
+
+  function ensureRoot() {
+    if (root || !mount || !getDocument()) {
+      return root;
+    }
+
+    root = createElement("section", "workbench-modal");
+    root.hidden = true;
+    root.setAttribute("aria-label", "Workbench");
+    root.setAttribute("role", "dialog");
+    applyElementStyles(root, {
+      position: "absolute",
+      inset: "0",
+      zIndex: "18",
+      display: "grid",
+      placeItems: "center",
+      pointerEvents: "auto",
+      background: "rgba(6, 7, 12, 0.34)",
+      imageRendering: "pixelated"
+    });
+    mount.append(root);
+    return root;
+  }
+
+  function getRecipeRequirementCopy(currentRecipe) {
+    return formatRequirementSummary(currentRecipe.ingredients, inventory);
+  }
+
+  function close() {
+    if (!root) {
+      return;
+    }
+
+    root.hidden = true;
+    root.replaceChildren();
+    recipe = null;
+    onConfirm = null;
+    open = false;
+    clearGameFlowInput?.();
+  }
+
+  function confirm() {
+    if (!open || typeof onConfirm !== "function") {
+      return false;
+    }
+
+    const crafted = Boolean(onConfirm());
+    if (crafted) {
+      close();
+      return true;
+    }
+
+    render();
+    return false;
+  }
+
+  function render() {
+    const currentRoot = ensureRoot();
+    if (!currentRoot || !recipe) {
+      return;
+    }
+
+    currentRoot.replaceChildren();
+
+    const panel = createElement("div", "workbench-modal__panel");
+    applyElementStyles(panel, {
+      width: "min(560px, 84%)",
+      border: "4px solid #f5c16a",
+      boxShadow: "0 0 0 4px #2b202c, 0 18px 0 rgba(0, 0, 0, 0.28)",
+      background: "#15101a",
+      color: "#fff1cf",
+      padding: "18px 20px",
+      fontFamily: "var(--game-ui-font, monospace)",
+      letterSpacing: "0",
+      textTransform: "uppercase"
+    });
+
+    const title = createElement("strong", "workbench-modal__title", "Workbench");
+    applyElementStyles(title, {
+      display: "block",
+      color: "#ffffff",
+      fontSize: "36px",
+      lineHeight: "1",
+      marginBottom: "14px"
+    });
+
+    const recipeCard = createElement("button", "workbench-modal__recipe");
+    recipeCard.type = "button";
+    recipeCard.dataset.selected = "true";
+    applyElementStyles(recipeCard, {
+      width: "100%",
+      display: "grid",
+      gridTemplateColumns: "64px minmax(0, 1fr)",
+      gap: "14px",
+      alignItems: "center",
+      border: "3px solid #f5c16a",
+      background: "#3b2a30",
+      color: "#fff1cf",
+      padding: "12px",
+      textAlign: "left",
+      font: "inherit",
+      cursor: "pointer"
+    });
+
+    const icon = createElement("span", "workbench-modal__recipe-icon", "F");
+    applyElementStyles(icon, {
+      width: "58px",
+      height: "58px",
+      display: "grid",
+      placeItems: "center",
+      background: "#ff8f2f",
+      color: "#241006",
+      border: "3px solid #ffd37a",
+      fontSize: "34px",
+      lineHeight: "1"
+    });
+
+    const textWrap = createElement("span", "workbench-modal__recipe-copy");
+    const recipeName = createElement("span", "workbench-modal__recipe-name", recipe.title || "Campfire");
+    applyElementStyles(recipeName, {
+      display: "block",
+      color: "#ffffff",
+      fontSize: "32px",
+      lineHeight: "1"
+    });
+    const requirement = createElement(
+      "span",
+      "workbench-modal__recipe-requirement",
+      `Needs ${getRecipeRequirementCopy(recipe)}`
+    );
+    applyElementStyles(requirement, {
+      display: "block",
+      color: "#d6b68a",
+      fontSize: "22px",
+      lineHeight: "1.1",
+      marginTop: "7px"
+    });
+    textWrap.append(recipeName, requirement);
+    recipeCard.append(icon, textWrap);
+
+    const hint = createElement(
+      "p",
+      "workbench-modal__hint",
+      `X Craft ${getItemLabel(CAMPFIRE_ITEM_ID)}    B Close`
+    );
+    applyElementStyles(hint, {
+      margin: "14px 0 0",
+      color: "#ffffff",
+      fontSize: "24px",
+      lineHeight: "1"
+    });
+
+    recipeCard.addEventListener("click", () => {
+      confirm();
+    });
+
+    panel.append(title, recipeCard, hint);
+    currentRoot.append(panel);
+  }
+
+  return {
+    open({ recipe: nextRecipe, onConfirm: nextOnConfirm } = {}) {
+      if (!nextRecipe) {
+        return false;
+      }
+
+      recipe = nextRecipe;
+      onConfirm = nextOnConfirm;
+      open = true;
+      render();
+      if (root) {
+        root.hidden = false;
+      }
+      clearGameFlowInput?.();
+      return true;
+    },
+    close,
+    handleKeydown(event) {
+      if (!open) {
+        return false;
+      }
+
+      if (event.code === "KeyX" || event.code === "Enter") {
+        confirm();
+        return true;
+      }
+
+      if (event.code === "KeyB" || event.code === "Space" || event.code === "Escape") {
+        close();
+        return true;
+      }
+
+      return true;
+    },
+    isOpen() {
+      return open;
+    }
+  };
 }
 
 export function createApplicationRuntime({
@@ -271,6 +507,21 @@ export function createApplicationRuntime({
       return new windowRef.Audio(src);
     }
   });
+  const planetAmbientRuntime = createPlanetAmbientRuntime({
+    audioFactory: (src) => {
+      if (typeof windowRef.Audio !== "function") {
+        return null;
+      }
+
+      return new windowRef.Audio(src);
+    }
+  });
+  planetAmbientRuntime.start({
+    intensity: PLANET_AMBIENT_INTENSITY.OPENING
+  });
+  planetAmbientRuntime.startOnFirstGesture(windowRef, {
+    intensity: PLANET_AMBIENT_INTENSITY.OPENING
+  });
   const playerMemory = {
     gender: null,
     confirmation: null,
@@ -305,6 +556,10 @@ export function createApplicationRuntime({
   let leppaTreeTaskCameraFocusFrame = null;
   let leppaTreeTaskHintTimeout = null;
   let leppaTreeTileHintFlashUntil = 0;
+  let squirtleDryGrassCameraFocusActive = false;
+  let squirtleDryGrassCameraFocusTimeout = null;
+  let squirtleDryGrassCameraFocusFrame = null;
+  let squirtleDryGrassCameraFocusShown = false;
   let followerCallRequested = false;
   let activeFieldMoveId = null;
   let mainThemeStarted = false;
@@ -319,6 +574,10 @@ export function createApplicationRuntime({
     }
 
     mainThemeStarted = true;
+    planetAmbientRuntime.start({
+      intensity: PLANET_AMBIENT_INTENSITY.CALM
+    });
+    planetAmbientRuntime.setIntensity(PLANET_AMBIENT_INTENSITY.CALM);
     musicRuntime.play(MUSIC_TRACK_IDS.MAIN_THEME);
   }
 
@@ -384,6 +643,58 @@ export function createApplicationRuntime({
       text: buildQuestCompletionPopText(completedQuestIds),
       expiresAt: getRuntimeNow() + QUEST_COMPLETION_POP_DURATION_MS
     };
+  }
+
+  function autoStartBulbasaurLeafageRewardFromTask(activeQuest = null) {
+    if (
+      activeQuest?.id !== "inspect-rustling-grass" ||
+      storyState.flags.bulbasaurDryGrassRequestTurnedIn
+    ) {
+      return false;
+    }
+
+    storyBeats?.playDialogue?.(STORY_BEAT_IDS.BULBASAUR_LEAFAGE_REWARD);
+    return true;
+  }
+
+  function isBulbasaurDryGrassRequestTaskActive() {
+    return Boolean(
+      storyState.flags.bulbasaurRevealed &&
+      !storyState.flags.bulbasaurDryGrassMissionAccepted &&
+      !(
+        storyState.flags.squirtleLeppaRequestAvailable &&
+        !storyState.flags.leppaTreeRevived
+      )
+    );
+  }
+
+  function autoStartBulbasaurDryGrassRequestFromTask() {
+    if (!isBulbasaurDryGrassRequestTaskActive()) {
+      return false;
+    }
+
+    storyState.flags.bulbasaurDryGrassMissionAccepted = true;
+    storyState.flags.bulbasaurFollowing = true;
+    syncQuestPanels();
+
+    const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+    const targetPosition =
+      gameSession?.bulbasaurEncounter?.position ||
+      gameSession?.bulbasaurEncounter?.repairPosition ||
+      null;
+
+    if (playerPosition && targetPosition) {
+      dialogueCamera?.focusNpcConversation({
+        targetId: "bulbasaur",
+        playerPosition,
+        npcActors: gameSession?.npcActors || [],
+        interactables: gameSession?.interactables || [],
+        targetPosition
+      });
+    }
+
+    storyBeats?.playDialogue?.(STORY_BEAT_IDS.BULBASAUR_DRY_GRASS_REQUEST);
+    return true;
   }
 
   function getQuestCompletionPop() {
@@ -678,6 +989,176 @@ export function createApplicationRuntime({
     leppaTreeTaskCameraFocusTimeout = windowRef.setTimeout(attemptFocus, 0);
   }
 
+  function clearSquirtleDryGrassCameraFocusTimeout() {
+    if (squirtleDryGrassCameraFocusTimeout !== null) {
+      windowRef.clearTimeout?.(squirtleDryGrassCameraFocusTimeout);
+      squirtleDryGrassCameraFocusTimeout = null;
+    }
+  }
+
+  function clearSquirtleDryGrassCameraFocusFrame() {
+    if (squirtleDryGrassCameraFocusFrame !== null) {
+      if (typeof windowRef.cancelAnimationFrame === "function") {
+        windowRef.cancelAnimationFrame(squirtleDryGrassCameraFocusFrame);
+      } else {
+        windowRef.clearTimeout?.(squirtleDryGrassCameraFocusFrame);
+      }
+      squirtleDryGrassCameraFocusFrame = null;
+    }
+  }
+
+  function requestSquirtleDryGrassCameraFocusFrame(callback) {
+    if (typeof windowRef.requestAnimationFrame === "function") {
+      squirtleDryGrassCameraFocusFrame = windowRef.requestAnimationFrame((timestamp) => {
+        squirtleDryGrassCameraFocusFrame = null;
+        callback(timestamp);
+      });
+      return;
+    }
+
+    squirtleDryGrassCameraFocusFrame = windowRef.setTimeout(() => {
+      squirtleDryGrassCameraFocusFrame = null;
+      callback(getRuntimeNow());
+    }, 16);
+  }
+
+  function finishSquirtleDryGrassCameraFocus({ refocusSquirtle = true } = {}) {
+    clearSquirtleDryGrassCameraFocusTimeout();
+    clearSquirtleDryGrassCameraFocusFrame();
+
+    if (!squirtleDryGrassCameraFocusActive) {
+      return;
+    }
+
+    squirtleDryGrassCameraFocusActive = false;
+    clearGameFlowInput();
+    scriptedInteractionActive = false;
+    if (refocusSquirtle) {
+      focusActTwoSquirtleConversation();
+    }
+  }
+
+  function findSquirtleDryGrassFocusPatch() {
+    const squirtlePosition = gameSession?.actTwoSquirtle?.position;
+    const dryPatches = (gameSession?.groundGrassPatches || [])
+      .filter((patch) => {
+        return (
+          patch?.state !== "alive" &&
+          Array.isArray(patch.position)
+        );
+      });
+
+    if (!dryPatches.length) {
+      return null;
+    }
+
+    if (!Array.isArray(squirtlePosition)) {
+      return dryPatches[0];
+    }
+
+    return dryPatches.reduce((nearestPatch, patch) => {
+      const nearestDistance = Math.hypot(
+        nearestPatch.position[0] - squirtlePosition[0],
+        nearestPatch.position[2] - squirtlePosition[2]
+      );
+      const patchDistance = Math.hypot(
+        patch.position[0] - squirtlePosition[0],
+        patch.position[2] - squirtlePosition[2]
+      );
+
+      return patchDistance < nearestDistance ? patch : nearestPatch;
+    }, dryPatches[0]);
+  }
+
+  function startSquirtleDryGrassCameraOrbit(position) {
+    if (!squirtleDryGrassCameraFocusActive || !Array.isArray(position)) {
+      finishSquirtleDryGrassCameraFocus();
+      return;
+    }
+
+    const camera = engine?.camera;
+
+    if (!camera?.getPose || !camera?.setPose) {
+      finishSquirtleDryGrassCameraFocus();
+      return;
+    }
+
+    const startedAt = getRuntimeNow();
+    const currentPose = camera.getPose();
+    const currentDirection = currentPose.direction || [1, LEPPA_TREE_TASK_CAMERA_ORBIT_PITCH, 0];
+    const startYaw = Math.atan2(currentDirection[2] || 0, currentDirection[0] || 1);
+    const pitch = Math.max(
+      0.18,
+      Math.min(0.58, Math.abs(currentDirection[1]) || LEPPA_TREE_TASK_CAMERA_ORBIT_PITCH)
+    );
+    const target = [
+      position[0],
+      SQUIRTLE_DRY_GRASS_CAMERA_FOCUS_HEIGHT,
+      position[2]
+    ];
+
+    const orbit = (now = getRuntimeNow()) => {
+      if (!squirtleDryGrassCameraFocusActive) {
+        return;
+      }
+
+      const progress = Math.min(
+        1,
+        (now - startedAt) / LEPPA_TREE_TASK_CAMERA_ORBIT_DURATION_MS
+      );
+      const angle = startYaw + Math.PI * 2 * progress;
+      const direction = [Math.cos(angle), pitch, Math.sin(angle)];
+
+      clearGameFlowInput();
+      camera.setPose({
+        target,
+        direction,
+        zoom: LEPPA_TREE_TASK_CAMERA_ORBIT_ZOOM,
+        distance: LEPPA_TREE_TASK_CAMERA_ORBIT_DISTANCE
+      });
+      engine.cameraOrbit?.sync?.(direction);
+
+      if (progress >= 1) {
+        finishSquirtleDryGrassCameraFocus();
+        return;
+      }
+
+      requestSquirtleDryGrassCameraFocusFrame(orbit);
+    };
+
+    requestSquirtleDryGrassCameraFocusFrame(orbit);
+  }
+
+  function startSquirtleDryGrassCameraFocus() {
+    if (squirtleDryGrassCameraFocusShown || squirtleDryGrassCameraFocusActive) {
+      return false;
+    }
+
+    const dryGrassPatch = findSquirtleDryGrassFocusPatch();
+    const position = dryGrassPatch?.position;
+
+    if (!Array.isArray(position)) {
+      return false;
+    }
+
+    squirtleDryGrassCameraFocusShown = true;
+    squirtleDryGrassCameraFocusActive = true;
+    scriptedInteractionActive = true;
+    clearGameFlowInput();
+    dialogueCamera?.focusWorldPoint({
+      position,
+      height: SQUIRTLE_DRY_GRASS_CAMERA_FOCUS_HEIGHT
+    });
+    squirtleDryGrassCameraFocusTimeout = windowRef.setTimeout(
+      () => {
+        squirtleDryGrassCameraFocusTimeout = null;
+        startSquirtleDryGrassCameraOrbit(position);
+      },
+      LEPPA_TREE_TASK_CAMERA_FOCUS_TRANSITION_MS
+    );
+    return true;
+  }
+
   function movePlayerAwayFromSquirtleForDialogue() {
     const squirtlePosition = gameSession?.actTwoSquirtle?.position;
     const playerCharacter = gameSession?.playerCharacter;
@@ -922,6 +1403,7 @@ export function createApplicationRuntime({
       "bulbasaurStrawBedComplete",
       "leppaBerryGift",
       "leppaBerryTree",
+      "pokemonCompanion",
       "timburrLeafDenFurnitureComplete",
       "charmanderCelebrationRequest"
     ]);
@@ -1300,6 +1782,7 @@ export function createApplicationRuntime({
           buildQuestTransitionNotice(payload.completedQuestIds, activeQuest),
           5.2
         );
+        autoStartBulbasaurLeafageRewardFromTask(activeQuest);
 
       }
     }
@@ -1577,6 +2060,13 @@ export function createApplicationRuntime({
       sceneFlowRuntime?.actTwoTutorial.notifyPokedexClosed();
     }
   });
+  const workbenchModal = createWorkbenchModalController({
+    mount: dom.renderFrame || dom.uiLayer || dom.mount,
+    inventory,
+    getItemLabel,
+    formatRequirementSummary,
+    clearGameFlowInput
+  });
   storyBeats = createStoryBeatSystem({
     dialogueSystem,
     gameplayDialogue: uiRuntime.gameplayDialogue,
@@ -1589,6 +2079,7 @@ export function createApplicationRuntime({
   });
 
   const {
+    craftCampfireAtWorkbench,
     findNearbyActionTarget,
     performHarvestAction,
     performInteractAction,
@@ -1694,7 +2185,18 @@ export function createApplicationRuntime({
       }
 
       if (targetId === "squirtle" && dialogueId === "discovery") {
+        squirtleDryGrassCameraFocusShown = false;
         const playDiscoveryDialogue = () => storyBeats.playDialogue(STORY_BEAT_IDS.SQUIRTLE_DISCOVERY, {
+          onLineChange(_line, lineIndex) {
+            if (lineIndex === SQUIRTLE_DRY_GRASS_FOCUS_LINE_INDEX) {
+              startSquirtleDryGrassCameraFocus();
+            }
+          },
+          onBeforeCompleteEffects: () => {
+            finishSquirtleDryGrassCameraFocus({
+              refocusSquirtle: false
+            });
+          },
           onComplete: restoreCameraOnComplete
         });
 
@@ -1801,10 +2303,44 @@ export function createApplicationRuntime({
         });
       };
 
-      const openBulbasaurDiscoveryDialogue = () => storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_HABITAT_DISCOVERY, {
-        onComplete: openChopperEncouragement
+      const focusBulbasaurDiscovery = () => {
+        const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+        const targetPosition = Array.isArray(encounter.position) ?
+          encounter.position :
+          repairPosition;
+
+        if (!playerPosition || !targetPosition) {
+          return;
+        }
+
+        dialogueCamera?.focusNpcConversation({
+          targetId: "bulbasaur",
+          playerPosition,
+          npcActors: gameSession?.npcActors || [],
+          interactables: gameSession?.interactables || [],
+          targetPosition
+        });
+      };
+
+      const openBulbasaurDiscoveryDialogue = () => {
+        scriptedInteractionActive = false;
+        clearGameFlowInput();
+        focusBulbasaurDiscovery();
+        storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_HABITAT_DISCOVERY, {
+          onComplete: openChopperEncouragement
+        });
+      };
+
+      scriptedInteractionActive = true;
+      clearGameFlowInput();
+      dialogueCamera?.focusWorldPoint({
+        position: repairPosition,
+        height: 1.12
       });
 
+      const revealDuration = 1.15;
+      const flashDuration = 0.2;
+      const visibleAtSeconds = revealDuration * 0.56;
       encounter.visible = false;
       encounter.jumpTimer = 0;
       encounter.originPosition = null;
@@ -1813,7 +2349,10 @@ export function createApplicationRuntime({
       encounter.revealBoxOpening = {
         active: true,
         elapsed: 0,
-        duration: 1.15,
+        duration: revealDuration,
+        flashStart: Math.max(0, visibleAtSeconds - flashDuration * 0.5),
+        flashDuration,
+        hideBoxWhenVisible: true,
         bulbasaurVisible: false,
         onComplete: openBulbasaurDiscoveryDialogue
       };
@@ -2113,6 +2652,21 @@ export function createApplicationRuntime({
         onComplete: syncQuestPanels
       });
     },
+    onCampfireCraftRequested({ recipe }) {
+      workbenchModal.open({
+        recipe,
+        onConfirm: () => {
+          const crafted = craftCampfireAtWorkbench({
+            storyState,
+            inventory
+          });
+          if (crafted) {
+            syncQuestPanels();
+          }
+          return crafted;
+        }
+      });
+    },
     onCampfireCrafted() {
       uiRuntime.bagUiRuntime.handleItemCollected(CAMPFIRE_ITEM_ID, storyState);
       storyBeats.complete(STORY_BEAT_IDS.CAMPFIRE_CREATED);
@@ -2304,7 +2858,11 @@ export function createApplicationRuntime({
         });
       }
     },
-    onLeppaTreeRevived() {},
+    onLeppaTreeRevived() {
+      windowRef.setTimeout(() => {
+        autoStartBulbasaurDryGrassRequestFromTask();
+      }, 0);
+    },
     onLeppaTreeWaterHintRequested() {
       flashLeppaTreeTaskHint();
     },
@@ -2378,6 +2936,8 @@ export function createApplicationRuntime({
     requestMoveCycle: cycleActiveFieldMove,
     shouldBagButtonInteract: shouldBagButtonInteractWithNearbyCharacter,
     shouldGamepadButtonHarvest: shouldGamepadButtonHarvestNearbyFieldAction,
+    isWorkbenchModalOpen: () => workbenchModal.isOpen(),
+    handleWorkbenchModalKeydown: (event) => workbenchModal.handleKeydown(event),
     inspectBag,
     windowRef
   });
@@ -2439,6 +2999,7 @@ export function createApplicationRuntime({
         isPrimaryActionActive: gameInput.isPrimaryActionActive,
         shouldBagButtonInteract: shouldBagButtonInteractWithNearbyCharacter,
         getActiveMoveId: () => activeFieldMoveId,
+        setActiveMoveId: setActiveFieldMove,
         inventory,
         playerSkills,
         storyState,
