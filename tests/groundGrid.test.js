@@ -146,6 +146,28 @@ describe("buildGroundGridInstances", () => {
     expect(reviveGroundGrass(groundInstances[0], grassPatches)).toBe(false);
   });
 
+  it("can seed dry grass across a target share of planet tiles", () => {
+    const groundInstances = buildGroundGridInstances({
+      worldLimit: 4,
+      tileFootprint: 3.8,
+      tileHeight: 3.8,
+    });
+
+    const grassPatches = buildGroundGrassPatches({
+      groundInstances,
+      layout: [
+        { id: "grass-anchor", position: [groundInstances[0].offset[0], 0, groundInstances[0].offset[2]] }
+      ],
+      coverageRatio: 0.25,
+      seed: "test-ecosystem-grass"
+    });
+
+    expect(grassPatches).toHaveLength(Math.round(groundInstances.length * 0.25));
+    expect(grassPatches.some((patch) => patch.id === "grass-anchor")).toBe(true);
+    expect(new Set(grassPatches.map((patch) => patch.cellId)).size).toBe(grassPatches.length);
+    expect(grassPatches.every((patch) => patch.state === DEAD_GRASS_STATE)).toBe(true);
+  });
+
   it("attaches flower patches to target cells and revives them with the same dead/alive states", () => {
     const groundInstances = buildGroundGridInstances({
       worldLimit: 2,

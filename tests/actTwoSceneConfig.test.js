@@ -29,9 +29,19 @@ describe("act two scene config", () => {
     expect(planarDistance(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION, ACT_TWO_MONSTER_POSITION))
       .toBeGreaterThanOrEqual(80);
     expect(planarDistance(ACT_TWO_PLAYER_SPAWN, ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION))
-      .toBeGreaterThan(3);
+      .toBeGreaterThan(10);
     expect(planarDistance(ACT_TWO_PLAYER_SPAWN, ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION))
-      .toBeLessThanOrEqual(5);
+      .toBeLessThanOrEqual(13);
+    expect(planarDistance(
+      ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION,
+      ACT_TWO_PLAYER_SPAWN
+    )).toBeCloseTo(
+      planarDistance(
+        ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION,
+        [0.58, 0, 67.82]
+      ) * 3,
+      5
+    );
     expect(planarDistance(
       ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION,
       ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION

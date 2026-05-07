@@ -395,7 +395,7 @@ export const GROUND_FLOWER_LAYOUT = [
 export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
 export const LEPPA_TREE_DROP_OFFSET = [0.82, 0.02, 0.48];
 export const WORKBENCH_POSITION = [38.0, 0.02, -17.0];
-export const WORKBENCH_INTERACT_DISTANCE = 2.8;
+export const WORKBENCH_INTERACT_DISTANCE = 5.4;
 export const RUINED_POKEMON_CENTER_POSITION = [25.4, 0, 12.6];
 export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [22.7, 0.02, 10.8];
 export const POKEMON_CENTER_PC_POSITION = [26.25, 0.02, 13.65];
@@ -699,7 +699,7 @@ export const STORY_QUESTS = [
     eyebrow: "Opening",
     act: "Act I • First Voice in the Ash",
     difficulty: 1,
-    title: "Talk to Tangrowth",
+    title: " ",
     body: "Reach Tangrowth near the ruins and figure out what he just spotted in the ash.",
     storyBeat:
       "The run does not start with tools or crafting. It starts with Tangrowth catching you in the aftermath and pulling your attention toward another survivor.",

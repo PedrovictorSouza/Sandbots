@@ -263,7 +263,9 @@ export function createWorldRenderer({
       gl.uniform1f(uniforms.instanceRoll, instance.roll || 0);
       gl.uniform3fv(uniforms.instanceTint, instance.tint || [1, 1, 1]);
       gl.uniform1f(uniforms.instanceTintStrength, instance.tintStrength || 0);
-      gl.uniform1f(uniforms.instanceAlpha, instance.alpha ?? 1);
+      const instanceAlpha = instance.alpha ?? 1;
+      const isTransparentInstance = instanceAlpha < 0.999;
+      gl.uniform1f(uniforms.instanceAlpha, instanceAlpha);
       if (uniforms.localYaw) {
         gl.uniform1f(uniforms.localYaw, instance.localYaw || 0);
       }
@@ -273,9 +275,17 @@ export function createWorldRenderer({
       }
       gl.uniform1f(uniforms.swayStrength, instance.swayStrength || 0);
 
+      if (isTransparentInstance) {
+        gl.depthMask?.(false);
+      }
+
       for (const primitive of sceneObject.model.primitives) {
         bindScenePrimitive(primitive);
         gl.drawElements(gl.TRIANGLES, primitive.indexCount, primitive.indexType, 0);
+      }
+
+      if (isTransparentInstance) {
+        gl.depthMask?.(true);
       }
     }
   }

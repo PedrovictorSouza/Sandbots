@@ -504,13 +504,14 @@ function getGroundCellOffset(groundCell) {
   return groundCell?.offset || groundCell?.position || null;
 }
 
-export function hasWateredLeppaTreeSurroundings(leppaTree, groundPurifiedInstances = []) {
+export function getLeppaTreeSurroundingGroundCells(leppaTree, groundCells = []) {
   if (!leppaTree?.position) {
-    return false;
+    return [];
   }
 
-  const wateredTileKeys = new Set();
-  for (const groundCell of groundPurifiedInstances) {
+  const surroundingGroundCells = [];
+  const groundCellKeys = new Set();
+  for (const groundCell of groundCells) {
     if (!groundCell || groundCell.active === false) {
       continue;
     }
@@ -531,10 +532,20 @@ export function hasWateredLeppaTreeSurroundings(leppaTree, groundPurifiedInstanc
       continue;
     }
 
-    wateredTileKeys.add(groundCell.id || `${offset[0].toFixed(2)}:${offset[2].toFixed(2)}`);
+    const groundCellKey = groundCell.id || `${offset[0].toFixed(2)}:${offset[2].toFixed(2)}`;
+    if (groundCellKeys.has(groundCellKey)) {
+      continue;
+    }
+
+    groundCellKeys.add(groundCellKey);
+    surroundingGroundCells.push(groundCell);
   }
 
-  return wateredTileKeys.size >= 4;
+  return surroundingGroundCells;
+}
+
+export function hasWateredLeppaTreeSurroundings(leppaTree, groundPurifiedInstances = []) {
+  return getLeppaTreeSurroundingGroundCells(leppaTree, groundPurifiedInstances).length >= 4;
 }
 
 export function reviveLeppaTreeFromWateredTiles(
@@ -612,7 +623,7 @@ export function buildLogChairPlacement(playerPosition) {
       0.02,
       playerPosition[2] + 0.42
     ],
-    size: [1.34, 1.08],
+    size: [1.18, 1.18],
     uvRect: [0, 0, 1, 1]
   };
 }
@@ -659,7 +670,6 @@ export function buildLeafDenKitPlacement(playerPosition) {
 export function findNearbyLogChair(playerPosition, logChair, storyState) {
   if (
     !storyState?.flags?.logChairPlaced ||
-    storyState?.flags?.logChairSat ||
     !logChair?.position
   ) {
     return null;
@@ -1052,7 +1062,7 @@ export function findNearbyInteractable(
     nearest = {
       kind: "logChairSeat",
       id: "logChair",
-      label: "Sit on Log Chair"
+      label: "Save Game"
     };
     nearestDistance = nearbyLogChair.distance;
   }
@@ -1269,7 +1279,7 @@ export function buildNearbyPrompt({
   }
 
   if (interactTarget?.target?.kind === "logChairSeat") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • ${quest.title}`;
+    return `[X] ${interactTarget.target.label}`;
   }
 
   if (interactTarget?.target?.kind === "station") {

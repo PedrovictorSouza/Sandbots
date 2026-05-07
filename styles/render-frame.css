@@ -43,7 +43,7 @@
 
 .pause-overlay__label {
   color: #fff1e8;
-  font-family: var(--game-ui-font, "Courier New", monospace);
+  font-family: var(--game-ui-font, "Super Mario World", monospace);
   font-size: 128px;
   line-height: 1;
   letter-spacing: 0;

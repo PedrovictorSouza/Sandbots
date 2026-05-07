@@ -128,6 +128,109 @@ function buildGroundPatches({
   return patches;
 }
 
+function getStableHash(value) {
+  const text = String(value || "");
+  let hash = 2166136261;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function isGroundCellInSafeZone(groundCell, safeZones = []) {
+  if (!Array.isArray(groundCell?.offset) || !Array.isArray(safeZones)) {
+    return false;
+  }
+
+  const cellX = groundCell.offset[0];
+  const cellZ = groundCell.offset[2];
+
+  return safeZones.some((safeZone) => {
+    if (!Array.isArray(safeZone?.position) || !(safeZone.radius > 0)) {
+      return false;
+    }
+
+    const dx = cellX - safeZone.position[0];
+    const dz = cellZ - safeZone.position[1];
+    return dx * dx + dz * dz <= safeZone.radius * safeZone.radius;
+  });
+}
+
+function createPatchFromGroundCell({
+  groundCell,
+  id,
+  elevation,
+  defaultSize,
+  habitatGroupId = null
+}) {
+  const patch = {
+    id,
+    cellId: groundCell.id,
+    position: [
+      groundCell.offset[0],
+      (groundCell.surfaceY || 0) + elevation,
+      groundCell.offset[2]
+    ],
+    size: [...defaultSize],
+    state: DEAD_PATCH_STATE
+  };
+
+  if (habitatGroupId) {
+    patch.habitatGroupId = habitatGroupId;
+  }
+
+  return patch;
+}
+
+function appendCoverageGroundPatches({
+  patches,
+  groundInstances,
+  coverageRatio,
+  safeZones = [],
+  seed = "ground-patches",
+  elevation,
+  defaultSize,
+  idPrefix
+}) {
+  if (!(coverageRatio > 0) || !Array.isArray(groundInstances) || !groundInstances.length) {
+    return patches;
+  }
+
+  const usedGroundCellIds = new Set(patches.map((patch) => patch.cellId));
+  const eligibleGroundCells = groundInstances.filter((groundCell) => {
+    return groundCell?.id && !isGroundCellInSafeZone(groundCell, safeZones);
+  });
+  const targetPatchCount = Math.round(eligibleGroundCells.length * Math.min(1, coverageRatio));
+  const additionalPatchCount = Math.max(0, targetPatchCount - patches.length);
+
+  if (!additionalPatchCount) {
+    return patches;
+  }
+
+  const selectedGroundCells = eligibleGroundCells
+    .filter((groundCell) => !usedGroundCellIds.has(groundCell.id))
+    .map((groundCell) => ({
+      groundCell,
+      hash: getStableHash(`${seed}:${groundCell.id}`)
+    }))
+    .sort((left, right) => left.hash - right.hash)
+    .slice(0, additionalPatchCount);
+
+  for (const { groundCell } of selectedGroundCells) {
+    patches.push(createPatchFromGroundCell({
+      groundCell,
+      id: `${idPrefix}-ecosystem-${patches.length}`,
+      elevation,
+      defaultSize
+    }));
+  }
+
+  return patches;
+}
+
 function reviveGroundPatch(groundCell, patches) {
   if (!groundCell || !Array.isArray(patches)) {
     return false;
@@ -192,11 +295,25 @@ export function buildGroundGrassPatches({
   groundInstances,
   layout = [],
   elevation = 0.02,
-  defaultSize = [1.18, 0.96]
+  defaultSize = [1.18, 0.96],
+  coverageRatio = 0,
+  safeZones = [],
+  seed = "ground-grass"
 } = {}) {
-  return buildGroundPatches({
+  const patches = buildGroundPatches({
     groundInstances,
     layout,
+    elevation,
+    defaultSize,
+    idPrefix: "grass"
+  });
+
+  return appendCoverageGroundPatches({
+    patches,
+    groundInstances,
+    coverageRatio,
+    safeZones,
+    seed,
     elevation,
     defaultSize,
     idPrefix: "grass"

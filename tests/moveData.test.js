@@ -54,7 +54,7 @@ describe("small island move data", () => {
       "Leafage: grow tall grass on restored ground."
     );
     expect(formatActiveMoveGuidanceByAbilityId("waterGun")).toBe(
-      "Water Gun: mark dry ground for Squirtle to restore."
+      "USE LT TO MARK THE GROUND"
     );
     expect(formatActiveMoveGuidanceByAbilityId("waterGun", {
       pendingWaterGunCount: 2
@@ -85,7 +85,7 @@ describe("small island move data", () => {
       storyFlags: {
         firstGrassRestored: true
       }
-    })).toBe("Water Gun: mark dry ground for Squirtle to restore.");
+    })).toBe("USE LT TO MARK THE GROUND");
 
     expect(formatActiveMoveGuidanceByAbilityId("leafage", {
       storyFlags: {}

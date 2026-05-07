@@ -18,8 +18,8 @@ describe("createMusicRuntime", () => {
       initialVolume: 0.4
     });
 
-    expect(music.play(MUSIC_TRACK_IDS.FIRST_TREE_REVIVED, { restart: true })).toBe(true);
-    expect(audioFactory).toHaveBeenCalledWith("/Soundtrack/SoundTheme-1.mp3");
+    expect(music.play(MUSIC_TRACK_IDS.MAIN_THEME, { restart: true })).toBe(true);
+    expect(audioFactory).toHaveBeenCalledWith("/Soundtrack/main-theme.mp3");
     expect(audio.loop).toBe(true);
     expect(audio.volume).toBe(0.4);
     expect(audio.currentTime).toBe(0);

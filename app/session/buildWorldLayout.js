@@ -35,6 +35,7 @@ import {
 } from "../../rendering/worldAssets.js";
 
 const LEPPA_TREE_DEAD_MODEL_FACE_YAW_OFFSET = 0;
+const DRY_GRASS_PLANET_COVERAGE_RATIO = 0.01;
 
 function toSafeZoneFromPosition(position, radius) {
   return {
@@ -140,6 +141,7 @@ export function buildWorldLayout(session, assets) {
   const groundTileFootprint = Math.max(groundDeadModel.size[0], groundDeadModel.size[2]);
   const groundTileScale = GROUND_TILE_INSTANCE_SCALE;
   const groundTileSpan = groundTileFootprint * groundTileScale;
+  const terrainSafeZones = buildElevatedTerrainSafeZones();
 
   session.palmModel = palmModel;
   session.tallGrassModel = tallGrassModel;
@@ -180,7 +182,9 @@ export function buildWorldLayout(session, assets) {
   session.groundGrassPatches = buildGroundGrassPatches({
     groundInstances: session.groundDeadInstances,
     layout: GROUND_GRASS_LAYOUT,
-    defaultSize: GROUND_GRASS_SIZE
+    defaultSize: GROUND_GRASS_SIZE,
+    coverageRatio: DRY_GRASS_PLANET_COVERAGE_RATIO,
+    seed: "small-island-dry-grass-planet"
   });
 
   session.groundFlowerPatches = buildGroundFlowerPatches({
@@ -193,7 +197,7 @@ export function buildWorldLayout(session, assets) {
     tileSpan: groundTileSpan,
     tileHeight: groundDeadModel.size[1],
     tileScale: groundTileScale,
-    safeZones: buildElevatedTerrainSafeZones()
+    safeZones: terrainSafeZones
   });
   session.elevatedTerrainInstances = elevatedTerrain.instances;
   session.elevatedTerrainColliders = [

@@ -1,14 +1,24 @@
 import { createQuestLog } from "./createQuestLog.js";
 import {
   getInventoryPresentationOrder,
-  getInventorySlotRole,
-  getInventorySlotRoleLabel
+  getInventorySlotRole
 } from "./inventoryPresentation.js";
 import { getCompanionAbilityByAbilityId } from "../gameplay/content/companionAbilities.js";
 import {
   formatActiveMoveGuidanceByAbilityId,
   getSmallIslandMoveByAbilityId
 } from "../sandbox/moveData.js";
+
+const ACTIVE_COMPANION_THUMBNAILS = Object.freeze({
+  squirtle: new URL("./images/Robot-1-thumb.png", import.meta.url).href,
+  bulbasaur: new URL("./images/Robot-2-thumb.png", import.meta.url).href
+});
+const ACTIVE_COMPANION_THUMBNAIL_ORDER = Object.freeze(["squirtle", "bulbasaur"]);
+const INVENTORY_ITEM_IMAGES = Object.freeze({
+  wood: new URL("../../Objects/wood.png", import.meta.url).href
+});
+const MISSION_COMPLETE_SFX_URL = new URL("../soundFx/mission-complete.mp3", import.meta.url).href;
+const MISSION_COMPLETE_SFX_VOLUME = 0.72;
 
 export function createGameHudController({
   statusElement,
@@ -63,6 +73,7 @@ export function createGameHudController({
     message: "",
     timer: 0
   };
+  const missionCompleteAudioPool = [];
   const uiCache = {
     inventoryHtml: "",
     missionsHtml: "",
@@ -87,6 +98,7 @@ export function createGameHudController({
   const trackedTaskCompletionDeadlines = new Map();
   const hiddenCompletedTrackedTaskIds = new Set();
   const noticedCompletedTrackedTaskIds = new Set();
+  const hudChecklistProgressValues = new Map();
   let latestStoryState = { flags: {} };
   let latestSkillsState = null;
   let latestActiveSkillId = null;
@@ -154,33 +166,74 @@ export function createGameHudController({
       }
     }
 
-    let companionHudElement = headerElement.querySelector(".active-companion-hud");
+    const companionHudParent = inventoryPanelElement.parentElement || inventoryPanelElement;
+    let companionHudElement = companionHudParent.querySelector(".active-companion-hud");
+
+    if (!companionHudElement) {
+      companionHudElement = inventoryPanelElement.querySelector(".active-companion-hud");
+    }
+
     if (!companionHudElement) {
       companionHudElement = document.createElement("div");
       companionHudElement.className = "active-companion-hud";
       companionHudElement.hidden = true;
       companionHudElement.setAttribute("aria-live", "polite");
-      headerElement.appendChild(companionHudElement);
+    }
+
+    if (companionHudElement.parentElement !== companionHudParent) {
+      companionHudParent.appendChild(companionHudElement);
     }
 
     return companionHudElement;
   }
 
-  function renderRobotThumbnailHtml(companionId) {
+  function renderRobotThumbnailImageHtml(companionId, variant) {
     const normalizedCompanionId = escapeHtml(companionId || "unknown");
+    const thumbnailUrl = ACTIVE_COMPANION_THUMBNAILS[companionId] || ACTIVE_COMPANION_THUMBNAILS.squirtle;
 
     return `
-      <span class="active-companion-hud__portrait" aria-hidden="true">
-        <span class="active-companion-hud__robot" data-companion-id="${normalizedCompanionId}">
-          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--body"></span>
-          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--head"></span>
-          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--face"></span>
-          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--eye active-companion-hud__robot-part--eye-left"></span>
-          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--eye active-companion-hud__robot-part--eye-right"></span>
-          <span class="active-companion-hud__robot-part active-companion-hud__robot-part--pack"></span>
-        </span>
+      <span class="active-companion-hud__portrait active-companion-hud__portrait--${variant}" aria-hidden="true">
+        <img
+          class="active-companion-hud__portrait-image"
+          src="${escapeHtml(thumbnailUrl)}"
+          alt=""
+          data-companion-id="${normalizedCompanionId}"
+          loading="eager"
+          decoding="async"
+        >
       </span>
     `;
+  }
+
+  function renderRobotThumbnailHtml(companionId) {
+    const secondaryCompanionId =
+      ACTIVE_COMPANION_THUMBNAIL_ORDER.find((candidateCompanionId) => candidateCompanionId !== companionId) ||
+      "squirtle";
+
+    return `
+      <span class="active-companion-hud__portraits" aria-hidden="true">
+        ${renderRobotThumbnailImageHtml(companionId, "primary")}
+        ${renderRobotThumbnailImageHtml(secondaryCompanionId, "secondary")}
+      </span>
+    `;
+  }
+
+  function renderInventorySlotIconHtml(itemId, item) {
+    const imageUrl = INVENTORY_ITEM_IMAGES[itemId];
+
+    if (imageUrl) {
+      return `
+        <img
+          class="inventory-slot__image"
+          src="${escapeHtml(imageUrl)}"
+          alt=""
+          loading="eager"
+          decoding="async"
+        >
+      `;
+    }
+
+    return escapeHtml(item.glyph || "?");
   }
 
   function syncActiveCompanionHud(skills, activeSkillId = null, storyState = null) {
@@ -423,9 +476,63 @@ export function createGameHudController({
     return transientNotice.message;
   }
 
+  function shouldPlayMissionCompleteSfx(message) {
+    return String(message || "").trim().toLowerCase().startsWith("task complete:");
+  }
+
+  function canCreateMissionCompleteAudio() {
+    const userAgent = globalThis.navigator?.userAgent || "";
+
+    return typeof Audio === "function" && !userAgent.toLowerCase().includes("jsdom");
+  }
+
+  function getMissionCompleteAudio() {
+    if (!canCreateMissionCompleteAudio()) {
+      return null;
+    }
+
+    const availableAudio = missionCompleteAudioPool.find((audio) => {
+      return audio.paused || audio.ended;
+    });
+
+    if (availableAudio) {
+      return availableAudio;
+    }
+
+    const audio = new Audio(MISSION_COMPLETE_SFX_URL);
+    audio.preload = "auto";
+    missionCompleteAudioPool.push(audio);
+    return audio;
+  }
+
+  function playMissionCompleteSfx() {
+    const audio = getMissionCompleteAudio();
+    if (!audio) {
+      return;
+    }
+
+    audio.loop = false;
+    audio.volume = MISSION_COMPLETE_SFX_VOLUME;
+
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // Some browser audio objects disallow seeking before metadata is ready.
+    }
+
+    const playResult = audio.play?.();
+    if (playResult?.catch) {
+      playResult.catch(() => {});
+    }
+  }
+
   function pushNotice(message, duration = 2.8) {
     transientNotice.message = message;
     transientNotice.timer = duration;
+
+    if (shouldPlayMissionCompleteSfx(message)) {
+      playMissionCompleteSfx();
+    }
   }
 
   function updateTransientNotice(deltaTime) {
@@ -453,7 +560,6 @@ export function createGameHudController({
       const item = itemDefs[itemId];
       const count = inventory[itemId] || 0;
       const slotRole = getInventorySlotRole(item);
-      const slotRoleLabel = getInventorySlotRoleLabel(item);
 
       return `
         <div
@@ -461,16 +567,15 @@ export function createGameHudController({
           data-filled="true"
           data-empty="false"
           data-slot-role="${escapeHtml(slotRole)}"
+          data-icon-kind="${INVENTORY_ITEM_IMAGES[itemId] ? "image" : "glyph"}"
         >
-          <span class="inventory-slot__role">${escapeHtml(slotRoleLabel)}</span>
           <div
             class="inventory-slot__icon"
             style="--slot-color:${item.color}; --slot-ink:${item.ink}"
             aria-hidden="true"
           >
-            ${item.glyph}
+            ${renderInventorySlotIconHtml(itemId, item)}
           </div>
-          <span class="inventory-slot__label">${item.shortLabel}</span>
           <span class="inventory-count">${count}</span>
         </div>
       `;
@@ -662,7 +767,127 @@ export function createGameHudController({
 
     uiCache.hudChecklist = nextHtml;
     hudChecklistElement.innerHTML = nextHtml;
+    syncHudChecklistProgressPop();
     flashHudBoard();
+  }
+
+  function getHudChecklistProgressKey(item, itemIndex, match, occurrenceIndex, required) {
+    const prefix = String(item.textContent || "")
+      .slice(0, match.index)
+      .replace(/\s+/g, " ")
+      .trim();
+    const objectiveType = item.dataset.objectiveType || "task";
+
+    return `${objectiveType}:${itemIndex}:${required}:${occurrenceIndex}:${prefix}`;
+  }
+
+  function wrapHudChecklistProgressOccurrences(item, occurrenceIndexes) {
+    if (!item || !occurrenceIndexes?.size) {
+      return;
+    }
+
+    const documentRef = item.ownerDocument;
+    const nodeFilter = documentRef?.defaultView?.NodeFilter;
+    const walker = documentRef?.createTreeWalker?.(
+      item,
+      nodeFilter?.SHOW_TEXT || 4,
+      {
+        acceptNode(node) {
+          if (node.parentElement?.classList?.contains("hud-checklist__progress")) {
+            return nodeFilter?.FILTER_REJECT || 2;
+          }
+
+          return /\d+\/\d+/.test(node.nodeValue || "") ?
+            (nodeFilter?.FILTER_ACCEPT || 1) :
+            (nodeFilter?.FILTER_REJECT || 2);
+        }
+      }
+    );
+
+    if (!documentRef || !walker) {
+      return;
+    }
+
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+
+    let occurrenceIndex = 0;
+    for (const textNode of textNodes) {
+      const text = textNode.nodeValue || "";
+      const fragment = documentRef.createDocumentFragment();
+      let lastIndex = 0;
+
+      for (const match of text.matchAll(/(\d+\/\d+)/g)) {
+        if (match.index > lastIndex) {
+          fragment.append(documentRef.createTextNode(text.slice(lastIndex, match.index)));
+        }
+
+        if (occurrenceIndexes.has(occurrenceIndex)) {
+          const progress = documentRef.createElement("span");
+          progress.className = "hud-checklist__progress";
+          progress.dataset.progressPop = "true";
+          progress.textContent = match[1];
+          fragment.append(progress);
+        } else {
+          fragment.append(documentRef.createTextNode(match[1]));
+        }
+
+        lastIndex = match.index + match[1].length;
+        occurrenceIndex += 1;
+      }
+
+      if (lastIndex < text.length) {
+        fragment.append(documentRef.createTextNode(text.slice(lastIndex)));
+      }
+
+      textNode.replaceWith(fragment);
+    }
+  }
+
+  function syncHudChecklistProgressPop() {
+    if (!hudChecklistElement) {
+      return;
+    }
+
+    const visibleProgressKeys = new Set();
+    const checklistItems = Array.from(hudChecklistElement.querySelectorAll(".hud-checklist__item"));
+
+    checklistItems.forEach((item, itemIndex) => {
+      const text = item.textContent || "";
+      const progressOccurrencesToPop = new Set();
+      let occurrenceIndex = 0;
+
+      for (const match of text.matchAll(/(\d+)\/(\d+)/g)) {
+        const current = Number(match[1]);
+        const required = Number(match[2]);
+        const progressKey = getHudChecklistProgressKey(
+          item,
+          itemIndex,
+          match,
+          occurrenceIndex,
+          required
+        );
+        const previous = hudChecklistProgressValues.get(progressKey);
+
+        if (previous !== undefined && current > previous) {
+          progressOccurrencesToPop.add(occurrenceIndex);
+        }
+
+        hudChecklistProgressValues.set(progressKey, current);
+        visibleProgressKeys.add(progressKey);
+        occurrenceIndex += 1;
+      }
+
+      wrapHudChecklistProgressOccurrences(item, progressOccurrencesToPop);
+    });
+
+    for (const progressKey of hudChecklistProgressValues.keys()) {
+      if (!visibleProgressKeys.has(progressKey)) {
+        hudChecklistProgressValues.delete(progressKey);
+      }
+    }
   }
 
   function syncQuestFocus(storyState) {
@@ -695,6 +920,7 @@ export function createGameHudController({
       if (hudChecklistElement && uiCache.hudChecklist !== nextChecklist) {
         uiCache.hudChecklist = nextChecklist;
         hudChecklistElement.innerHTML = nextChecklist;
+        syncHudChecklistProgressPop();
         if (!questChanged) {
           flashHudBoard();
         }

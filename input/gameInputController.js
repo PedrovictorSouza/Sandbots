@@ -95,6 +95,20 @@ export function createGameInputController({
     };
   }
 
+  function createPokedexPageButtonEvent(direction) {
+    const code = direction < 0 ?
+      GAME_INPUT_BINDINGS.previousMove.keyboardCode :
+      GAME_INPUT_BINDINGS.nextMove.keyboardCode;
+
+    return {
+      code,
+      key: code,
+      repeat: false,
+      target: null,
+      preventDefault() {}
+    };
+  }
+
   function shouldIgnoreLookInput(target) {
     return (
       isPokedexOpen() ||
@@ -463,24 +477,34 @@ export function createGameInputController({
 
     if (
       previousMoveButtonPressed &&
-      !gamepadPreviousMoveButtonPressed &&
-      !isPokedexOpen() &&
-      !sceneDirector.blocksGameplayInput() &&
-      !isBuilderPanelOpen()
+      !gamepadPreviousMoveButtonPressed
     ) {
-      requestMoveCycle(-1);
+      if (isPokedexOpen()) {
+        clearGameFlowInput();
+        pokedexEntry.handleKeydown(createPokedexPageButtonEvent(-1));
+      } else if (
+        !sceneDirector.blocksGameplayInput() &&
+        !isBuilderPanelOpen()
+      ) {
+        requestMoveCycle(-1);
+      }
     }
 
     gamepadPreviousMoveButtonPressed = previousMoveButtonPressed;
 
     if (
       nextMoveButtonPressed &&
-      !gamepadNextMoveButtonPressed &&
-      !isPokedexOpen() &&
-      !sceneDirector.blocksGameplayInput() &&
-      !isBuilderPanelOpen()
+      !gamepadNextMoveButtonPressed
     ) {
-      requestMoveCycle(1);
+      if (isPokedexOpen()) {
+        clearGameFlowInput();
+        pokedexEntry.handleKeydown(createPokedexPageButtonEvent(1));
+      } else if (
+        !sceneDirector.blocksGameplayInput() &&
+        !isBuilderPanelOpen()
+      ) {
+        requestMoveCycle(1);
+      }
     }
 
     gamepadNextMoveButtonPressed = nextMoveButtonPressed;

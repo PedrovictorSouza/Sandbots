@@ -25,7 +25,7 @@ const FIELD_MOVE_PRESENTATION = Object.freeze({
       feedback: "Target prompt, Squirtle movement, restored tile state, and restoration notice.",
       firstSafeUse: "A nearby dry grass or dry ground patch in the opening field."
     },
-    activeGuidance: "Water Gun: mark dry ground for Squirtle to restore.",
+    activeGuidance: "USE LT TO MARK THE GROUND",
     firstUseGuidance: "Water Gun: mark dry ground; Squirtle will move over and restore it.",
     firstUseCompleteFlags: ["firstGrassRestored"],
     targetPrompts: {

@@ -183,6 +183,7 @@ const LEPPA_TREE_TASK_CAMERA_ORBIT_PITCH = 0.34;
 const LEPPA_TREE_TASK_CAMERA_FOCUS_RETRY_MS = 160;
 const LEPPA_TREE_TASK_CAMERA_FOCUS_MAX_WAIT_MS = 8000;
 const LEAF_DEN_KIT_LIFE_COIN_COST = 10;
+const MANUAL_SAVE_STORAGE_KEY = "small-island.manual-save.v1";
 
 function scheduleIdleTask(windowRef, callback, timeout = 1200) {
   if (typeof windowRef.requestIdleCallback === "function") {
@@ -302,11 +303,60 @@ export function createApplicationRuntime({
   let leppaTreeTaskCameraFocusActive = false;
   let leppaTreeTaskCameraFocusTimeout = null;
   let leppaTreeTaskCameraFocusFrame = null;
+  let leppaTreeTaskHintTimeout = null;
+  let leppaTreeTileHintFlashUntil = 0;
   let followerCallRequested = false;
   let activeFieldMoveId = null;
+  let mainThemeStarted = false;
 
   function getRuntimeNow() {
     return windowRef.performance?.now?.() ?? Date.now();
+  }
+
+  function startMainThemeFromChopperFirstTalk() {
+    if (mainThemeStarted) {
+      return;
+    }
+
+    mainThemeStarted = true;
+    musicRuntime.play(MUSIC_TRACK_IDS.MAIN_THEME);
+  }
+
+  function flashLeppaTreeTaskHint() {
+    const applyFlash = () => {
+      const taskTitleElement = Array.from(
+        dom.hudChecklist?.querySelectorAll?.(".hud-checklist__task-title") || []
+      ).find((element) => {
+        return element.textContent?.trim() === "Revive the dead tree";
+      });
+
+      if (!taskTitleElement) {
+        return;
+      }
+
+      if (leppaTreeTaskHintTimeout !== null) {
+        windowRef.clearTimeout?.(leppaTreeTaskHintTimeout);
+        leppaTreeTaskHintTimeout = null;
+      }
+
+      taskTitleElement.dataset.hintFlash = "false";
+      void taskTitleElement.offsetWidth;
+      taskTitleElement.dataset.hintFlash = "true";
+      leppaTreeTaskHintTimeout = windowRef.setTimeout(() => {
+        taskTitleElement.dataset.hintFlash = "false";
+        leppaTreeTaskHintTimeout = null;
+      }, 1500);
+    };
+
+    uiRuntime?.syncQuestFocus?.(storyState);
+    leppaTreeTileHintFlashUntil = getRuntimeNow() + 1500;
+
+    if (typeof windowRef.requestAnimationFrame === "function") {
+      windowRef.requestAnimationFrame(applyFlash);
+      return;
+    }
+
+    windowRef.setTimeout?.(applyFlash, 0);
   }
 
   function buildQuestTransitionNotice(completedQuestIds = [], activeQuest = null) {
@@ -1254,6 +1304,36 @@ export function createApplicationRuntime({
       }
     }
   });
+
+  function writeManualSavePoint() {
+    try {
+      const playerPosition = gameSession.playerCharacter?.getPosition?.() || null;
+      const payload = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        storyState: {
+          questIndex: storyState.questIndex,
+          flags: { ...storyState.flags }
+        },
+        inventory: { ...inventory },
+        questState: questSystem.getState(),
+        playerPosition: Array.isArray(playerPosition) ? [...playerPosition] : null,
+        logChair: gameSession.logChair ?
+          {
+            ...gameSession.logChair,
+            position: [...gameSession.logChair.position],
+            size: [...gameSession.logChair.size],
+            uvRect: [...gameSession.logChair.uvRect]
+          } :
+          null
+      };
+
+      windowRef.localStorage?.setItem(MANUAL_SAVE_STORAGE_KEY, JSON.stringify(payload));
+      return true;
+    } catch {
+      return false;
+    }
+  }
   const dialogueSystem = createDialogueSystem({
     dialogues: SMALL_ISLAND_DIALOGUES,
     questSystem
@@ -1523,6 +1603,8 @@ export function createApplicationRuntime({
       };
 
       if (targetId === "tangrowth" && dialogueId === "onboarding") {
+        startMainThemeFromChopperFirstTalk();
+
         const openOnboardingConversation = () => {
           return storyBeats.playDialogue(STORY_BEAT_IDS.CHOPPER_ONBOARDING, {
             onLineChange(line) {
@@ -1621,6 +1703,18 @@ export function createApplicationRuntime({
         }
 
         return playDiscoveryDialogue();
+      }
+
+      if (targetId === "leppaTree" && dialogueId === "revivedTree") {
+        return uiRuntime.gameplayDialogue.openConversation({
+          lines: [
+            {
+              speaker: "TREE",
+              text: "Show me what you got"
+            }
+          ],
+          onComplete: restoreCameraOnComplete
+        });
       }
 
       return false;
@@ -1996,9 +2090,15 @@ export function createApplicationRuntime({
       syncQuestPanels();
     },
     onLogChairSitRequested() {
-      storyBeats.playDialogue(STORY_BEAT_IDS.LOG_CHAIR_REST, {
-        onComplete: syncQuestPanels
-      });
+      uiRuntime.pushNotice("Saving Game...");
+      storyState.flags.logChairSat = true;
+      storyState.flags.bulbasaurWorkbenchGuideAvailable = true;
+      trackFieldTask(FIELD_TASK_IDS.WORKBENCH_CAMPFIRE);
+      const saved = writeManualSavePoint();
+      syncQuestPanels();
+      windowRef.setTimeout(() => {
+        uiRuntime.pushNotice(saved ? "saved." : "save failed.");
+      }, 360);
     },
     onWorkbenchRecipesRequested() {
       storyBeats.playDialogue(STORY_BEAT_IDS.WORKBENCH_DIY_RECIPES, {
@@ -2204,8 +2304,9 @@ export function createApplicationRuntime({
         });
       }
     },
-    onLeppaTreeRevived() {
-      musicRuntime.play(MUSIC_TRACK_IDS.FIRST_TREE_REVIVED);
+    onLeppaTreeRevived() {},
+    onLeppaTreeWaterHintRequested() {
+      flashLeppaTreeTaskHint();
     },
     getActiveQuest,
     hasItems,
@@ -2438,6 +2539,9 @@ export function createApplicationRuntime({
         getItemLabel,
         performHarvestAction,
         performInteractAction,
+        isLeppaTreeTileHintFlashing() {
+          return leppaTreeTileHintFlashUntil > getRuntimeNow();
+        },
         recordQuestEvent(event) {
           return questSystem.emit(event);
         },

@@ -1,9 +1,9 @@
 export const MUSIC_TRACK_IDS = Object.freeze({
-  FIRST_TREE_REVIVED: "first-tree-revived"
+  MAIN_THEME: "main-theme"
 });
 
 export const DEFAULT_MUSIC_TRACKS = Object.freeze({
-  [MUSIC_TRACK_IDS.FIRST_TREE_REVIVED]: "/Soundtrack/SoundTheme-1.mp3"
+  [MUSIC_TRACK_IDS.MAIN_THEME]: "/Soundtrack/main-theme.mp3"
 });
 
 const DEFAULT_MUSIC_VOLUME = 0.72;

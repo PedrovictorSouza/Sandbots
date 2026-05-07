@@ -21,6 +21,11 @@ const BULBASAUR_REPAIR_BOX_POSITION = [
   BULBASAUR_REPAIR_MODULE_POSITION[1],
   BULBASAUR_REPAIR_MODULE_POSITION[2] + 1.05
 ];
+const BULBASAUR_REVEAL_POSITION = [
+  BULBASAUR_REPAIR_MODULE_POSITION[0] + 2.1,
+  BULBASAUR_REPAIR_MODULE_POSITION[1],
+  BULBASAUR_REPAIR_MODULE_POSITION[2] - 1.25
+];
 const CHARMANDER_REPAIR_MODULE_POSITION = [17.4, 0.04, -7.6];
 const TIMBURR_REPAIR_MODULE_POSITION = [
   BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION[0] + 1.45,
@@ -158,6 +163,75 @@ function createNatureRevivalSparkCanvas() {
 
 function createSquirtleWaterSprayCanvas() {
   const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(191, 244, 255, 0.96)";
+  context.fillRect(11, 3, 10, 4);
+  context.fillRect(7, 7, 18, 6);
+  context.fillRect(5, 13, 22, 8);
+  context.fillRect(8, 21, 16, 5);
+
+  context.fillStyle = "rgba(76, 181, 255, 0.88)";
+  context.fillRect(5, 15, 6, 6);
+  context.fillRect(21, 13, 6, 8);
+  context.fillRect(10, 24, 11, 3);
+
+  context.fillStyle = "rgba(255, 255, 255, 0.94)";
+  context.fillRect(10, 7, 6, 3);
+  context.fillRect(14, 4, 4, 3);
+
+  return canvas;
+}
+
+function createSquirtleStaminaBackCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 16;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(5, 3, 7, 0.82)";
+  context.fillRect(0, 2, 96, 12);
+  context.fillStyle = "rgba(255, 255, 255, 0.88)";
+  context.fillRect(0, 0, 96, 2);
+  context.fillRect(0, 14, 96, 2);
+  context.fillRect(0, 0, 2, 16);
+  context.fillRect(94, 0, 2, 16);
+
+  return canvas;
+}
+
+function createSquirtleStaminaFillCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 16;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(78, 214, 255, 0.96)";
+  context.fillRect(0, 0, 96, 16);
+  context.fillStyle = "rgba(211, 255, 255, 0.92)";
+  context.fillRect(4, 2, 62, 4);
+  context.fillStyle = "rgba(36, 118, 219, 0.82)";
+  context.fillRect(6, 12, 84, 3);
+
+  return canvas;
+}
+
+function createSquirtleChargingParticleCanvas() {
+  const canvas = document.createElement("canvas");
   canvas.width = 24;
   canvas.height = 24;
 
@@ -166,18 +240,13 @@ function createSquirtleWaterSprayCanvas() {
   context.fillStyle = "rgba(0, 0, 0, 0)";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.fillStyle = "rgba(191, 244, 255, 0.92)";
-  context.fillRect(8, 3, 8, 4);
-  context.fillRect(5, 7, 14, 8);
-  context.fillRect(8, 15, 8, 5);
-
-  context.fillStyle = "rgba(76, 181, 255, 0.82)";
-  context.fillRect(5, 10, 4, 6);
-  context.fillRect(15, 9, 4, 7);
-  context.fillRect(10, 17, 5, 3);
-
-  context.fillStyle = "rgba(255, 255, 255, 0.9)";
-  context.fillRect(9, 6, 4, 3);
+  context.fillStyle = "rgba(200, 250, 255, 0.92)";
+  context.fillRect(9, 3, 6, 4);
+  context.fillRect(6, 7, 12, 8);
+  context.fillRect(9, 15, 6, 5);
+  context.fillStyle = "rgba(82, 197, 255, 0.72)";
+  context.fillRect(4, 9, 5, 5);
+  context.fillRect(15, 10, 5, 5);
 
   return canvas;
 }
@@ -231,37 +300,68 @@ function createLeppaBerryCanvas() {
 function createLogChairCanvas() {
   const canvas = document.createElement("canvas");
   canvas.width = 64;
-  canvas.height = 56;
+  canvas.height = 64;
 
   const context = canvas.getContext("2d");
   context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "rgba(0, 0, 0, 0)";
-  context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.fillStyle = "rgba(40, 26, 16, 0.26)";
+  context.fillStyle = "rgba(255, 96, 205, 0.14)";
   context.beginPath();
-  context.ellipse(33, 47, 22, 5, 0, 0, Math.PI * 2);
+  context.ellipse(32, 47, 18, 5, 0, 0, Math.PI * 2);
   context.fill();
 
-  context.fillStyle = "#5d3723";
-  context.fillRect(17, 25, 8, 20);
-  context.fillRect(42, 25, 8, 20);
+  context.fillStyle = "rgba(255, 73, 204, 0.52)";
+  context.strokeStyle = "rgba(255, 225, 252, 0.78)";
+  context.lineWidth = 3;
+  context.beginPath();
+  context.moveTo(32, 5);
+  context.lineTo(57, 32);
+  context.lineTo(32, 59);
+  context.lineTo(7, 32);
+  context.closePath();
+  context.fill();
+  context.stroke();
 
-  context.fillStyle = "#7c4b2f";
-  context.fillRect(14, 21, 39, 12);
-  context.fillRect(17, 9, 33, 12);
+  context.fillStyle = "rgba(255, 246, 255, 0.42)";
+  context.beginPath();
+  context.moveTo(32, 13);
+  context.lineTo(48, 32);
+  context.lineTo(32, 51);
+  context.lineTo(16, 32);
+  context.closePath();
+  context.fill();
 
-  context.fillStyle = "#a86e42";
-  context.fillRect(17, 12, 27, 5);
-  context.fillRect(17, 24, 31, 5);
+  return canvas;
+}
 
-  context.fillStyle = "#3c2519";
-  context.fillRect(16, 32, 35, 4);
+function createSavePointStarCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
 
-  context.fillStyle = "#d0a06a";
-  context.fillRect(21, 13, 5, 3);
-  context.fillRect(29, 25, 6, 3);
-  context.fillRect(40, 13, 4, 3);
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(255, 255, 255, 0.88)";
+  context.fillRect(14, 2, 4, 28);
+  context.fillRect(2, 14, 28, 4);
+
+  context.fillStyle = "rgba(255, 222, 83, 0.94)";
+  context.beginPath();
+  context.moveTo(16, 4);
+  context.lineTo(20, 12);
+  context.lineTo(28, 16);
+  context.lineTo(20, 20);
+  context.lineTo(16, 28);
+  context.lineTo(12, 20);
+  context.lineTo(4, 16);
+  context.lineTo(12, 12);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "rgba(255, 255, 226, 0.94)";
+  context.fillRect(14, 12, 4, 8);
+  context.fillRect(12, 14, 8, 4);
 
   return canvas;
 }
@@ -650,6 +750,7 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.woodTexture = worldTextureFactory.fromImage(woodImage);
   session.leppaBerryTexture = worldTextureFactory.fromCanvas(createLeppaBerryCanvas());
   session.logChairTexture = worldTextureFactory.fromCanvas(createLogChairCanvas());
+  session.logChairStarTexture = worldTextureFactory.fromCanvas(createSavePointStarCanvas());
   session.strawBedTexture = worldTextureFactory.fromCanvas(createStrawBedCanvas());
   session.campfireTexture = worldTextureFactory.fromCanvas(createCampfireCanvas());
   session.leafDenKitTexture = worldTextureFactory.fromCanvas(createLeafDenKitCanvas());
@@ -684,6 +785,9 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.natureRevivalSparkTexture = worldTextureFactory.fromCanvas(createNatureRevivalSparkCanvas());
   session.leppaTreeMusicalNoteTextures = (leppaTreeMusicalNoteImages || [])
     .map((image) => worldTextureFactory.fromImage(image));
+  session.squirtleWaterStaminaBackTexture = worldTextureFactory.fromCanvas(createSquirtleStaminaBackCanvas());
+  session.squirtleWaterStaminaFillTexture = worldTextureFactory.fromCanvas(createSquirtleStaminaFillCanvas());
+  session.squirtleChargingParticleTexture = worldTextureFactory.fromCanvas(createSquirtleChargingParticleCanvas());
   session.squirtleWaterSprayTexture = worldTextureFactory.fromCanvas(createSquirtleWaterSprayCanvas());
   session.squirtleWaterGunQueue = [];
   session.natureRevivalEffects = createNatureRevivalEffectState();
@@ -736,7 +840,7 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     originPosition: null,
     landingPosition: null,
     position: null,
-    repairPosition: [...BULBASAUR_REPAIR_MODULE_POSITION],
+    repairPosition: [...BULBASAUR_REVEAL_POSITION],
     repairBoxPosition: [...BULBASAUR_REPAIR_BOX_POSITION],
     repairModuleInstance: createRobotRepairModuleInstance(
       "bulbasaur-dismantled-module",

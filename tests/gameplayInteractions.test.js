@@ -1695,6 +1695,66 @@ describe("createGameplayInteractions", () => {
     expect(pushNotice).toHaveBeenCalledWith("+1 Leppa Berry");
   });
 
+  it("starts the revived tree dialogue when the tree can talk", () => {
+    const startDialogue = vi.fn(() => true);
+    const interactions = createInteractions({
+      startDialogue,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "leppaBerryTree",
+          id: "leppaTree",
+          label: "Pick Leppa Berry"
+        },
+        distance: 1.2
+      }))
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        squirtleLeppaRequestAvailable: true,
+        leppaTreeRevived: true
+      }
+    };
+    const leppaTree = {
+      position: [1, 0.02, 1],
+      revived: true,
+      berryDropped: false
+    };
+    const inventory = {};
+    const leppaBerryDrops = [];
+    const onNpcInteractionStart = vi.fn();
+
+    const result = interactions.performInteractAction({
+      playerPosition: [1.2, 0, 1.2],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory,
+      leppaTree,
+      leppaBerryDrops,
+      onNpcInteractionStart
+    });
+
+    expect(result).toBe(true);
+    expect(inventory.leppaBerry).toBe(1);
+    expect(storyState.flags.leppaBerryDropped).toBe(true);
+    expect(storyState.flags.leppaBerryCollected).toBe(true);
+    expect(leppaBerryDrops).toHaveLength(1);
+    expect(leppaBerryDrops[0].collected).toBe(true);
+    expect(startDialogue).toHaveBeenCalledWith({
+      targetId: "leppaTree",
+      dialogueId: "revivedTree",
+      onComplete: expect.any(Function)
+    });
+    expect(onNpcInteractionStart).toHaveBeenCalledWith({
+      targetId: "leppaTree",
+      playerPosition: [1.2, 0, 1.2],
+      npcActors: [],
+      interactables: [],
+      targetPosition: leppaTree.position
+    });
+  });
+
   it("starts Chopper's log chair gift dialogue when the request is available", () => {
     let onComplete = null;
     const startDialogue = vi.fn(({ onComplete: nextOnComplete }) => {

@@ -321,6 +321,41 @@ describe("createGameInputController", () => {
     expect(inspectBag).not.toHaveBeenCalled();
   });
 
+  it("routes D-pad left and right to the open Pokedesk pages", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const handleKeydown = vi.fn(() => true);
+    const { controller, requestMoveCycle } = createController({
+      windowRef,
+      isPokedexOpen: () => true,
+      pokedexEntry: {
+        handleKeydown
+      }
+    });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.DPAD_LEFT] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+    gamepad.buttons[GAMEPAD_BUTTONS.DPAD_LEFT] = { pressed: false, value: 0 };
+    controller.updateGamepads(1 / 60);
+    gamepad.buttons[GAMEPAD_BUTTONS.DPAD_RIGHT] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+
+    expect(handleKeydown).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      code: "ArrowLeft",
+      key: "ArrowLeft"
+    }));
+    expect(handleKeydown).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      code: "ArrowRight",
+      key: "ArrowRight"
+    }));
+    expect(requestMoveCycle).not.toHaveBeenCalled();
+  });
+
   it("requests primary harvest from the left trigger", () => {
     const gamepad = createGamepad();
     const windowRef = {

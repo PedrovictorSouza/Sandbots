@@ -68,7 +68,6 @@ function createOverlayRoot() {
       <section data-pokedex-page-panel="requests"></section>
       <div data-pokedex-art-scene="squirtle"></div>
       <div data-pokedex-art-scene="bulbasaur" hidden></div>
-      <div data-pokedex-art-scene="flower-bed" hidden></div>
       <div data-pokedex-art-scene="tall-grass" hidden></div>
       <div data-pokedex-art-scene="timburr" hidden></div>
     </article>
@@ -92,7 +91,7 @@ describe("createPokedexOverlay", () => {
     expect(root.querySelector('[data-pokedex-field="drawer-label"]')?.textContent).toBe("Grass");
     expect(root.querySelector('[data-pokedex-field="drawer-count"]')?.textContent).toBe("x2");
     expect(root.querySelector('[data-pokedex-art-scene="squirtle"]')?.hidden).toBe(true);
-    expect(root.querySelector('[data-pokedex-art-scene="flower-bed"]')?.hidden).toBe(false);
+    expect(root.querySelector('[data-pokedex-art-scene="tall-grass"]')?.hidden).toBe(true);
   });
 
   it("switches to the tall grass entry when that discovery is unlocked", () => {
@@ -108,7 +107,7 @@ describe("createPokedexOverlay", () => {
     expect(root.querySelector('[data-pokedex-field="description"]')?.innerHTML).toContain("Four tufts of tall grass");
     expect(root.querySelector(".pokedex-entry")?.dataset.pokedexDrawer).toBe("hidden");
     expect(root.querySelector('[data-pokedex-art-scene="tall-grass"]')?.hidden).toBe(false);
-    expect(root.querySelector('[data-pokedex-art-scene="flower-bed"]')?.hidden).toBe(true);
+    expect(root.querySelector('[data-pokedex-art-scene="squirtle"]')?.hidden).toBe(true);
   });
 
   it("switches to the Bulbasaur entry when that encounter is unlocked", () => {

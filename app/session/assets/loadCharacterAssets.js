@@ -12,12 +12,16 @@ const PLAYER_MODEL_TEXTURE_PATH = new URL("../../characters/player/player.png", 
 const ROBOT_2_MODEL_GLTF_PATH = new URL("../../characters/Robot-2/robot-2.gltf", import.meta.url).href;
 const ROBOT_2_MODEL_BIN_PATH = new URL("../../characters/Robot-2/robot-2.bin", import.meta.url).href;
 const ROBOT_2_MODEL_TEXTURE_PATH = new URL("../../characters/Robot-2/robot-2.png", import.meta.url).href;
+const BEE_MODEL_GLTF_PATH = new URL("../../characters/bee/bee.gltf", import.meta.url).href;
+const BEE_MODEL_BIN_PATH = new URL("../../characters/bee/bee.bin", import.meta.url).href;
+const BEE_MODEL_TEXTURE_PATH = new URL("../../characters/bee/bee.png", import.meta.url).href;
 
 export async function loadCharacterAssets({ gl, setStatus }) {
   const [
     chopperAssets,
     robot1Model,
     robot2Model,
+    beeModel,
     gameplayOpeningShipModel,
     playerModel,
     billImage,
@@ -37,6 +41,14 @@ export async function loadCharacterAssets({ gl, setStatus }) {
       gltfPath: ROBOT_2_MODEL_GLTF_PATH,
       binPath: ROBOT_2_MODEL_BIN_PATH,
       texturePath: ROBOT_2_MODEL_TEXTURE_PATH,
+      normalizedSize: 1.65,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: BEE_MODEL_GLTF_PATH,
+      binPath: BEE_MODEL_BIN_PATH,
+      texturePath: BEE_MODEL_TEXTURE_PATH,
       normalizedSize: 1.65,
       onStatus: setStatus
     }),
@@ -67,6 +79,7 @@ export async function loadCharacterAssets({ gl, setStatus }) {
     ...chopperAssets,
     robot1Model,
     robot2Model,
+    beeModel,
     gameplayOpeningShipModel,
     playerModel,
     billImage,

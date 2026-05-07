@@ -12,13 +12,45 @@ import {
   findNearbyLeafDen,
   findNearbyLogChair,
   findNearbyLeppaTree,
+  getLeppaTreeSurroundingGroundCells,
   reviveLeppaTreeFromWateredTiles,
   updateBulbasaurStrawBedChallengeCompletion,
   waterNearbyPalm
 } from "../world/islandWorld.js";
-import { LEPPA_BERRY_ITEM_ID } from "../gameplayContent.js";
+import {
+  LEPPA_BERRY_ITEM_ID,
+  WORKBENCH_INTERACT_DISTANCE,
+  WORKBENCH_POSITION
+} from "../gameplayContent.js";
 
 describe("findNearbyInteractable", () => {
+  it("detects the Workbench from outside its solid collider footprint", () => {
+    const result = findNearbyInteractable(
+      [WORKBENCH_POSITION[0] + 4.6, 0, WORKBENCH_POSITION[2]],
+      [],
+      [
+        {
+          id: "workbench",
+          label: "Workbench",
+          type: "station",
+          position: [...WORKBENCH_POSITION],
+          interactDistance: WORKBENCH_INTERACT_DISTANCE,
+          activeWhen: () => true
+        }
+      ],
+      { flags: {} }
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "station",
+        id: "workbench",
+        label: "Workbench"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
   it("detects an active rustling grass encounter", () => {
     const result = findNearbyInteractable(
       [8.1, 0, -3.9],
@@ -514,6 +546,30 @@ describe("findNearbyInteractable", () => {
     });
   });
 
+  it("finds dry tiles around the Leppa tree for mission guidance", () => {
+    const leppaTree = {
+      position: [2, 0.02, 2]
+    };
+    const eastTile = { id: "east", offset: [3.4, 0, 2], tileSpan: 1.425 };
+    const westTile = { id: "west", offset: [0.6, 0, 2], tileSpan: 1.425 };
+    const centerTile = { id: "center", offset: [2, 0, 2], tileSpan: 1.425 };
+    const farTile = { id: "far", offset: [6, 0, 2], tileSpan: 1.425 };
+    const inactiveTile = {
+      id: "inactive",
+      offset: [2, 0, 3.4],
+      tileSpan: 1.425,
+      active: false
+    };
+
+    expect(getLeppaTreeSurroundingGroundCells(leppaTree, [
+      eastTile,
+      westTile,
+      centerTile,
+      farTile,
+      inactiveTile
+    ])).toEqual([eastTile, westTile]);
+  });
+
   it("drops and collects the Leppa Berry", () => {
     const storyState = { flags: {} };
     const leppaTree = {
@@ -707,7 +763,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "logChairSeat",
         id: "logChair",
-        label: "Sit on Log Chair"
+        label: "Save Game"
       },
       distance: expect.any(Number)
     });
@@ -733,7 +789,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "logChairSeat",
         id: "logChair",
-        label: "Sit on Log Chair"
+        label: "Save Game"
       },
       distance: expect.any(Number)
     });

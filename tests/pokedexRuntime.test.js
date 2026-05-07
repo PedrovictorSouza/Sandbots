@@ -37,7 +37,7 @@ function createRuntime(overrides = {}) {
 }
 
 describe("createPokedexRuntime", () => {
-  it("keeps the overlay locked until the Pokedex is unlocked", () => {
+  it("keeps the Pokedex screen hidden even after unlock", () => {
     const { alertButton, calls, clearGameFlowInput, runtime } = createRuntime();
 
     runtime.setOpen(true, {
@@ -53,36 +53,28 @@ describe("createPokedexRuntime", () => {
       entryId: "squirtle"
     });
 
-    expect(runtime.state.open).toBe(true);
+    expect(runtime.state.open).toBe(false);
     expect(runtime.state.seen).toBe(true);
-    expect(alertButton.hidden).toBe(false);
+    expect(alertButton.hidden).toBe(true);
     expect(alertButton.dataset.pulse).toBe("false");
     expect(clearGameFlowInput).toHaveBeenCalledTimes(1);
-    expect(calls[0]).toEqual({
-      methodName: "setOpen",
-      args: [
-        true,
-        {
-          page: "details",
-          entryId: "squirtle"
-        }
-      ]
-    });
+    expect(calls).toHaveLength(0);
   });
 
-  it("opens from the alert button after unlock", () => {
+  it("keeps the alert button disabled after unlock", () => {
     const { alertButton, runtime } = createRuntime();
 
     runtime.unlock();
     runtime.setSeen(false);
     alertButton.click();
 
-    expect(runtime.state.open).toBe(true);
+    expect(runtime.state.open).toBe(false);
     expect(runtime.state.seen).toBe(true);
+    expect(alertButton.hidden).toBe(true);
     expect(alertButton.dataset.pulse).toBe("false");
   });
 
-  it("resumes scripted tutorial flow after a scripted close", () => {
+  it("resumes scripted tutorial flow without opening the disabled screen", async () => {
     const onScriptedClose = vi.fn();
     const { calls, runtime } = createRuntime({
       onScriptedClose
@@ -92,19 +84,11 @@ describe("createPokedexRuntime", () => {
       force: true,
       scripted: true
     });
-    runtime.closeFromUser();
+    await Promise.resolve();
 
     expect(runtime.state.open).toBe(false);
     expect(runtime.state.scripted).toBe(false);
     expect(onScriptedClose).toHaveBeenCalledTimes(1);
-    expect(calls.at(-1)).toEqual({
-      methodName: "setOpen",
-      args: [
-        false,
-        {
-          preservePage: true
-        }
-      ]
-    });
+    expect(calls).toHaveLength(0);
   });
 });

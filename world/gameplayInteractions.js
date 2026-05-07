@@ -24,6 +24,7 @@ const LEAFAGE_TALL_GRASS_HABITAT_COUNT = 4;
 const LEAFAGE_TALL_GRASS_GROUP_ID = "leafage-tall-grass-habitat-0";
 const BOULDER_SHADED_TALL_GRASS_GROUP_ID = "boulder-shaded-tall-grass-habitat-0";
 const LEAFAGE_GROUND_CELL_INTERACT_RADIUS_FACTOR = 0.82;
+const LEPPA_TREE_WATER_HINT_DISTANCE = 2.85;
 const POKEMON_FOLLOW_FLAGS = Object.freeze({
   squirtle: "squirtleFollowing",
   bulbasaur: "bulbasaurFollowing",
@@ -89,6 +90,7 @@ export function createGameplayInteractions({
   onGroundItemCollected = () => {},
   onNaturePatchRevived = () => {},
   onLeppaTreeRevived = () => {},
+  onLeppaTreeWaterHintRequested = () => {},
   onTallGrassHabitatRestored = () => {},
   onFlowerHabitatRestored = () => {},
   getActiveQuest,
@@ -142,6 +144,25 @@ export function createGameplayInteractions({
           "No target in range. Move closer to clear ground, then press Enter to use Leafage." :
         "No resource in range. Move closer to a tree or drop, then press Enter."
     );
+  }
+
+  function isLeppaTreeWaterHintAvailable(playerPosition, leppaTree, storyState) {
+    if (
+      !Array.isArray(playerPosition) ||
+      !Array.isArray(leppaTree?.position) ||
+      !storyState?.flags?.squirtleLeppaRequestAvailable ||
+      storyState.flags.leppaTreeRevived ||
+      storyState.flags.leppaBerryGiftComplete
+    ) {
+      return false;
+    }
+
+    const distance = Math.hypot(
+      playerPosition[0] - leppaTree.position[0],
+      playerPosition[2] - leppaTree.position[2]
+    );
+
+    return distance <= LEPPA_TREE_WATER_HINT_DISTANCE;
   }
 
   function getRestoredPatchHabitat(revivedPatch, patches) {
@@ -1160,6 +1181,10 @@ export function createGameplayInteractions({
         return charmanderEncounter?.position || null;
       }
 
+      if (target.kind === "leppaBerryTree") {
+        return leppaTree?.position || null;
+      }
+
       return null;
     };
 
@@ -1193,6 +1218,14 @@ export function createGameplayInteractions({
       bulbasaurEncounter
     );
     if (!nearbyTarget?.target) {
+      if (isLeppaTreeWaterHintAvailable(playerPosition, leppaTree, storyState)) {
+        missedInteractAttempts = 0;
+        onLeppaTreeWaterHintRequested({
+          leppaTree
+        });
+        return true;
+      }
+
       pushMissedInteractNotice();
       return false;
     }
@@ -1281,24 +1314,38 @@ export function createGameplayInteractions({
     }
 
     if (target.kind === "leppaBerryTree") {
+      notifyInteractionStart(target);
+
       const drop = dropLeppaBerryFromTree(leppaTree, leppaBerryDrops, storyState);
+      if (drop) {
+        const collected = collectLeppaBerryDrops(
+          drop.position,
+          leppaBerryDrops,
+          inventory,
+          storyState
+        );
+
+        if (collected > 0) {
+          syncInventoryUi(inventory);
+          pushNotice(`+${collected} Leppa Berry`);
+        } else {
+          pushNotice("A Leppa Berry fell from the tree.");
+        }
+      }
+
+      const opened = startDialogue?.({
+        targetId: "leppaTree",
+        dialogueId: "revivedTree",
+        onComplete: () => {}
+      });
+
+      if (opened) {
+        return true;
+      }
+
       if (!drop) {
         pushNotice("The tree has already dropped its Leppa Berry.");
         return false;
-      }
-
-      const collected = collectLeppaBerryDrops(
-        drop.position,
-        leppaBerryDrops,
-        inventory,
-        storyState
-      );
-
-      if (collected > 0) {
-        syncInventoryUi(inventory);
-        pushNotice(`+${collected} Leppa Berry`);
-      } else {
-        pushNotice("A Leppa Berry fell from the tree.");
       }
 
       return true;

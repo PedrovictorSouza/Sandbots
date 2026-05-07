@@ -89,10 +89,13 @@ export function createWorldSpeechController({ mount } = {}) {
   }
 
   function showTaskPop({ text, worldPosition, anchorHeight = 2.68 } = {}) {
+    const message = text || "";
     state.taskPopActive = true;
     state.taskPopAnchorHeight = anchorHeight;
     state.taskPopWorldPosition = worldPosition ? [...worldPosition] : [0, 0, 0];
-    taskPop.bubble.textContent = text || "";
+    taskPop.bubble.textContent = message;
+    taskPop.speech.dataset.taskPopSize =
+      message === "YOU TOOK YOUR FIRST STEPS!" ? "large" : "default";
     taskPop.speech.hidden = false;
     layer.hidden = false;
 

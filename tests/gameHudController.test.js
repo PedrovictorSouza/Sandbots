@@ -103,27 +103,26 @@ describe("createGameHudController", () => {
     });
 
     const slots = [...inventoryGridElement.querySelectorAll(".inventory-slot[data-filled='true']")];
-    expect(slots.map((slot) => slot.querySelector(".inventory-slot__label")?.textContent)).toEqual([
-      "Fire",
-      "Wood",
-      "Leppa",
-      "Totem"
-    ]);
-    expect(slots.map((slot) => slot.querySelector(".inventory-slot__role")?.textContent)).toEqual([
-      "Place",
-      "Mat",
-      "Gift",
-      "Key"
-    ]);
+    expect(inventoryGridElement.querySelector(".inventory-slot__label")).toBeNull();
+    expect(inventoryGridElement.querySelector(".inventory-slot__role")).toBeNull();
+
+    const woodSlot = slots.find((slot) => {
+      return slot.dataset.slotRole === "material";
+    });
+
+    expect(woodSlot?.dataset.iconKind).toBe("image");
+    expect(woodSlot?.querySelector(".inventory-slot__image")?.getAttribute("src")).toContain("Objects/wood.png");
   });
 
   it("shows the companion robot for the selected field move beside supplies", () => {
+    const uiLayerElement = document.createElement("div");
     const inventoryPanelElement = document.createElement("div");
     inventoryPanelElement.className = "inventory";
     const inventoryTitleElement = document.createElement("strong");
     inventoryTitleElement.textContent = "Supplies";
     const inventoryGridElement = document.createElement("div");
     inventoryPanelElement.append(inventoryTitleElement, inventoryGridElement);
+    uiLayerElement.append(inventoryPanelElement);
     const skillsPanelElement = document.createElement("div");
     const skillsGridElement = document.createElement("div");
     const hudInstructionsElement = document.createElement("span");
@@ -160,10 +159,22 @@ describe("createGameHudController", () => {
       flags: {}
     });
 
-    const companionHudElement = inventoryPanelElement.querySelector(".active-companion-hud");
+    const companionHudElement = uiLayerElement.querySelector(".active-companion-hud");
     expect(inventoryPanelElement.querySelector(".inventory-header strong")?.textContent).toBe("Supplies");
+    expect(inventoryPanelElement.querySelector(".active-companion-hud")).toBeNull();
+    expect(companionHudElement?.parentElement).toBe(uiLayerElement);
     expect(companionHudElement?.hidden).toBe(false);
     expect(companionHudElement?.dataset.companionId).toBe("squirtle");
+    expect(
+      companionHudElement
+        ?.querySelector(".active-companion-hud__portrait--primary .active-companion-hud__portrait-image")
+        ?.getAttribute("src")
+    ).toContain("Robot-1-thumb.png");
+    expect(
+      companionHudElement
+        ?.querySelector(".active-companion-hud__portrait--secondary .active-companion-hud__portrait-image")
+        ?.getAttribute("src")
+    ).toContain("Robot-2-thumb.png");
     expect(companionHudElement?.textContent).toContain("Water");
     expect(companionHudElement?.textContent).toContain("Squirtle");
     expect(companionHudElement?.textContent).toContain("mark dry ground");
@@ -175,13 +186,23 @@ describe("createGameHudController", () => {
     });
 
     expect(companionHudElement?.textContent).not.toContain("Squirtle will move over and restore it");
-    expect(companionHudElement?.textContent).toContain("mark dry ground for Squirtle to restore");
+    expect(companionHudElement?.textContent).toContain("USE LT TO MARK THE GROUND");
 
     controller.syncSkillsUi(unlockedSkills, "leafage", {
       flags: {}
     });
 
     expect(companionHudElement?.dataset.companionId).toBe("bulbasaur");
+    expect(
+      companionHudElement
+        ?.querySelector(".active-companion-hud__portrait--primary .active-companion-hud__portrait-image")
+        ?.getAttribute("src")
+    ).toContain("Robot-2-thumb.png");
+    expect(
+      companionHudElement
+        ?.querySelector(".active-companion-hud__portrait--secondary .active-companion-hud__portrait-image")
+        ?.getAttribute("src")
+    ).toContain("Robot-1-thumb.png");
     expect(companionHudElement?.textContent).toContain("Leaf");
     expect(companionHudElement?.textContent).toContain("Bulbasaur");
     expect(companionHudElement?.textContent).toContain("restored ground");

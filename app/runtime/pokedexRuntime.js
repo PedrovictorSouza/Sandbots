@@ -1,3 +1,5 @@
+const POKEDEX_OVERLAY_ENABLED = false;
+
 export function createPokedexRuntime({
   createLazyUiModule,
   root,
@@ -16,7 +18,7 @@ export function createPokedexRuntime({
   };
   let runtime = null;
 
-  const entryModule = createLazyUiModule(async () => {
+  const entryModule = POKEDEX_OVERLAY_ENABLED ? createLazyUiModule(async () => {
     const { createPokedexOverlay } = await loadPokedexOverlay();
     return createPokedexOverlay({
       root,
@@ -24,18 +26,30 @@ export function createPokedexRuntime({
         runtime?.closeFromUser();
       }
     });
-  });
+  }) : null;
 
   const entry = {
     preload() {
+      if (!POKEDEX_OVERLAY_ENABLED) {
+        return Promise.resolve(null);
+      }
+
       return entryModule.preload();
     },
     setOpen(open, options) {
+      if (!POKEDEX_OVERLAY_ENABLED) {
+        return Promise.resolve(false);
+      }
+
       return entryModule.invoke("setOpen", [open, options], {
         replayIfUnloaded: true
       });
     },
     handleKeydown(event) {
+      if (!POKEDEX_OVERLAY_ENABLED) {
+        return false;
+      }
+
       return entryModule.invoke("handleKeydown", [event], {
         defaultValue: false
       });
@@ -43,6 +57,19 @@ export function createPokedexRuntime({
   };
 
   function syncUi() {
+    if (!POKEDEX_OVERLAY_ENABLED) {
+      state.open = false;
+      state.scripted = false;
+      if (root) {
+        root.hidden = true;
+      }
+      if (alertButton) {
+        alertButton.hidden = true;
+        alertButton.dataset.pulse = "false";
+      }
+      return;
+    }
+
     if (alertButton) {
       alertButton.hidden = !state.unlocked;
       alertButton.dataset.pulse = state.unlocked && !state.seen ? "true" : "false";
@@ -61,6 +88,20 @@ export function createPokedexRuntime({
     } = {}
   ) {
     if (open && !state.unlocked && !force) {
+      return;
+    }
+
+    if (!POKEDEX_OVERLAY_ENABLED) {
+      state.open = false;
+      state.scripted = false;
+      if (open && markSeen) {
+        state.seen = true;
+      }
+      clearGameFlowInput();
+      syncUi();
+      if (open && scripted) {
+        queueMicrotask(onScriptedClose);
+      }
       return;
     }
 

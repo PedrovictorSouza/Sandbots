@@ -1,9 +1,6 @@
 import { createFrameSnapshotController } from "./frameSnapshotController.js";
 import { createCameraZoomPresetController } from "./cameraZoomPresetController.js";
-import {
-  getPlayerDustBillboards,
-  updatePlayerDustParticles
-} from "../session/playerDustParticles.js";
+import { updatePlayerDustParticles } from "../session/playerDustParticles.js";
 import {
   getNatureRevivalBillboards,
   getNatureRevivalScale,
@@ -15,6 +12,8 @@ import { updateChopperNpcActor } from "../session/chopperNpcActor.js";
 import { createGameplayCameraDirector } from "./gameplayCameraDirector.js";
 import {
   appendGameplayOpeningShipBillboards,
+  consumeGameplayOpeningShipEvents,
+  GAMEPLAY_OPENING_SHIP_EVENTS,
   getGameplayOpeningShipSceneObjects
 } from "../session/gameplayOpeningShip.js";
 import {
@@ -22,12 +21,19 @@ import {
   WORKBENCH_INTERACT_DISTANCE,
   WORKBENCH_POSITION
 } from "../../gameplayContent.js";
+import { getLeppaTreeSurroundingGroundCells } from "../../world/islandWorld.js";
 import {
   BULBASAUR_IDLE_PATROL_RADIUS,
   SQUIRTLE_IDLE_PATROL_RADIUS
 } from "./robotPatrolConfig.js";
 import { resolveTransientNoticeRoute } from "./contextualPromptNotice.js";
 
+const WATER_DROP_SFX_URL = new URL("../soundFx/water-drop..mp3", import.meta.url).href;
+const PLAYER_DRIVING_SFX_URL = new URL("../soundFx/driving.mp3", import.meta.url).href;
+const SHIP_IMPACT_SFX_URL = new URL("../soundFx/impact.mp3", import.meta.url).href;
+const SHIP_FALL_SFX_URL = new URL("../soundFx/cartoon-fall.mp3", import.meta.url).href;
+const WOOD_GRAB_SFX_URL = new URL("../soundFx/grab.mp3", import.meta.url).href;
+const INSTANCE_OBJECT_SFX_URL = new URL("../soundFx/instance-object.mp3", import.meta.url).href;
 const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 1500;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
@@ -38,6 +44,13 @@ const BULBASAUR_WORKBENCH_GUIDE_RAMP_APPROACH_MARGIN = 0.92;
 const BULBASAUR_WORKBENCH_GUIDE_SIDE_APPROACH_MARGIN = 1.22;
 const BEE_FIELD_FLOWER_GROUP_ID = "water-gun-flower-field-0";
 const BEE_FIELD_REPAIR_BOX_LOCKED_ALPHA = 0.5;
+const BEE_FIELD_BEE_COUNT = 10;
+const BEE_FIELD_BEE_SCALE = 0.15;
+const BEE_FIELD_BEE_PATROL_RADIUS_X = 5.8;
+const BEE_FIELD_BEE_PATROL_RADIUS_Z = 4.3;
+const BEE_FIELD_BEE_BASE_HEIGHT = 1.04;
+const BEE_FIELD_BEE_BOB_HEIGHT = 0.22;
+const BEE_MODEL_FACE_YAW_OFFSET = Math.PI;
 const CHARMANDER_FOLLOW_SPEED = 2.65;
 const CHARMANDER_FOLLOW_DISTANCE = 1.28;
 const CHARMANDER_CAMPFIRE_LIGHT_DISTANCE = 1.9;
@@ -54,7 +67,37 @@ const SQUIRTLE_WATER_GUN_ARRIVE_DISTANCE = 0.08;
 const SQUIRTLE_WATER_GUN_SPRAY_DURATION = 0.82;
 const SQUIRTLE_WATER_GUN_IMPACT_TIME = 0.34;
 const SQUIRTLE_WATER_GUN_ARC_HEIGHT = 0.86;
-const SQUIRTLE_WATER_GUN_PARTICLE_COUNT = 9;
+const SQUIRTLE_WATER_GUN_PARTICLE_COUNT = 24;
+const SQUIRTLE_WATER_GUN_STREAM_LANE_COUNT = 5;
+const SQUIRTLE_WATER_GUN_STREAM_WIDTH = 0.05;
+const SQUIRTLE_WATER_GUN_SPLASH_PARTICLE_COUNT = 18;
+const SQUIRTLE_WATER_GUN_SPLASH_DURATION = 0.52;
+const SQUIRTLE_WATER_GUN_SPLASH_RADIUS = 0.86;
+const SQUIRTLE_WATER_GUN_SFX_INTERVAL = 0.3;
+const SQUIRTLE_WATER_GUN_SFX_VOLUME = 0.58;
+const SQUIRTLE_WATER_GUN_USE_COUNT_FLAG = "squirtleWaterGunUseCount";
+const SQUIRTLE_WATER_GUN_EVOLUTION_MAX_USES = 24;
+const SQUIRTLE_WATER_GUN_MAX_SPEED_MULTIPLIER = 1.7;
+const SQUIRTLE_WATER_GUN_MIN_SPRAY_DURATION = 0.46;
+const SQUIRTLE_WATER_GUN_MIN_IMPACT_TIME = 0.18;
+const PLAYER_DRIVING_SFX_VOLUME = 0.48;
+const SHIP_IMPACT_SFX_VOLUME = 0.74;
+const SHIP_FALL_SFX_VOLUME = 0.5;
+const WOOD_GRAB_SFX_VOLUME = 0.68;
+const INSTANCE_OBJECT_SFX_VOLUME = 0.66;
+const WOOD_COLLECT_POP_DURATION = 0.34;
+const WOOD_COLLECT_POP_LIFT = 0.24;
+const WOOD_COLLECT_POP_SCALE = 1.65;
+const SQUIRTLE_WATER_STAMINA_MAX = 3;
+const SQUIRTLE_WATER_STAMINA_COST = 1;
+const SQUIRTLE_WATER_STAMINA_RECHARGE_DURATION = 3.2;
+const SQUIRTLE_WATER_STAMINA_BAR_WIDTH = 1.72;
+const SQUIRTLE_WATER_STAMINA_BAR_HEIGHT = 0.2;
+const SQUIRTLE_WATER_STAMINA_VISUAL_DECREASE_DURATION = 0.28;
+const SQUIRTLE_WATER_STAMINA_VISUAL_INCREASE_DURATION = 0.16;
+const SQUIRTLE_CHARGING_PARTICLE_COUNT = 14;
+const SQUIRTLE_CHARGING_PARTICLE_RADIUS = 0.72;
+const SQUIRTLE_CHARGING_PARTICLE_DURATION = 1.15;
 const WATER_GUN_FIRST_USE_PROMPT_FLAG = "waterGunFirstUsePromptDismissed";
 const WATER_GUN_FIRST_USE_PROMPT_TEXT = "Press LT to use Squirtle";
 const SQUIRTLE_REASSEMBLY_PART_SCALE = 0.5;
@@ -90,6 +133,8 @@ const PLAYER_MODEL_TURN_SPEED = 14;
 const GRASS_PLAYER_BEND_RADIUS = 0.92;
 const GRASS_PLAYER_BEND_OFFSET = 0.14;
 const GRASS_PLAYER_BEND_SWAY = 0.18;
+const GRASS_OBJECT_COLLISION_ALPHA = 0.5;
+const GRASS_OBJECT_COLLISION_BASE_RADIUS = 0.58;
 const FLOWER_ARRANGEMENT_OFFSETS = Object.freeze([
   [-0.34, -0.24, 0.82],
   [-0.16, 0.08, 0.66],
@@ -119,6 +164,10 @@ const LEPPA_TREE_MISSION_PARTICLE_COUNT = 9;
 const LEPPA_TREE_MISSION_PARTICLE_RADIUS = 0.72;
 const LEPPA_TREE_MISSION_PARTICLE_BASE_HEIGHT = 0.62;
 const LEPPA_TREE_MISSION_PARTICLE_HEIGHT = 1.64;
+const SAVE_POINT_STAR_PARTICLE_COUNT = 10;
+const SAVE_POINT_STAR_PARTICLE_RADIUS = 0.64;
+const SAVE_POINT_STAR_PARTICLE_HEIGHT = 1.18;
+const SAVE_POINT_STAR_PARTICLE_DURATION = 1.9;
 const FPS_PANEL_UPDATE_INTERVAL = 0.25;
 const CAMERA_DEBUG_ENABLED = (() => {
   try {
@@ -309,6 +358,14 @@ function lerp(start, end, progress) {
   return start + (end - start) * progress;
 }
 
+function moveValueToward(current, target, maxStep) {
+  if (Math.abs(target - current) <= maxStep) {
+    return target;
+  }
+
+  return current + Math.sign(target - current) * maxStep;
+}
+
 function isOpeningLeppaTreeRequestActive(storyState) {
   return Boolean(
     storyState?.flags?.squirtleLeppaRequestAvailable &&
@@ -328,6 +385,140 @@ function rotateAngleToward(fromAngle, toAngle, maxStep) {
   }
 
   return fromAngle + Math.sign(delta) * maxStep;
+}
+
+function createRepeatingSfxController({
+  src,
+  interval = SQUIRTLE_WATER_GUN_SFX_INTERVAL,
+  volume = SQUIRTLE_WATER_GUN_SFX_VOLUME
+} = {}) {
+  const audioPool = [];
+  let nextPlayAt = 0;
+
+  function createAudio() {
+    if (!src || typeof Audio !== "function") {
+      return null;
+    }
+
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.volume = volume;
+    return audio;
+  }
+
+  function getAudio() {
+    const availableAudio = audioPool.find((audio) => {
+      return audio.paused || audio.ended;
+    });
+
+    if (availableAudio) {
+      return availableAudio;
+    }
+
+    const audio = createAudio();
+    if (!audio) {
+      return null;
+    }
+
+    audioPool.push(audio);
+    return audio;
+  }
+
+  function playOnce() {
+    const audio = getAudio();
+    if (!audio) {
+      return;
+    }
+
+    audio.loop = false;
+    audio.volume = volume;
+
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // Some browser audio objects disallow seeking before metadata is ready.
+    }
+
+    const playResult = audio.play?.();
+    if (playResult?.catch) {
+      playResult.catch(() => {});
+    }
+  }
+
+  return {
+    update({ active, nowSeconds }) {
+      if (!active) {
+        nextPlayAt = 0;
+        return;
+      }
+
+      if (nowSeconds < nextPlayAt) {
+        return;
+      }
+
+      playOnce();
+      nextPlayAt = nowSeconds + interval;
+    }
+  };
+}
+
+function createLoopingSfxController({
+  src,
+  volume = PLAYER_DRIVING_SFX_VOLUME
+} = {}) {
+  let audio = null;
+  let activeLastFrame = false;
+
+  function getAudio() {
+    if (audio || !src || typeof Audio !== "function") {
+      return audio;
+    }
+
+    audio = new Audio(src);
+    audio.preload = "auto";
+    audio.loop = true;
+    audio.volume = volume;
+    return audio;
+  }
+
+  function play() {
+    const loopAudio = getAudio();
+    if (!loopAudio || activeLastFrame) {
+      return;
+    }
+
+    loopAudio.loop = true;
+    loopAudio.volume = volume;
+    const playResult = loopAudio.play?.();
+    if (playResult?.catch) {
+      playResult.catch(() => {});
+    }
+  }
+
+  function stop() {
+    if (!audio || !activeLastFrame) {
+      return;
+    }
+
+    audio.pause?.();
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // Some browser audio objects disallow seeking before metadata is ready.
+    }
+  }
+
+  return {
+    update({ active }) {
+      if (active) {
+        play();
+      } else {
+        stop();
+      }
+
+      activeLastFrame = Boolean(active);
+    }
+  };
 }
 
 export function startGameLoop({
@@ -379,9 +570,60 @@ export function startGameLoop({
     cameraOrbit
   });
   const fpsPanelController = createFpsPanelController(fpsPanel);
+  const waterGunSfxController = createRepeatingSfxController({
+    src: WATER_DROP_SFX_URL
+  });
+  const playerDrivingSfxController = createLoopingSfxController({
+    src: PLAYER_DRIVING_SFX_URL,
+    volume: PLAYER_DRIVING_SFX_VOLUME
+  });
+  const shipFallSfxController = createLoopingSfxController({
+    src: SHIP_FALL_SFX_URL,
+    volume: SHIP_FALL_SFX_VOLUME
+  });
+  const shipImpactSfxController = createRepeatingSfxController({
+    src: SHIP_IMPACT_SFX_URL,
+    interval: Number.POSITIVE_INFINITY,
+    volume: SHIP_IMPACT_SFX_VOLUME
+  });
+  const woodGrabSfxController = createRepeatingSfxController({
+    src: WOOD_GRAB_SFX_URL,
+    interval: 0,
+    volume: WOOD_GRAB_SFX_VOLUME
+  });
+  const instanceObjectSfxController = createRepeatingSfxController({
+    src: INSTANCE_OBJECT_SFX_URL,
+    interval: 0,
+    volume: INSTANCE_OBJECT_SFX_VOLUME
+  });
+  const woodCollectPopEffects = [];
   let repairBoxElapsed = 0;
+  let waterGunSfxBurstUntilSeconds = 0;
   let cameraDebugElement = null;
   const cameraDebugErrors = [];
+
+  function getRuntimeNowSeconds() {
+    const nowMs =
+      typeof performance !== "undefined" && typeof performance.now === "function" ?
+        performance.now() :
+        Date.now();
+    return nowMs * 0.001;
+  }
+
+  function playInstanceObjectSfx() {
+    instanceObjectSfxController.update({
+      active: true,
+      nowSeconds: getRuntimeNowSeconds()
+    });
+  }
+
+  function triggerWaterGunSfxBurst(duration = SQUIRTLE_WATER_GUN_SPRAY_DURATION) {
+    const nowSeconds = getRuntimeNowSeconds();
+    waterGunSfxBurstUntilSeconds = Math.max(
+      waterGunSfxBurstUntilSeconds,
+      nowSeconds + duration
+    );
+  }
 
   function restoreActiveZoomPresetOnMovement(playerPosition) {
     if (!Array.isArray(playerPosition) || !camera.isTargetTransitionActive()) {
@@ -473,6 +715,18 @@ export function startGameLoop({
       (offset[1] || 0) + 0.04,
       offset[2] || 0
     ];
+  }
+
+  function findGrassPatchForGroundCell(groundCell) {
+    if (!groundCell?.id || !Array.isArray(session.groundGrassPatches)) {
+      return null;
+    }
+
+    return session.groundGrassPatches.find((patch) => patch?.cellId === groundCell.id) || null;
+  }
+
+  function isAliveGrassPatchForGroundCell(groundCell) {
+    return findGrassPatchForGroundCell(groundCell)?.state === "alive";
   }
 
   function syncSquirtleModelInstance() {
@@ -616,6 +870,193 @@ export function startGameLoop({
     beeFieldRepairBox.alpha = unlocked ? 1 : BEE_FIELD_REPAIR_BOX_LOCKED_ALPHA;
     beeFieldRepairBox.tint = unlocked && !opened ? REPAIR_BOX_ACTIVE_TINT : null;
     beeFieldRepairBox.tintStrength = unlocked && !opened ? REPAIR_BOX_ACTIVE_TINT_STRENGTH : 0;
+  }
+
+  function getBeeFieldCenterPosition() {
+    const repairBox = session.beeFieldRepairBox;
+
+    if (Array.isArray(repairBox?.baseOffset)) {
+      return repairBox.baseOffset;
+    }
+
+    if (Array.isArray(repairBox?.offset)) {
+      return repairBox.offset;
+    }
+
+    const patches = (session.groundFlowerPatches || [])
+      .filter((patch) => {
+        return patch.habitatGroupId === BEE_FIELD_FLOWER_GROUP_ID &&
+          Array.isArray(patch.position);
+      });
+
+    if (patches.length === 0) {
+      return null;
+    }
+
+    const total = patches.reduce((sum, patch) => {
+      sum[0] += patch.position[0];
+      sum[1] += patch.position[1] || 0;
+      sum[2] += patch.position[2];
+      return sum;
+    }, [0, 0, 0]);
+
+    return [
+      total[0] / patches.length,
+      total[1] / patches.length,
+      total[2] / patches.length
+    ];
+  }
+
+  function createBeeFieldBeeInstance(index) {
+    return {
+      id: `bee-field-bee-${index}`,
+      offset: [0, 0, 0],
+      scale: BEE_FIELD_BEE_SCALE,
+      yaw: BEE_MODEL_FACE_YAW_OFFSET,
+      pitch: 0,
+      roll: 0,
+      active: true,
+      patrolAngle: (index / BEE_FIELD_BEE_COUNT) * Math.PI * 2,
+      patrolRadiusScale: 0.62 + (index % 5) * 0.09,
+      angularSpeed: 0.42 + (index % 4) * 0.055,
+      bobPhase: index * 1.71,
+      bobSpeed: 1.7 + (index % 3) * 0.18
+    };
+  }
+
+  function syncBeeFieldBees(deltaTime) {
+    if (!Array.isArray(session.beeInstances)) {
+      return;
+    }
+
+    const opened = Boolean(controls.storyState?.flags?.beeFieldRepairBoxOpened);
+    const center = getBeeFieldCenterPosition();
+
+    if (!opened || !session.beeModel || !center) {
+      session.beeInstances.length = 0;
+      return;
+    }
+
+    session.beePatrolState ||= { elapsed: 0 };
+    session.beePatrolState.elapsed += Math.max(0, Number(deltaTime) || 0);
+
+    while (session.beeInstances.length < BEE_FIELD_BEE_COUNT) {
+      session.beeInstances.push(createBeeFieldBeeInstance(session.beeInstances.length));
+    }
+
+    if (session.beeInstances.length > BEE_FIELD_BEE_COUNT) {
+      session.beeInstances.length = BEE_FIELD_BEE_COUNT;
+    }
+
+    const elapsed = session.beePatrolState.elapsed;
+
+    session.beeInstances.forEach((bee, index) => {
+      const angle = bee.patrolAngle + elapsed * bee.angularSpeed;
+      const radiusScale = bee.patrolRadiusScale || 1;
+      const wobble = Math.sin(elapsed * 1.3 + bee.bobPhase) * 0.28;
+      const x = center[0] + Math.cos(angle) * BEE_FIELD_BEE_PATROL_RADIUS_X * radiusScale +
+        Math.sin(angle * 2 + bee.bobPhase) * 0.26;
+      const z = center[2] + Math.sin(angle) * BEE_FIELD_BEE_PATROL_RADIUS_Z * radiusScale +
+        Math.cos(angle * 2 + bee.bobPhase) * 0.18;
+      const y = (center[1] || 0) + BEE_FIELD_BEE_BASE_HEIGHT +
+        Math.sin(elapsed * bee.bobSpeed + bee.bobPhase) * BEE_FIELD_BEE_BOB_HEIGHT;
+
+      bee.active = true;
+      bee.offset[0] = x;
+      bee.offset[1] = y;
+      bee.offset[2] = z;
+      bee.scale = BEE_FIELD_BEE_SCALE * (0.9 + (index % 3) * 0.06);
+      bee.yaw = angle + Math.PI * 0.5 + BEE_MODEL_FACE_YAW_OFFSET;
+      bee.pitch = Math.sin(elapsed * 1.8 + bee.bobPhase) * 0.04;
+      bee.roll = wobble * 0.08;
+    });
+  }
+
+  function appendGrassCollisionObject(objects, position, radius = GRASS_OBJECT_COLLISION_BASE_RADIUS) {
+    if (!Array.isArray(position) || position.length < 3) {
+      return;
+    }
+
+    const x = Number(position[0]);
+    const z = Number(position[2]);
+
+    if (!Number.isFinite(x) || !Number.isFinite(z)) {
+      return;
+    }
+
+    objects.push({
+      position,
+      radius
+    });
+  }
+
+  function getGrassCollisionObjects() {
+    const objects = [];
+
+    if (session.playerCharacter) {
+      appendGrassCollisionObject(objects, session.playerCharacter.getPosition?.(), 0.52);
+    }
+
+    appendGrassCollisionObject(objects, session.chopperNpcActor?.bodyInstance?.offset, 0.54);
+
+    if (session.actTwoSquirtle?.modelInstance?.active) {
+      appendGrassCollisionObject(
+        objects,
+        session.actTwoSquirtle.position || session.actTwoSquirtle.modelInstance.offset,
+        0.48
+      );
+    }
+
+    if (session.bulbasaurEncounter?.visible) {
+      appendGrassCollisionObject(
+        objects,
+        session.bulbasaurEncounter.position || session.bulbasaurEncounter.modelInstance?.offset,
+        0.66
+      );
+    }
+
+    if (session.charmanderEncounter?.visible) {
+      appendGrassCollisionObject(objects, session.charmanderEncounter.position, 0.54);
+    }
+
+    if (session.timburrEncounter?.visible) {
+      appendGrassCollisionObject(objects, session.timburrEncounter.position, 0.56);
+    }
+
+    for (const repairModuleInstance of session.robotRepairModuleInstances || []) {
+      if (repairModuleInstance?.active !== false) {
+        appendGrassCollisionObject(
+          objects,
+          repairModuleInstance.baseOffset || repairModuleInstance.offset,
+          0.62
+        );
+      }
+    }
+
+    return objects;
+  }
+
+  function getGrassObjectCollisionAlpha(groundGrassPatch, objects) {
+    if (!Array.isArray(groundGrassPatch?.position) || !objects.length) {
+      return 1;
+    }
+
+    const patchRadius = Math.max(
+      groundGrassPatch.size?.[0] || TALL_GRASS_MIN_FOOTPRINT,
+      groundGrassPatch.size?.[1] || TALL_GRASS_MIN_FOOTPRINT
+    ) * 0.42;
+
+    for (const object of objects) {
+      const radius = patchRadius + object.radius;
+      const deltaX = groundGrassPatch.position[0] - object.position[0];
+      const deltaZ = groundGrassPatch.position[2] - object.position[2];
+
+      if (deltaX * deltaX + deltaZ * deltaZ <= radius * radius) {
+        return GRASS_OBJECT_COLLISION_ALPHA;
+      }
+    }
+
+    return 1;
   }
 
   function syncActiveRepairBoxHighlight() {
@@ -1171,7 +1612,8 @@ export function startGameLoop({
   }
 
   function applyBulbasaurLeafageImpact(action) {
-    return gameplay.performHarvestAction({
+    const hadGrassPatch = Boolean(findGrassPatchForGroundCell(action.groundCell));
+    const result = gameplay.performHarvestAction({
       playerPosition: action.approachPosition,
       palmModel: session.palmModel,
       palmInstances: session.palmInstances,
@@ -1193,6 +1635,12 @@ export function startGameLoop({
         distance: 0
       }
     });
+
+    if (result && !hadGrassPatch && findGrassPatchForGroundCell(action.groundCell)) {
+      playInstanceObjectSfx();
+    }
+
+    return result;
   }
 
   function updateBulbasaurLeafageAction(deltaTime) {
@@ -1265,6 +1713,136 @@ export function startGameLoop({
     return session.squirtleWaterGunQueue;
   }
 
+  function getSquirtleWaterGunUseCount() {
+    return Math.max(
+      0,
+      Math.floor(Number(controls.storyState?.flags?.[SQUIRTLE_WATER_GUN_USE_COUNT_FLAG] || 0))
+    );
+  }
+
+  function getSquirtleWaterGunSpeedMultiplier() {
+    const progress = clamp01(getSquirtleWaterGunUseCount() / SQUIRTLE_WATER_GUN_EVOLUTION_MAX_USES);
+    return 1 + (SQUIRTLE_WATER_GUN_MAX_SPEED_MULTIPLIER - 1) * progress;
+  }
+
+  function getSquirtleWaterGunSprayDuration(speedMultiplier = getSquirtleWaterGunSpeedMultiplier()) {
+    return Math.max(
+      SQUIRTLE_WATER_GUN_MIN_SPRAY_DURATION,
+      SQUIRTLE_WATER_GUN_SPRAY_DURATION / Math.max(1, speedMultiplier)
+    );
+  }
+
+  function getSquirtleWaterGunImpactTime(speedMultiplier = getSquirtleWaterGunSpeedMultiplier()) {
+    return Math.max(
+      SQUIRTLE_WATER_GUN_MIN_IMPACT_TIME,
+      SQUIRTLE_WATER_GUN_IMPACT_TIME / Math.max(1, speedMultiplier)
+    );
+  }
+
+  function recordSquirtleWaterGunUse() {
+    if (!controls.storyState) {
+      return;
+    }
+
+    controls.storyState.flags ||= {};
+    controls.storyState.flags[SQUIRTLE_WATER_GUN_USE_COUNT_FLAG] =
+      getSquirtleWaterGunUseCount() + 1;
+  }
+
+  function getSquirtleWaterStaminaState() {
+    if (!session.squirtleWaterStamina) {
+      session.squirtleWaterStamina = {
+        current: SQUIRTLE_WATER_STAMINA_MAX,
+        visualCurrent: SQUIRTLE_WATER_STAMINA_MAX,
+        max: SQUIRTLE_WATER_STAMINA_MAX,
+        charging: false,
+        chargeElapsed: 0
+      };
+    }
+
+    session.squirtleWaterStamina.max = SQUIRTLE_WATER_STAMINA_MAX;
+    session.squirtleWaterStamina.current = Math.min(
+      SQUIRTLE_WATER_STAMINA_MAX,
+      Math.max(0, Number(session.squirtleWaterStamina.current || 0))
+    );
+    session.squirtleWaterStamina.visualCurrent = Math.min(
+      SQUIRTLE_WATER_STAMINA_MAX,
+      Math.max(
+        0,
+        Number.isFinite(session.squirtleWaterStamina.visualCurrent) ?
+          session.squirtleWaterStamina.visualCurrent :
+          session.squirtleWaterStamina.current
+      )
+    );
+    return session.squirtleWaterStamina;
+  }
+
+  function isSquirtleWaterCharging() {
+    return Boolean(getSquirtleWaterStaminaState().charging);
+  }
+
+  function beginSquirtleWaterRecharge() {
+    const stamina = getSquirtleWaterStaminaState();
+    if (stamina.charging) {
+      return;
+    }
+
+    stamina.current = 0;
+    stamina.charging = true;
+    stamina.chargeElapsed = 0;
+  }
+
+  function consumeSquirtleWaterStamina() {
+    const stamina = getSquirtleWaterStaminaState();
+    if (stamina.charging || stamina.current <= 0) {
+      beginSquirtleWaterRecharge();
+      return false;
+    }
+
+    stamina.current = Math.max(0, stamina.current - SQUIRTLE_WATER_STAMINA_COST);
+    return true;
+  }
+
+  function consumeSquirtleWaterStaminaForInstantAction() {
+    if (!consumeSquirtleWaterStamina()) {
+      return false;
+    }
+
+    if (getSquirtleWaterStaminaState().current <= 0) {
+      beginSquirtleWaterRecharge();
+    }
+
+    return true;
+  }
+
+  function updateSquirtleWaterStamina(deltaTime) {
+    const stamina = getSquirtleWaterStaminaState();
+
+    if (stamina.charging) {
+      stamina.chargeElapsed += deltaTime;
+      const progress = clamp01(stamina.chargeElapsed / SQUIRTLE_WATER_STAMINA_RECHARGE_DURATION);
+      stamina.current = stamina.max * progress;
+
+      if (progress >= 1) {
+        stamina.current = stamina.max;
+        stamina.charging = false;
+        stamina.chargeElapsed = 0;
+        startNextQueuedSquirtleWaterGunAction();
+      }
+    }
+
+    const visualDuration =
+      stamina.current < stamina.visualCurrent ?
+        SQUIRTLE_WATER_STAMINA_VISUAL_DECREASE_DURATION :
+        SQUIRTLE_WATER_STAMINA_VISUAL_INCREASE_DURATION;
+    const maxVisualStep = (stamina.max * deltaTime) / Math.max(0.001, visualDuration);
+    stamina.visualCurrent = moveValueToward(
+      stamina.visualCurrent,
+      stamina.current,
+      maxVisualStep
+    );
+  }
+
   function isSquirtleWaterGunCellPending(groundCell) {
     if (!groundCell?.id) {
       return false;
@@ -1284,6 +1862,10 @@ export function startGameLoop({
       return "unavailable";
     }
 
+    if (isSquirtleWaterCharging()) {
+      return "charging";
+    }
+
     if (isSquirtleWaterGunCellPending(groundCell)) {
       return "duplicate";
     }
@@ -1301,6 +1883,12 @@ export function startGameLoop({
   function startSquirtleWaterGunAction({ groundCell, playerPosition }) {
     if (!groundCell) {
       return "unavailable";
+    }
+
+    const stamina = getSquirtleWaterStaminaState();
+    if (stamina.charging || stamina.current <= 0) {
+      beginSquirtleWaterRecharge();
+      return "charging";
     }
 
     if (session.squirtleWaterGunAction) {
@@ -1324,12 +1912,16 @@ export function startGameLoop({
       targetPosition,
       playerPosition
     );
+    const speedMultiplier = getSquirtleWaterGunSpeedMultiplier();
 
     session.squirtleWaterGunAction = {
       phase: "approach",
       groundCell,
       targetPosition,
       approachPosition,
+      speedMultiplier,
+      sprayDuration: getSquirtleWaterGunSprayDuration(speedMultiplier),
+      impactTime: getSquirtleWaterGunImpactTime(speedMultiplier),
       sprayElapsed: 0,
       impactApplied: false
     };
@@ -1342,6 +1934,16 @@ export function startGameLoop({
 
   function startNextQueuedSquirtleWaterGunAction() {
     if (session.squirtleWaterGunAction) {
+      return;
+    }
+
+    const stamina = getSquirtleWaterStaminaState();
+    if (stamina.charging) {
+      return;
+    }
+
+    if (stamina.current <= 0) {
+      beginSquirtleWaterRecharge();
       return;
     }
 
@@ -1387,7 +1989,10 @@ export function startGameLoop({
   }
 
   function applySquirtleWaterGunImpact(action) {
-    return gameplay.performHarvestAction({
+    const grassPatchWasDry =
+      Boolean(findGrassPatchForGroundCell(action.groundCell)) &&
+      !isAliveGrassPatchForGroundCell(action.groundCell);
+    const result = gameplay.performHarvestAction({
       playerPosition: action.approachPosition,
       palmModel: session.palmModel,
       palmInstances: session.palmInstances,
@@ -1410,6 +2015,16 @@ export function startGameLoop({
         distance: 0
       }
     });
+
+    if (result && grassPatchWasDry && isAliveGrassPatchForGroundCell(action.groundCell)) {
+      playInstanceObjectSfx();
+    }
+
+    if (result) {
+      recordSquirtleWaterGunUse();
+    }
+
+    return result;
   }
 
   function updateSquirtleWaterGunAction(deltaTime) {
@@ -1428,7 +2043,10 @@ export function startGameLoop({
       const deltaX = action.approachPosition[0] - squirtle.position[0];
       const deltaZ = action.approachPosition[2] - squirtle.position[2];
       const distance = Math.hypot(deltaX, deltaZ);
-      const travel = Math.min(SQUIRTLE_WATER_GUN_SPEED * deltaTime, distance);
+      const speedMultiplier = Number(action.speedMultiplier) > 0 ?
+        action.speedMultiplier :
+        getSquirtleWaterGunSpeedMultiplier();
+      const travel = Math.min(SQUIRTLE_WATER_GUN_SPEED * speedMultiplier * deltaTime, distance);
 
       if (distance > SQUIRTLE_WATER_GUN_ARRIVE_DISTANCE && travel > 0) {
         squirtle.position = [
@@ -1437,6 +2055,11 @@ export function startGameLoop({
           squirtle.position[2] + (deltaZ / distance) * travel
         ];
       } else {
+        if (!consumeSquirtleWaterStamina()) {
+          session.squirtleWaterGunAction = null;
+          return;
+        }
+
         squirtle.position = [...action.approachPosition];
         action.phase = "spray";
         action.sprayElapsed = 0;
@@ -1456,20 +2079,33 @@ export function startGameLoop({
     }
 
     action.sprayElapsed += deltaTime;
+    const speedMultiplier = Number(action.speedMultiplier) > 0 ?
+      action.speedMultiplier :
+      getSquirtleWaterGunSpeedMultiplier();
+    const impactTime = Number(action.impactTime) > 0 ?
+      action.impactTime :
+      getSquirtleWaterGunImpactTime(speedMultiplier);
+    const sprayDuration = Number(action.sprayDuration) > 0 ?
+      action.sprayDuration :
+      getSquirtleWaterGunSprayDuration(speedMultiplier);
     squirtle.modelInstance.yaw = getSquirtleModelYawToward(
       squirtle.position,
       action.targetPosition
     );
     syncSquirtleModelInstance();
 
-    if (!action.impactApplied && action.sprayElapsed >= SQUIRTLE_WATER_GUN_IMPACT_TIME) {
+    if (!action.impactApplied && action.sprayElapsed >= impactTime) {
       action.impactApplied = true;
       applySquirtleWaterGunImpact(action);
     }
 
-    if (action.sprayElapsed >= SQUIRTLE_WATER_GUN_SPRAY_DURATION) {
+    if (action.sprayElapsed >= sprayDuration) {
       session.squirtleWaterGunAction = null;
-      startNextQueuedSquirtleWaterGunAction();
+      if (getSquirtleWaterStaminaState().current <= 0) {
+        beginSquirtleWaterRecharge();
+      } else {
+        startNextQueuedSquirtleWaterGunAction();
+      }
     }
   }
 
@@ -1490,9 +2126,15 @@ export function startGameLoop({
       return [];
     }
 
+    const sprayDuration = Number(action.sprayDuration) > 0 ?
+      action.sprayDuration :
+      SQUIRTLE_WATER_GUN_SPRAY_DURATION;
+    const impactTime = Number(action.impactTime) > 0 ?
+      action.impactTime :
+      SQUIRTLE_WATER_GUN_IMPACT_TIME;
     const progress = Math.min(
       1,
-      Math.max(0, action.sprayElapsed / SQUIRTLE_WATER_GUN_SPRAY_DURATION)
+      Math.max(0, action.sprayElapsed / sprayDuration)
     );
     const mouthPosition = getSquirtleMouthPosition();
     const targetPosition = action.targetPosition;
@@ -1501,28 +2143,228 @@ export function startGameLoop({
     const streamLength = Math.hypot(streamDirectionX, streamDirectionZ) || 1;
     const sideX = -streamDirectionZ / streamLength;
     const sideZ = streamDirectionX / streamLength;
+    const forwardX = streamDirectionX / streamLength;
+    const forwardZ = streamDirectionZ / streamLength;
     const billboards = [];
 
     for (let index = 0; index < SQUIRTLE_WATER_GUN_PARTICLE_COUNT; index += 1) {
-      const pathProgress = (progress * 1.55 + index * 0.105) % 1;
-      const wobble = Math.sin(progress * 18 + index * 1.7) * 0.035;
-      const size = 0.095 + (index % 3) * 0.018;
+      const pathProgress = (progress * 1.72 + index * 0.047) % 1;
+      const lane = (index % SQUIRTLE_WATER_GUN_STREAM_LANE_COUNT) -
+        (SQUIRTLE_WATER_GUN_STREAM_LANE_COUNT - 1) * 0.5;
+      const impactStretch = clamp01((pathProgress - 0.74) / 0.26);
+      const wobble = Math.sin(progress * 22 + index * 1.7) * 0.045;
+      const laneOffset = lane * SQUIRTLE_WATER_GUN_STREAM_WIDTH;
+      const splashSide = (index % 2 === 0 ? -1 : 1) *
+        impactStretch *
+        (0.11 + (index % 4) * 0.035);
+      const splashForward = ((index % 5) - 2) * impactStretch * 0.035;
+      const baseSize = 0.14 + (index % 4) * 0.018;
+      const arcY = mouthPosition[1] +
+        (targetPosition[1] - mouthPosition[1]) * pathProgress +
+        Math.sin(pathProgress * Math.PI) * SQUIRTLE_WATER_GUN_ARC_HEIGHT;
+      const groundY = targetPosition[1] + 0.045 + (index % 2) * 0.012;
+      const y = lerp(arcY, groundY, impactStretch * impactStretch);
 
       billboards.push({
         texture,
         position: [
-          mouthPosition[0] + (targetPosition[0] - mouthPosition[0]) * pathProgress + sideX * wobble,
-          mouthPosition[1] +
-            (targetPosition[1] - mouthPosition[1]) * pathProgress +
-            Math.sin(pathProgress * Math.PI) * SQUIRTLE_WATER_GUN_ARC_HEIGHT,
-          mouthPosition[2] + (targetPosition[2] - mouthPosition[2]) * pathProgress + sideZ * wobble
+          mouthPosition[0] +
+            (targetPosition[0] - mouthPosition[0]) * pathProgress +
+            sideX * (wobble + laneOffset + splashSide) +
+            forwardX * splashForward,
+          y,
+          mouthPosition[2] +
+            (targetPosition[2] - mouthPosition[2]) * pathProgress +
+            sideZ * (wobble + laneOffset + splashSide) +
+            forwardZ * splashForward
         ],
-        size: [size, size],
+        size: [
+          baseSize * (1.08 + impactStretch * 2.35),
+          baseSize * (0.96 - impactStretch * 0.48)
+        ],
         uvRect
       });
     }
 
+    const splashElapsed = action.sprayElapsed - impactTime;
+
+    if (splashElapsed >= 0) {
+      const splashProgress = clamp01(splashElapsed / SQUIRTLE_WATER_GUN_SPLASH_DURATION);
+      const splashRadius = easeOutCubic(splashProgress) * SQUIRTLE_WATER_GUN_SPLASH_RADIUS;
+      const splashLift = Math.sin(splashProgress * Math.PI) * 0.075 * (1 - splashProgress * 0.35);
+
+      for (let index = 0; index < SQUIRTLE_WATER_GUN_SPLASH_PARTICLE_COUNT; index += 1) {
+        const angle = index * 2.39996 + progress * 1.6;
+        const radius = splashRadius * (0.36 + (index % 4) * 0.18);
+        const size = 0.16 + (index % 3) * 0.035;
+
+        billboards.push({
+          texture,
+          position: [
+            targetPosition[0] + Math.cos(angle) * radius,
+            targetPosition[1] + 0.05 + splashLift + (index % 2) * 0.012,
+            targetPosition[2] + Math.sin(angle) * radius
+          ],
+          size: [
+            size * (1.45 + splashProgress * 1.85),
+            size * (0.48 - splashProgress * 0.18)
+          ],
+          uvRect
+        });
+      }
+    }
+
     return billboards;
+  }
+
+  function getSquirtleWorldPosition() {
+    const squirtle = session.actTwoSquirtle;
+    return squirtle?.position || squirtle?.modelInstance?.offset || null;
+  }
+
+  function getSquirtleStaminaBillboards(fillTexture, uvRect) {
+    const position = getSquirtleWorldPosition();
+    if (!Array.isArray(position) || !fillTexture) {
+      return [];
+    }
+
+    const stamina = getSquirtleWaterStaminaState();
+    const ratio = clamp01(stamina.visualCurrent / stamina.max);
+    const barPosition = [
+      position[0],
+      (position[1] || 0) + 1.25,
+      position[2]
+    ];
+    const billboards = [];
+
+    if (ratio > 0.02) {
+      const fillWidth = SQUIRTLE_WATER_STAMINA_BAR_WIDTH * ratio;
+      const quadRight = camera.getBillboardAxes?.()?.right || [1, 0, 0];
+      const fillCenterOffset = -(SQUIRTLE_WATER_STAMINA_BAR_WIDTH * 0.5) + (fillWidth * 0.5);
+      const fillUvRect = [
+        uvRect[0],
+        uvRect[1],
+        uvRect[0] + ((uvRect[2] - uvRect[0]) * ratio),
+        uvRect[3]
+      ];
+
+      billboards.push({
+        texture: fillTexture,
+        position: [
+          barPosition[0] + (quadRight[0] * fillCenterOffset),
+          barPosition[1] + ((quadRight[1] || 0) * fillCenterOffset),
+          barPosition[2] + (quadRight[2] * fillCenterOffset)
+        ],
+        size: [fillWidth, SQUIRTLE_WATER_STAMINA_BAR_HEIGHT],
+        uvRect: fillUvRect,
+        alpha: 0.95
+      });
+    }
+
+    return billboards;
+  }
+
+  function getSquirtleChargingBillboards(texture, uvRect, now) {
+    const position = getSquirtleWorldPosition();
+    if (!isSquirtleWaterCharging() || !Array.isArray(position) || !texture) {
+      return [];
+    }
+
+    const time = now * 0.001;
+    const billboards = [];
+    for (let index = 0; index < SQUIRTLE_CHARGING_PARTICLE_COUNT; index += 1) {
+      const cycle = (time / SQUIRTLE_CHARGING_PARTICLE_DURATION + index / SQUIRTLE_CHARGING_PARTICLE_COUNT) % 1;
+      const inward = easeOutCubic(cycle);
+      const radius = SQUIRTLE_CHARGING_PARTICLE_RADIUS * (1 - inward);
+      const angle = index * 2.39996 + time * 0.72;
+      const size = 0.09 + (index % 3) * 0.022;
+      const alpha = Math.sin(cycle * Math.PI) * 0.88;
+
+      billboards.push({
+        texture,
+        position: [
+          position[0] + Math.cos(angle) * radius,
+          (position[1] || 0) + lerp(1.68 + (index % 4) * 0.08, 0.66, inward),
+          position[2] + Math.sin(angle) * radius
+        ],
+        size: [size, size],
+        uvRect,
+        alpha
+      });
+    }
+
+    return billboards;
+  }
+
+  function snapshotAvailableWoodDrops(woodDrops = []) {
+    const snapshots = new Map();
+
+    for (const woodDrop of woodDrops) {
+      if (!woodDrop || woodDrop.collected) {
+        continue;
+      }
+
+      snapshots.set(woodDrop, {
+        position: [...woodDrop.position],
+        size: [...woodDrop.size],
+        uvRect: woodDrop.uvRect || [0, 0, 1, 1]
+      });
+    }
+
+    return snapshots;
+  }
+
+  function triggerWoodCollectPopEffects(woodDropSnapshots) {
+    for (const [woodDrop, snapshot] of woodDropSnapshots) {
+      if (!woodDrop.collected) {
+        continue;
+      }
+
+      woodCollectPopEffects.push({
+        ...snapshot,
+        age: 0,
+        duration: WOOD_COLLECT_POP_DURATION
+      });
+    }
+  }
+
+  function updateWoodCollectPopEffects(deltaTime) {
+    for (let index = woodCollectPopEffects.length - 1; index >= 0; index -= 1) {
+      const effect = woodCollectPopEffects[index];
+      effect.age += deltaTime;
+
+      if (effect.age >= effect.duration) {
+        woodCollectPopEffects.splice(index, 1);
+      }
+    }
+  }
+
+  function getWoodCollectPopBillboards(texture, fallbackUvRect) {
+    if (!texture || woodCollectPopEffects.length === 0) {
+      return [];
+    }
+
+    return woodCollectPopEffects.map((effect) => {
+      const progress = clamp01(effect.age / effect.duration);
+      const popScale = 1 + Math.sin(progress * Math.PI) * (WOOD_COLLECT_POP_SCALE - 1);
+      const fade = clamp01((1 - progress) / 0.42);
+      const lift = Math.sin(progress * Math.PI) * WOOD_COLLECT_POP_LIFT;
+
+      return {
+        texture,
+        position: [
+          effect.position[0],
+          effect.position[1] + lift,
+          effect.position[2]
+        ],
+        size: [
+          effect.size[0] * popScale,
+          effect.size[1] * popScale
+        ],
+        uvRect: effect.uvRect || fallbackUvRect,
+        alpha: fade
+      };
+    });
   }
 
   function faceInteractionTargetTowardPlayer({
@@ -1581,65 +2423,6 @@ export function startGameLoop({
     } else {
       Promise.resolve().then(focusIfDialogueOpened);
     }
-  }
-
-  function normalizeMarkerTargetId(targetId) {
-    if (targetId === "chopper" || targetId === "chopper-first-habitat-report") {
-      return "tangrowth";
-    }
-
-    return targetId;
-  }
-
-  function getQuestAttentionTargetIds({ systemQuest, storyQuest, storyState }) {
-    const targetIds = new Set();
-
-    for (const objective of systemQuest?.objectives || []) {
-      if (objective.type === "TALK") {
-        targetIds.add(normalizeMarkerTargetId(objective.targetId));
-      }
-    }
-
-    if (storyQuest?.targetId) {
-      targetIds.add(normalizeMarkerTargetId(storyQuest.targetId));
-    }
-
-    if (storyState?.flags?.pokemonCenterGuideStarted && !storyState.flags.ruinedPokemonCenterInspected) {
-      targetIds.add("ruinedPokemonCenter");
-    }
-
-    if (storyState?.flags?.ruinedPokemonCenterInspected && !storyState.flags.challengesUnlocked) {
-      targetIds.add("pokemonCenterPc");
-    }
-
-    if (storyState?.flags?.boulderChallengeRewardReady && !storyState.flags.boulderChallengeRewardClaimed) {
-      targetIds.add("pokemonCenterPc");
-    }
-
-    if (storyState?.flags?.newPcChallengesAvailable && !storyState.flags.newPcChallengesChecked) {
-      targetIds.add("pokemonCenterPc");
-    }
-
-    if (storyState?.flags?.tangrowthHouseTalkAvailable && !storyState.flags.tangrowthHouseTalkComplete) {
-      targetIds.add("tangrowth");
-    }
-
-    if (storyState?.flags?.leafDenKitPurchaseAvailable && !storyState.flags.leafDenKitPurchased) {
-      targetIds.add("pokemonCenterPc");
-    }
-
-    if (storyState?.flags?.charmanderCelebrationSuggested && !storyState.flags.charmanderCelebrationComplete) {
-      targetIds.add("tangrowth");
-    }
-
-    if (storyState?.flags?.strawBedRecipeUnlocked && !storyState.flags.strawBedCrafted) {
-      targetIds.add("workbench");
-    }
-
-    targetIds.delete(undefined);
-    targetIds.delete(null);
-    targetIds.delete("");
-    return [...targetIds];
   }
 
   function revealBulbasaurAtRepairPosition(encounter) {
@@ -2119,6 +2902,39 @@ export function startGameLoop({
     });
   }
 
+  function getSavePointStarBillboards(logChair, texture, uvRect, now) {
+    if (!Array.isArray(logChair?.position) || !texture) {
+      return [];
+    }
+
+    const time = now * 0.001;
+    const [saveX, saveY, saveZ] = logChair.position;
+
+    return Array.from({ length: SAVE_POINT_STAR_PARTICLE_COUNT }, (_, index) => {
+      const cycle =
+        (time / SAVE_POINT_STAR_PARTICLE_DURATION + index / SAVE_POINT_STAR_PARTICLE_COUNT) % 1;
+      const angle = time * (0.84 + (index % 3) * 0.11) + index * 2.39996;
+      const radius = SAVE_POINT_STAR_PARTICLE_RADIUS * (0.34 + cycle * 0.66);
+      const fadeIn = clamp01(cycle / 0.16);
+      const fadeOut = clamp01((1 - cycle) / 0.28);
+      const pulse = 0.78 + Math.sin(time * 7.2 + index * 1.37) * 0.16;
+      const size = (0.12 + (index % 3) * 0.024) * pulse * (1 + cycle * 0.18);
+
+      return {
+        texture,
+        position: [
+          saveX + Math.cos(angle) * radius,
+          saveY + 0.24 + cycle * SAVE_POINT_STAR_PARTICLE_HEIGHT,
+          saveZ + Math.sin(angle) * radius
+        ],
+        size: [size, size],
+        uvRect,
+        alpha: fadeIn * fadeOut,
+        rotation: angle * 0.22 + time * 0.45
+      };
+    });
+  }
+
   function getRustlingGrassParticleBillboards(groundGrassPatch, texture, now, uvRect) {
     if (!texture) {
       return [];
@@ -2329,6 +3145,8 @@ export function startGameLoop({
       controls.clearCameraLookInput?.();
     }
 
+    let playerMovedThisFrame = false;
+
     if (
       session.playerCharacter &&
       !cinematicActive &&
@@ -2345,6 +3163,7 @@ export function startGameLoop({
         nextPlayerPosition[0] - previousPlayerPosition[0],
         nextPlayerPosition[2] - previousPlayerPosition[2]
       );
+      playerMovedThisFrame = movedDistance > 0.0005;
       syncPlayerModelInstance(deltaTime, [
         nextPlayerPosition[0] - previousPlayerPosition[0],
         nextPlayerPosition[2] - previousPlayerPosition[2]
@@ -2391,6 +3210,7 @@ export function startGameLoop({
         !dialogueActive
     });
     updateNatureRevivalEffects(session.natureRevivalEffects, deltaTime);
+    updateWoodCollectPopEffects(deltaTime);
 
     const activeMoveId = controls.getActiveMoveId?.() || null;
     const waterGunEquipped = Boolean(
@@ -2407,7 +3227,7 @@ export function startGameLoop({
     );
 
     function performHarvestAction(playerPosition, options = {}) {
-      return gameplay.performHarvestAction({
+      const result = gameplay.performHarvestAction({
         playerPosition,
         palmModel: session.palmModel,
         palmInstances: session.palmInstances,
@@ -2427,6 +3247,12 @@ export function startGameLoop({
         useWaterGun: Boolean(options.useWaterGun),
         forcedHarvestTarget: options.forcedHarvestTarget || null
       });
+
+      if (result && options.useWaterGun) {
+        recordSquirtleWaterGunUse();
+      }
+
+      return result;
     }
 
     const harvestRequest = controls.consumeHarvestRequest();
@@ -2515,16 +3341,20 @@ export function startGameLoop({
           });
 
           if (squirtleWaterGunResult === "unavailable") {
+            triggerWaterGunSfxBurst();
             performHarvestAction(playerPosition, {
               useWaterGun: true,
               forcedHarvestTarget: primaryActionTarget
             });
           }
         } else if (isWaterGunTreeTarget(primaryActionTarget)) {
-          performHarvestAction(playerPosition, {
-            useWaterGun: true,
-            forcedHarvestTarget: primaryActionTarget
-          });
+          if (consumeSquirtleWaterStaminaForInstantAction()) {
+            triggerWaterGunSfxBurst();
+            performHarvestAction(playerPosition, {
+              useWaterGun: true,
+              forcedHarvestTarget: primaryActionTarget
+            });
+          }
         } else if (leafageEquipped && primaryActionTarget?.leafageGroundCell) {
           const bulbasaurLeafageResult = startBulbasaurLeafageAction({
             groundCell: primaryActionTarget.leafageGroundCell,
@@ -2616,6 +3446,7 @@ export function startGameLoop({
         });
 
         if (squirtleWaterGunResult === "unavailable") {
+          triggerWaterGunSfxBurst();
           performHarvestAction(playerPosition, {
             useWaterGun: true,
             forcedHarvestTarget: waterGunTarget
@@ -2628,10 +3459,13 @@ export function startGameLoop({
           waterGunTarget?.palm
         )
       ) {
-        performHarvestAction(playerPosition, {
-          forcedHarvestTarget: waterGunTarget,
-          useWaterGun: true
-        });
+        if (consumeSquirtleWaterStaminaForInstantAction()) {
+          triggerWaterGunSfxBurst();
+          performHarvestAction(playerPosition, {
+            forcedHarvestTarget: waterGunTarget,
+            useWaterGun: true
+          });
+        }
       }
     }
 
@@ -2738,8 +3572,15 @@ export function startGameLoop({
     updateTimburrEncounter(deltaTime);
     syncCompanionRepairModules();
     syncBeeFieldRepairBox();
+    syncBeeFieldBees(deltaTime);
     updateSquirtleReassembly(deltaTime);
+    updateSquirtleWaterStamina(deltaTime);
     updateSquirtleWaterGunAction(deltaTime);
+    waterGunSfxController.update({
+      active: session.squirtleWaterGunAction?.phase === "spray" ||
+        (now * 0.001) < waterGunSfxBurstUntilSeconds,
+      nowSeconds: now * 0.001
+    });
     updateBulbasaurLeafageAction(deltaTime);
     const robotIdlePatrolActive = Boolean(
       isGameFlow(gameFlowValues.GAMEPLAY) &&
@@ -2766,6 +3607,7 @@ export function startGameLoop({
 
     if (session.playerCharacter && !cinematicActive) {
       if (!tutorialActive && !pokedexModalOpen && !skillLearnActive && !scriptedInteractionActive) {
+        const woodDropSnapshots = snapshotAvailableWoodDrops(session.woodDrops);
         const collectedWoodCount = gameplay.collectWoodDrops(
           session.playerCharacter.getPosition(),
           session.woodDrops,
@@ -2773,6 +3615,13 @@ export function startGameLoop({
         );
 
         if (collectedWoodCount > 0) {
+          triggerWoodCollectPopEffects(woodDropSnapshots);
+          for (let woodIndex = 0; woodIndex < collectedWoodCount; woodIndex += 1) {
+            woodGrabSfxController.update({
+              active: true,
+              nowSeconds: (now * 0.001) + woodIndex * 0.025
+            });
+          }
           hud.syncInventoryUi(controls.inventory);
           hud.pushNotice(`+${collectedWoodCount} Wood`);
 
@@ -2810,7 +3659,7 @@ export function startGameLoop({
           now,
           gameplayActive: true,
           playerPosition: session.playerCharacter?.getPosition?.() || null,
-          canFollow: !dialogueActive && !camera.isTargetTransitionActive(),
+          canFollow: !dialogueActive && !cameraTransitionActive && !scriptedInteractionActive,
           spawnPlayer(spawnPosition) {
             session.spawnActTwoPlayer?.({
               configureCamera: false,
@@ -2827,6 +3676,34 @@ export function startGameLoop({
         camera.follow(session.playerCharacter.getPosition());
       }
     }
+
+    for (const shipEvent of consumeGameplayOpeningShipEvents(session.gameplayOpeningShip)) {
+      if (shipEvent.type === GAMEPLAY_OPENING_SHIP_EVENTS.FALL_STARTED) {
+        shipFallSfxController.update({
+          active: true
+        });
+      }
+
+      if (shipEvent.type === GAMEPLAY_OPENING_SHIP_EVENTS.IMPACT) {
+        shipFallSfxController.update({
+          active: false
+        });
+        shipImpactSfxController.update({
+          active: true,
+          nowSeconds: now * 0.001
+        });
+      }
+
+      if (shipEvent.type === GAMEPLAY_OPENING_SHIP_EVENTS.SETTLED) {
+        shipFallSfxController.update({
+          active: false
+        });
+      }
+    }
+
+    playerDrivingSfxController.update({
+      active: playerMovedThisFrame || gameplayOpeningCameraFrame?.phase === "player-exit"
+    });
 
     if (gameplayOpeningCameraFrame?.released && gameplayOpeningHudHidden) {
       gameplayOpeningHudRevealAt = now + GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS;
@@ -2953,9 +3830,31 @@ export function startGameLoop({
       session.bulbasaurLeafageAction?.groundCell ?
         [session.bulbasaurLeafageAction.groundCell] :
         [];
+    const leppaTreeMissionGroundCells =
+      !gameplayOpeningCameraActive &&
+      !gameplayOpeningHudHidden &&
+      !cinematicActive &&
+      !tutorialActive &&
+      !pokedexModalOpen &&
+      !skillLearnActive &&
+      !scriptedInteractionActive &&
+      !gameplayDialogue.isActive() &&
+      isOpeningLeppaTreeRequestActive(controls.storyState) ?
+        getLeppaTreeSurroundingGroundCells(
+          session.leppaTree,
+          session.groundDeadInstances
+        ) :
+        [];
+    const leppaTreeTileHintFlashing = Boolean(gameplay.isLeppaTreeTileHintFlashing?.());
+    const markedGroundCellPulsePhase = leppaTreeTileHintFlashing ?
+      (Math.sin(now * 0.035) + 1) * 0.5 :
+      (Math.sin(now * 0.012) + 1) * 0.5;
     const markedActionGroundCells = [
-      ...pendingWaterGunGroundCells,
-      ...activeLeafageGroundCells
+      ...new Set([
+        ...leppaTreeMissionGroundCells,
+        ...pendingWaterGunGroundCells,
+        ...activeLeafageGroundCells
+      ])
     ];
     const transientNoticeRoute = resolveTransientNoticeRoute(hud.getNoticeMessage());
     const promptCopy =
@@ -3208,6 +4107,11 @@ export function startGameLoop({
       activeMoveId === "waterGun" &&
       !controls.storyState.flags[WATER_GUN_FIRST_USE_PROMPT_FLAG] &&
       !controls.isPrimaryActionActive?.();
+    const squirtleChargingPosition = getSquirtleWorldPosition();
+    const shouldShowSquirtleChargingPrompt =
+      canShowWorldSpaceUi &&
+      isSquirtleWaterCharging() &&
+      Array.isArray(squirtleChargingPosition);
     const shouldShowCharacterWorldPrompt =
       canShowWorldSpaceUi &&
       !shouldShowRepairBoxPrompt &&
@@ -3301,7 +4205,11 @@ export function startGameLoop({
       nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
     }
 
-    if (shouldShowTransientWorldPrompt) {
+    if (shouldShowSquirtleChargingPrompt) {
+      nextFrame.worldPrompt.visible = true;
+      nextFrame.worldPrompt.text = "charging";
+      nextFrame.worldPrompt.worldPosition = squirtleChargingPosition;
+    } else if (shouldShowTransientWorldPrompt) {
       nextFrame.worldPrompt.visible = true;
       nextFrame.worldPrompt.text = transientNoticeRoute.worldPromptMessage;
       nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
@@ -3330,7 +4238,7 @@ export function startGameLoop({
     if (markedActionGroundCells.length) {
       nextFrame.groundCellHighlight.visible = true;
       nextFrame.groundCellHighlight.markedGroundCells.push(...markedActionGroundCells);
-      nextFrame.groundCellHighlight.pulsePhase = (Math.sin(now * 0.012) + 1) * 0.5;
+      nextFrame.groundCellHighlight.pulsePhase = markedGroundCellPulsePhase;
     }
 
     const questCompletionPop = gameplay.getQuestCompletionPop?.();
@@ -3358,6 +4266,7 @@ export function startGameLoop({
       session.playerCharacter && !cinematicActive ?
         session.playerCharacter.getPosition() :
         null;
+    const grassCollisionObjects = getGrassCollisionObjects();
     const selectedRepairBoxParticleTarget = getSelectedRepairBoxParticleTarget();
     let shouldShowRepairBoxRustlingParticles = false;
 
@@ -3385,6 +4294,10 @@ export function startGameLoop({
         session.natureRevivalEffects,
         groundGrassPatch.id
       );
+      const grassAlpha = getGrassObjectCollisionAlpha(
+        groundGrassPatch,
+        grassCollisionObjects
+      );
 
       const aliveGrassModelAvailable = Boolean(
         groundGrassPatch.state === "alive" &&
@@ -3410,6 +4323,7 @@ export function startGameLoop({
             groundGrassPatch,
             grassRevivalScale
           ),
+          alpha: grassAlpha,
           yaw: getTallGrassYaw(groundGrassPatch),
           swayStrength: getTallGrassSway(groundGrassPatch, shouldRustleGrass, now) + playerBend.swayStrength
         });
@@ -3426,6 +4340,7 @@ export function startGameLoop({
             groundGrassPatch,
             grassRevivalScale
           ),
+          alpha: grassAlpha,
           yaw: getTallGrassYaw(groundGrassPatch),
           swayStrength: playerBend.swayStrength
         });
@@ -3439,7 +4354,8 @@ export function startGameLoop({
             groundGrassPatch.position[1],
             groundGrassPatch.position[2] + playerBend.offsetZ
           ],
-          size: groundGrassPatch.size.map((value) => value * grassRevivalScale)
+          size: groundGrassPatch.size.map((value) => value * grassRevivalScale),
+          alpha: grassAlpha
         });
       }
 
@@ -3485,31 +4401,11 @@ export function startGameLoop({
       });
     }
 
-    if (!gameplayOpeningCameraActive && !cinematicActive && !tutorialActive) {
-      nextFrame.render.worldMarkers = {
-        storyState: controls.storyState,
-        resourceNodes: session.resourceNodes,
-        npcActors: session.npcActors,
-        interactables: session.interactables,
-        markerTextures: session.markerTextures,
-        worldMarkerHeight: rendering.worldMarkerHeight,
-        worldMarkerSize: rendering.worldMarkerSize,
-        npcMarkerOffset: rendering.npcMarkerOffset,
-        npcMarkerSize: rendering.npcMarkerSize,
-        fullUvRect: rendering.fullUvRect,
-        attentionTargetIds: getQuestAttentionTargetIds({
-          systemQuest: activeSystemQuest,
-          storyQuest: activeQuest,
-          storyState: controls.storyState
-        }),
-        isNpcActive: rendering.isNpcActive,
-        isInteractableActive: rendering.isInteractableActive,
-        isResourceNodeActive: rendering.isResourceNodeActive
-      };
-    }
-
     nextFrame.render.woodTexture = session.woodTexture;
     nextFrame.render.woodDrops = session.woodDrops;
+    nextFrame.render.genericBillboards.push(
+      ...getWoodCollectPopBillboards(session.woodTexture, rendering.fullUvRect)
+    );
     nextFrame.render.genericBillboards.push(
       ...(session.leppaBerryDrops || [])
         .filter((leppaBerryDrop) => !leppaBerryDrop.collected)
@@ -3553,6 +4449,14 @@ export function startGameLoop({
         size: session.logChair.size,
         uvRect: rendering.fullUvRect
       });
+      nextFrame.render.genericBillboards.push(
+        ...getSavePointStarBillboards(
+          session.logChair,
+          session.logChairStarTexture,
+          rendering.fullUvRect,
+          now
+        )
+      );
     }
     if (session.strawBed && controls.storyState.flags.strawBedPlacedInBulbasaurHabitat) {
       nextFrame.render.genericBillboards.push({
@@ -3656,7 +4560,24 @@ export function startGameLoop({
       syncSquirtleModelInstance();
       squirtle.modelInstance.active = Boolean(
         (visibleActTwoSquirtle && assembledActTwoSquirtle) ||
-        session.squirtleWaterGunAction
+        session.squirtleWaterGunAction ||
+        isSquirtleWaterCharging()
+      );
+    }
+    const shouldShowSquirtleStamina =
+      controls.playerSkills?.waterGun &&
+      (
+        activeMoveId === "waterGun" ||
+        session.squirtleWaterGunAction ||
+        isSquirtleWaterCharging() ||
+        getSquirtleWaterStaminaState().current < SQUIRTLE_WATER_STAMINA_MAX
+      );
+    if (shouldShowSquirtleStamina) {
+      nextFrame.render.genericBillboards.push(
+        ...getSquirtleStaminaBillboards(
+          session.squirtleWaterStaminaFillTexture,
+          rendering.fullUvRect
+        )
       );
     }
     nextFrame.render.genericBillboards.push(
@@ -3664,6 +4585,13 @@ export function startGameLoop({
         session.squirtleWaterGunAction,
         session.squirtleWaterSprayTexture,
         rendering.fullUvRect
+      )
+    );
+    nextFrame.render.genericBillboards.push(
+      ...getSquirtleChargingBillboards(
+        session.squirtleChargingParticleTexture,
+        rendering.fullUvRect,
+        now
       )
     );
     if (!session.bulbasaurEncounter?.modelInstance) {
@@ -3686,9 +4614,6 @@ export function startGameLoop({
       size: session.timburrEncounter?.visible ? session.timburrEncounter.size : null,
       uvRect: rendering.fullUvRect
     });
-    nextFrame.render.genericBillboards.push(
-      ...getPlayerDustBillboards(session.playerDust, session.playerDustTexture, rendering.fullUvRect)
-    );
     nextFrame.render.genericBillboards.push(
       ...getNatureRevivalBillboards(
         session.natureRevivalEffects,

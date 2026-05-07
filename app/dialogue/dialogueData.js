@@ -45,19 +45,19 @@ export const SMALL_ISLAND_DIALOGUES = Object.freeze({
     speakerId: "stranded-helper",
     lines: [
       {
-        text: "Water... please..."
+        text: "Hello! im piper!"
       },
       {
         speakerId: "chopper",
-        text: "They're almost dry. The island is asking for a tool, not a fight."
+        text: "I was built to wash the ground of this soil."
       },
       {
-        text: "If you can carry this motion, you can wake the soil again.",
+        text: "Just press LT on the ground and start hidrating this planet already my friend!",
         completesQuest: "record-a-memory"
       },
       {
         speakerId: "",
-        text: "You learned Water Gun. The field camera has recorded its first memory.",
+        text: "Now you can use this bot to hidrate the planet.",
         completesQuest: "open-the-water-route"
       }
     ]

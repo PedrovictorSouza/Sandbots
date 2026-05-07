@@ -1,3 +1,5 @@
+const SQUIRTLE_POKEDEX_IMAGE_URL = new URL("./images/Robot-1-thumb.png", import.meta.url).href;
+const BULBASAUR_POKEDEX_IMAGE_URL = new URL("./images/Robot-2-thumb.png", import.meta.url).href;
 
 const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
   <section class="start-overlay" id="start-overlay" aria-label="Start screen"></section>
@@ -127,36 +129,7 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
               <div class="pokedex-entry__art" aria-hidden="true">
                 <div class="pokedex-entry__glow"></div>
                 <div class="pokedex-entry__creature" data-pokedex-art-scene="squirtle">
-                  <div class="pokedex-entry__creature-head"></div>
-                  <div class="pokedex-entry__creature-shell"></div>
-                  <div class="pokedex-entry__creature-limb pokedex-entry__creature-limb--arm-left"></div>
-                  <div class="pokedex-entry__creature-limb pokedex-entry__creature-limb--arm-right"></div>
-                  <div class="pokedex-entry__creature-limb pokedex-entry__creature-limb--leg-left"></div>
-                  <div class="pokedex-entry__creature-limb pokedex-entry__creature-limb--leg-right"></div>
-                </div>
-                <div class="pokedex-entry__flower-scene" data-pokedex-art-scene="flower-bed" hidden>
-                  <div class="pokedex-entry__flower-card">
-                    <strong data-pokedex-field="art-card-title">???</strong>
-                    <div class="pokedex-entry__flower-card-row">
-                      <span>Time</span>
-                      <strong data-pokedex-field="art-time">Day</strong>
-                    </div>
-                    <div class="pokedex-entry__flower-card-rarity" data-pokedex-field="art-rarity">Common</div>
-                  </div>
-                  <div class="pokedex-entry__flower-window">
-                    <div class="pokedex-entry__flower-cloud pokedex-entry__flower-cloud--one"></div>
-                    <div class="pokedex-entry__flower-cloud pokedex-entry__flower-cloud--two"></div>
-                    <div class="pokedex-entry__flower-cloud pokedex-entry__flower-cloud--three"></div>
-                    <div class="pokedex-entry__flower-tree pokedex-entry__flower-tree--left"></div>
-                    <div class="pokedex-entry__flower-tree pokedex-entry__flower-tree--right"></div>
-                    <div class="pokedex-entry__flower-hill"></div>
-                    <div class="pokedex-entry__flower-bed">
-                      <span class="pokedex-entry__flower-cluster pokedex-entry__flower-cluster--one"></span>
-                      <span class="pokedex-entry__flower-cluster pokedex-entry__flower-cluster--two"></span>
-                      <span class="pokedex-entry__flower-cluster pokedex-entry__flower-cluster--three"></span>
-                      <span class="pokedex-entry__flower-cluster pokedex-entry__flower-cluster--four"></span>
-                    </div>
-                  </div>
+                  <img class="pokedex-entry__robot-image pokedex-entry__robot-image--squirtle" src="${SQUIRTLE_POKEDEX_IMAGE_URL}" alt="" loading="eager" decoding="async">
                 </div>
                 <div class="pokedex-entry__flower-scene" data-pokedex-art-scene="tall-grass" hidden>
                   <div class="pokedex-entry__flower-card">
@@ -183,30 +156,9 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
                   </div>
                 </div>
                 <div class="pokedex-entry__bulbasaur-scene" data-pokedex-art-scene="bulbasaur" hidden>
-                  <div class="pokedex-entry__bulbasaur-platform"></div>
-                  <div class="pokedex-entry__bulbasaur">
-                    <div class="pokedex-entry__bulbasaur-bulb"></div>
-                    <div class="pokedex-entry__bulbasaur-body"></div>
-                    <div class="pokedex-entry__bulbasaur-head">
-                      <div class="pokedex-entry__bulbasaur-smile"></div>
-                    </div>
-                    <div class="pokedex-entry__bulbasaur-leg pokedex-entry__bulbasaur-leg--back-left"></div>
-                    <div class="pokedex-entry__bulbasaur-leg pokedex-entry__bulbasaur-leg--back-right"></div>
-                    <div class="pokedex-entry__bulbasaur-leg pokedex-entry__bulbasaur-leg--front-left"></div>
-                    <div class="pokedex-entry__bulbasaur-leg pokedex-entry__bulbasaur-leg--front-right"></div>
-                  </div>
+                  <img class="pokedex-entry__robot-image pokedex-entry__robot-image--bulbasaur" src="${BULBASAUR_POKEDEX_IMAGE_URL}" alt="" loading="eager" decoding="async">
                 </div>
                 <div class="pokedex-entry__charmander-scene" data-pokedex-art-scene="charmander" hidden>
-                  <div class="pokedex-entry__charmander-platform"></div>
-                  <div class="pokedex-entry__charmander">
-                    <div class="pokedex-entry__charmander-tail"></div>
-                    <div class="pokedex-entry__charmander-body"></div>
-                    <div class="pokedex-entry__charmander-head">
-                      <div class="pokedex-entry__charmander-smile"></div>
-                    </div>
-                    <div class="pokedex-entry__charmander-leg pokedex-entry__charmander-leg--left"></div>
-                    <div class="pokedex-entry__charmander-leg pokedex-entry__charmander-leg--right"></div>
-                  </div>
                 </div>
                 <div class="pokedex-entry__timburr-scene" data-pokedex-art-scene="timburr" hidden>
                   <div class="pokedex-entry__timburr-platform"></div>
@@ -248,10 +200,6 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
             <div class="bag-onboarding-panel__body" id="bag-onboarding-body"></div>
           </aside>
           <div class="hud" id="hud-panel">
-            <section class="hud-current-action" id="hud-current-action" data-action-kind="neutral" aria-live="polite" aria-label="Current action">
-              <span class="hud-current-action__eyebrow">Current Action</span>
-              <span class="hud-current-action__body" id="hud-instructions">Use WASD ou o analogico esquerdo para falar com Chopper. Ele te orientara no que fazer.</span>
-            </section>
             <div class="hud-context" id="hud-context" aria-live="polite"></div>
             <div class="hud-checklist" id="hud-checklist" aria-label="Quest checks"></div>
             <span id="hud-meta"></span>

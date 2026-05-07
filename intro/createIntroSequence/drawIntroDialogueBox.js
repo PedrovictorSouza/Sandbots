@@ -6,7 +6,7 @@ const DIALOGUE_BOX = Object.freeze({
   pixel: 1,
   speaker: "MEMORY GUIDE",
   hint: "SPACE",
-  font: "\"Courier New\", monospace",
+  font: "\"Super Mario World\", monospace",
   colors: {
     shadow: "#0f1a30",
     borderDark: "#13213e",

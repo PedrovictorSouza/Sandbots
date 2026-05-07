@@ -24,6 +24,9 @@ const CLOUD_ATMOSPHERE_GROUND_Y = 0.075;
 const CLOUD_ATMOSPHERE_DRAW_DISTANCE = 190;
 const CLOUD_SHADOW_LIGHT_OFFSET_X = -1.4;
 const CLOUD_SHADOW_LIGHT_OFFSET_Z = 2.15;
+const PLAYER_DUST_CLOUD_DRAW_DISTANCE = 34;
+const PLAYER_DUST_CLOUD_BRIGHTNESS = 0.94;
+const BEE_FIELD_DRAW_DISTANCE = 72;
 
 function withTerrainSupportDrawDistance(sceneObject) {
   return {
@@ -167,6 +170,7 @@ export function buildSceneAssembly(session, assets) {
     playerModel,
     robot1Model,
     robot2Model,
+    beeModel,
     gameplayOpeningShipModel,
     characterFactory
   } = assets;
@@ -362,12 +366,33 @@ export function buildSceneAssembly(session, assets) {
     }));
   }
 
+  session.beeModel = beeModel;
+  session.beeInstances ||= [];
+
+  if (beeModel) {
+    session.sceneObjects.push({
+      model: beeModel,
+      instances: session.beeInstances,
+      brightness: 1.08,
+      drawDistanceFromCameraTarget: BEE_FIELD_DRAW_DISTANCE
+    });
+  }
+
   if (playerModel && session.playerModelInstance) {
     session.sceneObjects.push(withTerrainSupportDrawDistance({
       model: playerModel,
       instances: [session.playerModelInstance],
       brightness: 1
     }));
+  }
+
+  if (cloudModel && session.playerDust?.particles) {
+    session.sceneObjects.push({
+      model: cloudModel,
+      instances: session.playerDust.particles,
+      brightness: PLAYER_DUST_CLOUD_BRIGHTNESS,
+      drawDistanceFromCameraTarget: PLAYER_DUST_CLOUD_DRAW_DISTANCE
+    });
   }
 
   if (cloudModel && session.cloudAtmosphere) {
