@@ -57,4 +57,20 @@ describe("createGroundCellHighlightController", () => {
     expect(layer.dataset.groundCellTargetState).toBe("valid");
     expect(outline.getAttribute("stroke")).toBe("#9ef8ff");
   });
+
+  it("renders Fire action targets with a red cue", () => {
+    const mount = document.createElement("div");
+    const controller = createGroundCellHighlightController({ mount });
+
+    controller.show({
+      groundCell: createGroundCell({ highlightAbilityId: "fire" })
+    });
+    controller.update(createCamera(), 320, 180);
+
+    const layer = mount.querySelector("[data-ground-cell-highlight-layer]");
+    const [, outline] = mount.querySelectorAll("svg > polygon");
+
+    expect(layer.dataset.groundCellTargetState).toBe("fire");
+    expect(outline.getAttribute("stroke")).toBe("#ff5a36");
+  });
 });

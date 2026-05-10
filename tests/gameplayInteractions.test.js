@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGameplayInteractions } from "../world/gameplayInteractions.js";
+import {
+  CHARMANDER_FIRE_CARBON_USES_FLAG,
+  canAddPokemonFollower,
+  countActivePokemonFollowers,
+  createGameplayInteractions
+} from "../world/gameplayInteractions.js";
 import { HABITAT_EVENT } from "../app/sandbox/habitatData.js";
 import {
   BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION,
   CAMPFIRE_ITEM_ID,
+  CARBON_ITEM_ID,
   DITTO_FLAG_ITEM_ID,
   LEAF_DEN_KIT_ITEM_ID,
   LEAVES_ITEM_ID,
@@ -282,13 +288,18 @@ describe("createGameplayInteractions", () => {
       pushNotice
     });
 
+    const inventory = {
+      [CARBON_ITEM_ID]: 2
+    };
+    const storyState = { questIndex: 0, flags: {} };
+
     const result = interactions.performHarvestAction({
       playerPosition: [0, 0, 0],
       palmModel: null,
       palmInstances: [],
       resourceNodes: [],
-      inventory: {},
-      storyState: { questIndex: 0, flags: {} },
+      inventory,
+      storyState,
       woodDrops: [],
       groundDeadInstances: [groundCell],
       groundPurifiedInstances: [],
@@ -359,6 +370,239 @@ describe("createGameplayInteractions", () => {
       groundDeadInstances,
       groundPurifiedInstances
     );
+  });
+
+  it("burns a white ground cell into dry ground with Fire", () => {
+    const fireGroundCell = {
+      id: "white-ground-1",
+      offset: [0, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0,
+      purifiable: false,
+      groundKind: "cold"
+    };
+    const iceGroundInstances = [fireGroundCell];
+    const groundDeadInstances = [];
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      pushNotice
+    });
+    const inventory = {
+      [CARBON_ITEM_ID]: 2
+    };
+    const storyState = { questIndex: 0, flags: {} };
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory,
+      storyState,
+      woodDrops: [],
+      groundDeadInstances,
+      iceGroundInstances,
+      groundPurifiedInstances: [],
+      groundGrassPatches: [],
+      canUseFire: true,
+      useFire: true,
+      forcedHarvestTarget: {
+        fireGroundCell,
+        distance: 0
+      }
+    });
+
+    expect(result).toBe(true);
+    expect(inventory[CARBON_ITEM_ID]).toBe(2);
+    expect(storyState.flags[CHARMANDER_FIRE_CARBON_USES_FLAG]).toBe(1);
+    expect(iceGroundInstances).toEqual([]);
+    expect(groundDeadInstances).toEqual([fireGroundCell]);
+    expect(fireGroundCell).toEqual(expect.objectContaining({
+      groundKind: "dead",
+      purifiable: true,
+      wasColdGroundBurned: true
+    }));
+    expect(pushNotice).toHaveBeenCalledWith(
+      "Fire burned the white ground into dry ground."
+    );
+  });
+
+  it("spends one Carbon after ten Charmander Fire uses", () => {
+    const fireGroundCells = Array.from({ length: 10 }, (_, index) => ({
+      id: `white-ground-${index}`,
+      offset: [index, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0,
+      purifiable: false,
+      groundKind: "cold"
+    }));
+    const extraFireGroundCell = {
+      id: "white-ground-extra",
+      offset: [12, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0,
+      purifiable: false,
+      groundKind: "cold"
+    };
+    const iceGroundInstances = [...fireGroundCells, extraFireGroundCell];
+    const groundDeadInstances = [];
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      pushNotice
+    });
+    const inventory = {
+      [CARBON_ITEM_ID]: 1
+    };
+    const storyState = { questIndex: 0, flags: {} };
+
+    for (const [index, fireGroundCell] of fireGroundCells.entries()) {
+      const result = interactions.performHarvestAction({
+        playerPosition: [0, 0, 0],
+        palmModel: null,
+        palmInstances: [],
+        resourceNodes: [],
+        inventory,
+        storyState,
+        woodDrops: [],
+        groundDeadInstances,
+        iceGroundInstances,
+        groundPurifiedInstances: [],
+        groundGrassPatches: [],
+        canUseFire: true,
+        useFire: true,
+        forcedHarvestTarget: {
+          fireGroundCell,
+          distance: 0
+        }
+      });
+
+      expect(result).toBe(true);
+      expect(storyState.flags[CHARMANDER_FIRE_CARBON_USES_FLAG]).toBe((index + 1) % 10);
+    }
+
+    expect(inventory[CARBON_ITEM_ID]).toBe(0);
+    expect(groundDeadInstances).toEqual(fireGroundCells);
+    expect(iceGroundInstances).toEqual([extraFireGroundCell]);
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory,
+      storyState,
+      woodDrops: [],
+      groundDeadInstances,
+      iceGroundInstances,
+      groundPurifiedInstances: [],
+      groundGrassPatches: [],
+      canUseFire: true,
+      useFire: true,
+      forcedHarvestTarget: {
+        fireGroundCell: extraFireGroundCell,
+        distance: 0
+      }
+    });
+
+    expect(result).toBe(false);
+    expect(iceGroundInstances).toEqual([extraFireGroundCell]);
+    expect(pushNotice).toHaveBeenCalledWith("Charmander needs Carbon to use Fire.");
+  });
+
+  it("does not burn a white ground cell with Fire when Carbon is empty", () => {
+    const fireGroundCell = {
+      id: "white-ground-1",
+      offset: [0, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0,
+      purifiable: false,
+      groundKind: "cold"
+    };
+    const iceGroundInstances = [fireGroundCell];
+    const groundDeadInstances = [];
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      pushNotice
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {
+        [CARBON_ITEM_ID]: 0
+      },
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundDeadInstances,
+      iceGroundInstances,
+      groundPurifiedInstances: [],
+      groundGrassPatches: [],
+      canUseFire: true,
+      useFire: true,
+      forcedHarvestTarget: {
+        fireGroundCell,
+        distance: 0
+      }
+    });
+
+    expect(result).toBe(false);
+    expect(iceGroundInstances).toEqual([fireGroundCell]);
+    expect(groundDeadInstances).toEqual([]);
+    expect(fireGroundCell.groundKind).toBe("cold");
+    expect(pushNotice).toHaveBeenCalledWith("Charmander needs Carbon to use Fire.");
+  });
+
+  it("lets LT field moves ignore pending Solar Station placement targets", () => {
+    const fireGroundCell = {
+      id: "white-ground-1",
+      offset: [0, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0,
+      purifiable: false,
+      groundKind: "cold"
+    };
+    const interactions = createInteractions();
+    const target = interactions.findNearbyActionTarget({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {
+        [STRAW_BED_ITEM_ID]: 1
+      },
+      storyState: {
+        questIndex: 0,
+        flags: {
+          strawBedCrafted: true,
+          strawBedPlacedInBulbasaurHabitat: false,
+          rustlingGrassCellId: "grass-0"
+        }
+      },
+      groundDeadInstances: [],
+      iceGroundInstances: [fireGroundCell],
+      groundPurifiedInstances: [],
+      groundGrassPatches: [
+        { cellId: "grass-0", habitatGroupId: "bulba", state: "alive", position: [0, 0, 0] },
+        { cellId: "grass-1", habitatGroupId: "bulba", state: "alive", position: [1.425, 0, 0] },
+        { cellId: "grass-2", habitatGroupId: "bulba", state: "alive", position: [0, 0, 1.425] },
+        { cellId: "grass-3", habitatGroupId: "bulba", state: "alive", position: [1.425, 0, 1.425] }
+      ],
+      groundFlowerPatches: [],
+      canUseFire: true,
+      allowPlacement: false
+    });
+
+    expect(target).toEqual(expect.objectContaining({
+      fireGroundCell,
+      distance: 0
+    }));
   });
 
   it("can purify a specific ground cell through a forced harvest target", () => {
@@ -610,6 +854,8 @@ describe("createGameplayInteractions", () => {
     onComplete();
     expect(unlockPlayerAbility).toHaveBeenCalledWith("waterGun");
     expect(unlockPokedexReward).toHaveBeenCalledTimes(1);
+    expect(storyState.flags.squirtleRobotReactivated).toBe(true);
+    expect(storyState.flags.squirtleFollowing).toBe(true);
     expect(storyState.questIndex).toBe(2);
     expect(pushNotice).toHaveBeenCalledWith(
       expect.stringContaining("You found the stranded Pokemon.")
@@ -891,6 +1137,72 @@ describe("createGameplayInteractions", () => {
     expect(pushNotice).toHaveBeenCalledWith("A patch of tall grass is rustling.", 3.4);
   });
 
+  it("grows a revived flower with Leafage when Bulbasaur's object is set to flower", () => {
+    const groundCell = {
+      id: "ground-flower-leafage",
+      offset: [0, 0, 0],
+      surfaceY: 0,
+      tileSpan: 1.425,
+      active: true,
+      purifiable: true
+    };
+    const pushNotice = vi.fn();
+    const habitatSystem = {
+      recordEvent: vi.fn()
+    };
+    const onNaturePatchRevived = vi.fn();
+    const interactions = createInteractions({
+      habitatSystem,
+      onNaturePatchRevived,
+      pushNotice
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafageObjectId: "flower"
+      }
+    };
+    const groundGrassPatches = [];
+    const groundFlowerPatches = [];
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState,
+      woodDrops: [],
+      groundDeadInstances: [],
+      groundPurifiedInstances: [groundCell],
+      groundGrassPatches,
+      groundFlowerPatches,
+      canUseLeafage: true
+    });
+
+    expect(result).toBe(true);
+    expect(groundGrassPatches).toEqual([]);
+    expect(groundFlowerPatches).toEqual([
+      expect.objectContaining({
+        id: "leafage-flower-ground-flower-leafage",
+        cellId: "ground-flower-leafage",
+        habitatGroupId: "leafage-flower-bed-habitat-0",
+        source: "leafage",
+        state: "alive"
+      })
+    ]);
+    expect(storyState.flags.leafageFlowerCount).toBe(1);
+    expect(onNaturePatchRevived).toHaveBeenCalledWith({
+      patch: groundFlowerPatches[0],
+      type: "flower"
+    });
+    expect(habitatSystem.recordEvent).toHaveBeenCalledWith({
+      type: HABITAT_EVENT.REVIVE_PATCH,
+      targetId: "flower"
+    });
+    expect(pushNotice).toHaveBeenCalledWith("Leafage grew a flower.");
+  });
+
   it("finds a Leafage target without rebuilding the full ground grid candidate list", () => {
     const targetGroundCell = {
       id: "near-leafage-cell",
@@ -990,6 +1302,104 @@ describe("createGameplayInteractions", () => {
     expect(pushNotice).toHaveBeenCalledWith(
       "Leafage needs restored ground. Use Water Gun here first."
     );
+  });
+
+  it("destroys a nearby Leafage-instantiated object", () => {
+    const pushNotice = vi.fn();
+    const groundGrassPatches = [
+      {
+        id: "leafage-grass-ground-1",
+        cellId: "ground-1",
+        habitatGroupId: "leafage-tall-grass-habitat-0",
+        leafageObjectId: "garden1",
+        source: "leafage",
+        state: "alive",
+        position: [0, 0.02, 0],
+        size: [1.42, 1.18]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "site",
+          id: "leafage-grass-ground-1",
+          label: "Garden-1",
+          action: "destroyInstantiatedObject",
+          cellId: "ground-1"
+        },
+        distance: 0.25
+      })),
+      pushNotice
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafageTallGrassCount: 1
+      }
+    };
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory: {},
+      groundGrassPatches
+    });
+
+    expect(result).toBe(true);
+    expect(groundGrassPatches).toEqual([]);
+    expect(storyState.flags.leafageTallGrassCount).toBe(0);
+    expect(pushNotice).toHaveBeenCalledWith("Garden-1 destroyed.");
+  });
+
+  it("destroys a nearby Leafage-instantiated flower", () => {
+    const pushNotice = vi.fn();
+    const groundFlowerPatches = [
+      {
+        id: "leafage-flower-ground-1",
+        cellId: "ground-1",
+        habitatGroupId: "leafage-flower-bed-habitat-0",
+        source: "leafage",
+        state: "alive",
+        position: [0, 0.02, 0],
+        size: [1.12, 1.12]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "site",
+          id: "leafage-flower-ground-1",
+          label: "Flower",
+          action: "destroyInstantiatedObject",
+          cellId: "ground-1"
+        },
+        distance: 0.25
+      })),
+      pushNotice
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafageFlowerCount: 1
+      }
+    };
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory: {},
+      groundGrassPatches: [],
+      groundFlowerPatches
+    });
+
+    expect(result).toBe(true);
+    expect(groundFlowerPatches).toEqual([]);
+    expect(storyState.flags.leafageFlowerCount).toBe(0);
+    expect(pushNotice).toHaveBeenCalledWith("Flower destroyed.");
   });
 
   it("shows a tall grass habitat notice when a full grass group is restored", () => {
@@ -1259,6 +1669,8 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(true);
     expect(storyState.flags.bulbasaurRevealed).toBe(true);
+    expect(storyState.flags.bulbasaurRobotReactivated).toBe(true);
+    expect(storyState.flags.bulbasaurFollowing).toBe(true);
     expect(onBulbasaurRevealed).toHaveBeenCalledWith({
       cellId: "ground-2-3"
     });
@@ -1296,6 +1708,8 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(true);
     expect(storyState.flags.charmanderRevealed).toBe(true);
+    expect(storyState.flags.charmanderRobotReactivated).toBe(true);
+    expect(storyState.flags.charmanderFollowing).toBe(true);
     expect(onCharmanderRevealed).toHaveBeenCalledWith({
       cellId: "ground-8-7"
     });
@@ -1444,6 +1858,8 @@ describe("createGameplayInteractions", () => {
     expect(result).toBe(true);
     expect(storyState.flags.restoredGrassCount).toBe(10);
     expect(storyState.flags.bulbasaurDryGrassMissionComplete).toBe(true);
+    expect(storyState.flags.firstRequiredTaughtActionComplete).toBe(true);
+    expect(storyState.flags.firstRequiredTaughtActionFreedomWindowActive).toBe(true);
   });
 
   it("turns in Bulbasaur's completed dry grass request from the Bulbasaur interaction", () => {
@@ -1484,7 +1900,7 @@ describe("createGameplayInteractions", () => {
     expect(onBulbasaurDryGrassRequestCompleted).toHaveBeenCalledTimes(1);
   });
 
-  it("requests Bulbasaur's Straw Bed recipe from the Do you need anything interaction", () => {
+  it("requests Bulbasaur's Solar Station recipe from the Do you need anything interaction", () => {
     const onBulbasaurStrawBedRecipeRequested = vi.fn();
     const interactions = createInteractions({
       onBulbasaurStrawBedRecipeRequested,
@@ -1518,7 +1934,7 @@ describe("createGameplayInteractions", () => {
     expect(onBulbasaurStrawBedRecipeRequested).toHaveBeenCalledTimes(1);
   });
 
-  it("turns in Bulbasaur's request after the Straw Bed is placed", () => {
+  it("turns in Bulbasaur's request after the Solar Station is placed", () => {
     const onBulbasaurStrawBedRequestCompleted = vi.fn();
     const interactions = createInteractions({
       onBulbasaurStrawBedRequestCompleted,
@@ -1805,6 +2221,46 @@ describe("createGameplayInteractions", () => {
     expect(pushNotice).toHaveBeenCalledWith("+1 Leppa Berry");
   });
 
+  it("opens Leafage object options from a revived Leppa tree after the berry drops", () => {
+    const onLeppaTreeLeafageOptionsRequested = vi.fn();
+    const interactions = createInteractions({
+      onLeppaTreeLeafageOptionsRequested,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "leppaTreeLeafageOptions",
+          id: "leppaTree",
+          label: "Leafage Options"
+        },
+        distance: 2.8
+      }))
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leppaTreeRevived: true,
+        leppaBerryDropped: true
+      }
+    };
+
+    const result = interactions.performInteractAction({
+      playerPosition: [1.2, 0, 1.2],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory: {},
+      leppaTree: {
+        position: [1, 0.02, 1],
+        revived: true,
+        berryDropped: true
+      }
+    });
+
+    expect(result).toBe(true);
+    expect(onLeppaTreeLeafageOptionsRequested).toHaveBeenCalledWith({
+      targetId: "leppaTree"
+    });
+  });
+
   it("starts the revived tree dialogue when the tree can talk", () => {
     let completeTreeDialogue = null;
     const startDialogue = vi.fn(({ onComplete }) => {
@@ -2034,14 +2490,68 @@ describe("createGameplayInteractions", () => {
     expect(onWorkbenchRecipesRequested).toHaveBeenCalledTimes(1);
   });
 
+  it("opens the Workbench catalog as a locked preview before recipes are learned", () => {
+    const onWorkbenchCraftOptionsRequested = vi.fn();
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      onWorkbenchCraftOptionsRequested,
+      placeholderRecipes: PLACEHOLDER_RECIPES,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "station",
+          id: "workbench",
+          label: "Workbench"
+        },
+        distance: 0.8
+      })),
+      pushNotice
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: {
+        questIndex: 2,
+        flags: {}
+      },
+      inventory: {},
+      groundGrassPatches: []
+    });
+
+    expect(result).toBe(true);
+    expect(pushNotice).not.toHaveBeenCalled();
+    expect(onWorkbenchCraftOptionsRequested).toHaveBeenCalledWith({
+      recipes: [
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "campfire" }),
+          disabled: true,
+          status: "Locked"
+        }),
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "strawBed" }),
+          disabled: true,
+          status: "Locked"
+        }),
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "leafDenKit" }),
+          disabled: true,
+          status: "Locked"
+        })
+      ]
+    });
+  });
+
   it("requests the Campfire Workbench modal after recipes are learned", () => {
     const onCampfireCraftRequested = vi.fn();
     const onCampfireCrafted = vi.fn();
+    const onWorkbenchCraftOptionsRequested = vi.fn();
     const syncInventoryUi = vi.fn();
     const questSystem = { emit: vi.fn() };
     const interactions = createInteractions({
       onCampfireCraftRequested,
       onCampfireCrafted,
+      onWorkbenchCraftOptionsRequested,
       placeholderRecipes: PLACEHOLDER_RECIPES,
       addItems,
       consumeItems,
@@ -2085,10 +2595,30 @@ describe("createGameplayInteractions", () => {
     expect(syncInventoryUi).not.toHaveBeenCalled();
     expect(questSystem.emit).not.toHaveBeenCalled();
     expect(onCampfireCrafted).not.toHaveBeenCalled();
-    expect(onCampfireCraftRequested).toHaveBeenCalledWith({
-      recipe: expect.objectContaining({
-        id: "campfire"
-      })
+    expect(onCampfireCraftRequested).not.toHaveBeenCalled();
+    expect(onWorkbenchCraftOptionsRequested).toHaveBeenCalledWith({
+      recipes: [
+        expect.objectContaining({
+          recipe: expect.objectContaining({
+            id: "campfire"
+          }),
+          disabled: false
+        }),
+        expect.objectContaining({
+          recipe: expect.objectContaining({
+            id: "strawBed"
+          }),
+          disabled: true,
+          status: "Locked"
+        }),
+        expect.objectContaining({
+          recipe: expect.objectContaining({
+            id: "leafDenKit"
+          }),
+          disabled: true,
+          status: "Locked"
+        })
+      ]
     });
   });
 
@@ -2139,12 +2669,14 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("crafts a Straw Bed at the Workbench after Bulbasaur unlocks the recipe", () => {
+  it("opens Workbench craft options with Campfire first and Solar Station second", () => {
     const onStrawBedCrafted = vi.fn();
+    const onWorkbenchCraftOptionsRequested = vi.fn();
     const syncInventoryUi = vi.fn();
     const questSystem = { emit: vi.fn() };
     const interactions = createInteractions({
       onStrawBedCrafted,
+      onWorkbenchCraftOptionsRequested,
       placeholderRecipes: PLACEHOLDER_RECIPES,
       addItems,
       consumeItems,
@@ -2183,6 +2715,28 @@ describe("createGameplayInteractions", () => {
     });
 
     expect(result).toBe(true);
+    expect(onWorkbenchCraftOptionsRequested).toHaveBeenCalledWith({
+      recipes: [
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "campfire" }),
+          disabled: true,
+          status: "Created"
+        }),
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "strawBed" }),
+          disabled: false
+        }),
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "leafDenKit" }),
+          disabled: true,
+          status: "Locked"
+        })
+      ]
+    });
+    expect(inventory[LEAVES_ITEM_ID]).toBe(2);
+    expect(inventory[STRAW_BED_ITEM_ID]).toBeUndefined();
+
+    expect(interactions.craftStrawBedAtWorkbench({ storyState, inventory })).toBe(true);
     expect(inventory[LEAVES_ITEM_ID]).toBe(0);
     expect(inventory[STRAW_BED_ITEM_ID]).toBe(1);
     expect(storyState.flags.strawBedCrafted).toBe(true);
@@ -2199,7 +2753,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("places the selected Straw Bed only inside Bulbasaur's habitat", () => {
+  it("places the crafted Solar Station on open terrain", () => {
     const onStrawBedPlacementRequested = vi.fn();
     const pushNotice = vi.fn();
     const interactions = createInteractions({
@@ -2211,7 +2765,6 @@ describe("createGameplayInteractions", () => {
       flags: {
         rustlingGrassCellId: "ground-1",
         strawBedCrafted: true,
-        strawBedSelectedForBulbasaur: true,
         strawBedPlacedInBulbasaurHabitat: false
       }
     };
@@ -2243,22 +2796,6 @@ describe("createGameplayInteractions", () => {
     ];
 
     expect(interactions.performHarvestAction({
-      playerPosition: [14, 0, -5],
-      palmModel: null,
-      palmInstances: [],
-      resourceNodes: [],
-      inventory: {
-        [STRAW_BED_ITEM_ID]: 1
-      },
-      storyState,
-      woodDrops: [],
-      groundGrassPatches
-    })).toBe(false);
-    expect(pushNotice).toHaveBeenCalledWith(
-      "Move closer to Bulbasaur's restored tall grass habitat."
-    );
-
-    expect(interactions.performHarvestAction({
       playerPosition: [8.4, 0, -5.4],
       palmModel: null,
       palmInstances: [],
@@ -2273,12 +2810,19 @@ describe("createGameplayInteractions", () => {
     expect(onStrawBedPlacementRequested).toHaveBeenCalledWith({
       placementTarget: expect.objectContaining({
         canPlace: true,
-        center: [8.5, 0.02, -5.5]
+        center: [8.4, 0.02, -5.4],
+        bounds: {
+          minX: -141.8,
+          maxX: 141.8,
+          minZ: -141.8,
+          maxZ: 141.8
+        },
+        gridStep: 1
       })
     });
   });
 
-  it("places the selected Leaf Den Kit in the current area", () => {
+  it("places the selected House Kit in the current area", () => {
     const onLeafDenKitPlacementRequested = vi.fn();
     const interactions = createInteractions({
       onLeafDenKitPlacementRequested
@@ -2309,7 +2853,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("requests Leaf Den construction when inspecting the placed kit", () => {
+  it("requests House construction when inspecting the placed kit", () => {
     const onLeafDenConstructionRequested = vi.fn();
     const interactions = createInteractions({
       onLeafDenConstructionRequested,
@@ -2317,7 +2861,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "leafDenConstruction",
           id: "leafDen",
-          label: "Leaf Den Kit"
+          label: "House"
         },
         distance: 1.1
       }))
@@ -2346,7 +2890,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("requests Leaf Den entry after the den is complete", () => {
+  it("requests House entry after the den is complete", () => {
     const onLeafDenEnterRequested = vi.fn();
     const interactions = createInteractions({
       onLeafDenEnterRequested,
@@ -2354,7 +2898,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "leafDenEntrance",
           id: "leafDen",
-          label: "Leaf Den"
+          label: "House"
         },
         distance: 1.1
       }))
@@ -2384,7 +2928,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("places furniture inside the Leaf Den once the player has entered", () => {
+  it("places furniture inside the House once the player has entered", () => {
     const onLeafDenFurniturePlacementRequested = vi.fn();
     const interactions = createInteractions({
       onLeafDenFurniturePlacementRequested
@@ -2412,7 +2956,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("places the selected Ditto Flag on the Leaf Den", () => {
+  it("places the selected Ditto Flag on the House", () => {
     const onDittoFlagPlacementRequested = vi.fn();
     const interactions = createInteractions({
       onDittoFlagPlacementRequested
@@ -2451,7 +2995,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("requests Timburr's Leaf Den furniture completion dialogue", () => {
+  it("requests Timburr's House furniture completion dialogue", () => {
     const onTimburrLeafDenFurnitureCompleteRequested = vi.fn();
     const interactions = createInteractions({
       onTimburrLeafDenFurnitureCompleteRequested,
@@ -2485,6 +3029,119 @@ describe("createGameplayInteractions", () => {
     expect(onTimburrLeafDenFurnitureCompleteRequested).toHaveBeenCalledWith({
       targetId: "timburr"
     });
+  });
+
+  it("lets the player choose follow me near a companion Pokemon", () => {
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      pushNotice,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "pokemonCompanion",
+          id: "charmander",
+          label: "Follow me: Charmander"
+        },
+        distance: 1.1
+      }))
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        charmanderRevealed: true,
+        charmanderFollowing: false
+      }
+    };
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory: {},
+      groundGrassPatches: []
+    });
+
+    expect(result).toBe(true);
+    expect(storyState.flags.charmanderFollowing).toBe(true);
+    expect(pushNotice).toHaveBeenCalledWith("Charmander is following you.");
+  });
+
+  it("enforces the active follower limit before adding another Pokemon", () => {
+    const followFlags = {
+      one: "oneFollowing",
+      two: "twoFollowing",
+      three: "threeFollowing",
+      four: "fourFollowing",
+      five: "fiveFollowing",
+      six: "sixFollowing"
+    };
+    const storyState = {
+      flags: {
+        oneFollowing: true,
+        twoFollowing: true,
+        threeFollowing: true,
+        fourFollowing: true,
+        fiveFollowing: true
+      }
+    };
+
+    expect(countActivePokemonFollowers(storyState.flags, followFlags)).toBe(5);
+    expect(canAddPokemonFollower(storyState, "six", {
+      followFlags,
+      maxFollowers: 5
+    })).toBe(false);
+    expect(canAddPokemonFollower(storyState, "one", {
+      followFlags,
+      maxFollowers: 5
+    })).toBe(true);
+  });
+
+  it("shows feedback when the follower group is full", () => {
+    const pushNotice = vi.fn();
+    const pokemonFollowFlags = {
+      one: "oneFollowing",
+      two: "twoFollowing",
+      three: "threeFollowing",
+      four: "fourFollowing",
+      five: "fiveFollowing",
+      six: "sixFollowing"
+    };
+    const interactions = createInteractions({
+      maxPokemonFollowers: 5,
+      pokemonFollowFlags,
+      pushNotice,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "pokemonCompanion",
+          id: "six",
+          label: "Follow me: Six"
+        },
+        distance: 1.1
+      }))
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        oneFollowing: true,
+        twoFollowing: true,
+        threeFollowing: true,
+        fourFollowing: true,
+        fiveFollowing: true
+      }
+    };
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory: {},
+      groundGrassPatches: []
+    });
+
+    expect(result).toBe(true);
+    expect(pushNotice).toHaveBeenCalledWith("Follower group is full.");
+    expect(storyState.flags.sixFollowing).toBeUndefined();
   });
 
   it("starts Charmander's celebration request from Charmander", () => {
@@ -2565,19 +3222,12 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("asks the player to select the Campfire before giving it to Tangrowth", () => {
+  it("places crafted Campfire wood from interaction without selecting it in the bag", () => {
     const pushNotice = vi.fn();
     const onCampfireSpitOutRequested = vi.fn();
     const interactions = createInteractions({
       onCampfireSpitOutRequested,
-      findNearbyInteractable: vi.fn(() => ({
-        target: {
-          kind: "npc",
-          id: "tangrowth",
-          label: "Professor Tangrowth"
-        },
-        distance: 1.1
-      })),
+      findNearbyInteractable: vi.fn(() => null),
       pushNotice
     });
 
@@ -2589,7 +3239,6 @@ describe("createGameplayInteractions", () => {
         questIndex: 2,
         flags: {
           campfireCrafted: true,
-          campfireSelectedForTangrowth: false,
           campfireSpatOut: false
         }
       },
@@ -2599,12 +3248,14 @@ describe("createGameplayInteractions", () => {
       groundGrassPatches: []
     });
 
-    expect(result).toBe(false);
-    expect(pushNotice).toHaveBeenCalledWith("Open the bag with X and select the Campfire first.");
-    expect(onCampfireSpitOutRequested).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+    expect(pushNotice).not.toHaveBeenCalled();
+    expect(onCampfireSpitOutRequested).toHaveBeenCalledWith({
+      playerPosition: [0, 0, 0]
+    });
   });
 
-  it("starts Tangrowth's Campfire spit out flow once the Campfire is selected", () => {
+  it("places Campfire wood before nearby NPC interactions while the crafted Campfire is ready", () => {
     const onCampfireSpitOutRequested = vi.fn();
     const onNpcInteractionStart = vi.fn();
     const interactions = createInteractions({
@@ -2622,7 +3273,6 @@ describe("createGameplayInteractions", () => {
       questIndex: 2,
       flags: {
         campfireCrafted: true,
-        campfireSelectedForTangrowth: true,
         campfireSpatOut: false
       }
     };
@@ -2640,14 +3290,9 @@ describe("createGameplayInteractions", () => {
     });
 
     expect(result).toBe(true);
-    expect(onNpcInteractionStart).toHaveBeenCalledWith({
-      targetId: "tangrowth",
-      playerPosition: [0, 0, 0],
-      npcActors: [],
-      interactables: []
-    });
+    expect(onNpcInteractionStart).not.toHaveBeenCalled();
     expect(onCampfireSpitOutRequested).toHaveBeenCalledWith({
-      targetId: "tangrowth"
+      playerPosition: [0, 0, 0]
     });
   });
 
@@ -2871,6 +3516,8 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(true);
     expect(storyState.flags.timburrRevealed).toBe(true);
+    expect(storyState.flags.timburrRobotReactivated).toBe(true);
+    expect(storyState.flags.timburrFollowing).toBe(true);
     expect(onTimburrRevealed).toHaveBeenCalledWith({
       cellId: "boulder-ground-0"
     });

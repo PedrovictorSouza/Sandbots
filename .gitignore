@@ -1,5 +1,8 @@
 node_modules/
 dist/
+*.log
+*.so
+material/*.pdf
 .playwright/
 .DS_Store
 test-results/

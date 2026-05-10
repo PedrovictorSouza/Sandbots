@@ -132,6 +132,16 @@ export function createWorldRenderer({
     border: [126, 255, 165, 228],
     outerBorder: [8, 40, 20, 212]
   });
+  const selectedFireGroundHighlightTexture = createGroundHighlightTexture({
+    fill: [255, 88, 54, 40],
+    border: [255, 90, 54, 232],
+    outerBorder: [60, 8, 0, 218]
+  });
+  const selectedInvalidGroundHighlightTexture = createGroundHighlightTexture({
+    fill: [255, 143, 47, 56],
+    border: [255, 211, 122, 232],
+    outerBorder: [84, 48, 0, 220]
+  });
   const markedGroundHighlightTexture = createGroundHighlightTexture({
     fill: [255, 212, 71, 72],
     border: [255, 240, 161, 230],
@@ -338,9 +348,19 @@ export function createWorldRenderer({
   }
 
   function getSelectedGroundHighlightTexture(groundCell) {
-    return groundCell?.highlightAbilityId === "leafage" ?
-      selectedLeafGroundHighlightTexture :
-      selectedWaterGroundHighlightTexture;
+    if (groundCell?.highlightAbilityId === "leafage") {
+      return selectedLeafGroundHighlightTexture;
+    }
+
+    if (groundCell?.highlightAbilityId === "fire") {
+      return selectedFireGroundHighlightTexture;
+    }
+
+    if (groundCell?.highlightAbilityId === "invalid") {
+      return selectedInvalidGroundHighlightTexture;
+    }
+
+    return selectedWaterGroundHighlightTexture;
   }
 
   function prepareSpritePass(viewProjection) {
@@ -543,7 +563,7 @@ export function createWorldRenderer({
           texture,
           position: [
             interactable.position[0],
-            interactable.position[1] + worldMarkerHeight,
+            interactable.position[1] + (interactable.markerHeight ?? worldMarkerHeight),
             interactable.position[2]
           ],
           size: worldMarkerSize,

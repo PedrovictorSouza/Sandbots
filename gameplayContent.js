@@ -8,6 +8,7 @@ export const SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID = "simpleWoodenDiyRecipes";
 export const CAMPFIRE_ITEM_ID = "campfire";
 export const LIFE_COINS_ITEM_ID = "lifeCoins";
 export const LEAVES_ITEM_ID = "leaves";
+export const CARBON_ITEM_ID = "carbon";
 export const STRAW_BED_RECIPE_ITEM_ID = "strawBedRecipe";
 export const STRAW_BED_ITEM_ID = "strawBed";
 export const LEAF_DEN_KIT_ITEM_ID = "leafDenKit";
@@ -16,8 +17,76 @@ export const LEAF_DEN_BUILD_REQUIREMENTS = Object.freeze({
   wood: 3,
   [LEAVES_ITEM_ID]: 3
 });
-export const LEAF_DEN_BUILD_DURATION_MS = 2 * 60 * 60 * 1000;
+export const LEAF_DEN_BUILD_DURATION_MS = 15 * 1000;
 export const PRETTY_FLOWER_BED_HABITAT_LABEL = "Pretty flower bed";
+export const BUILDING_KIT_ITEM_KIND = "BuildingKit";
+export const CREATURE_SPECIALTY = Object.freeze({
+  BUILD: "build",
+  BURN: "burn"
+});
+
+export const CREATURE_DEFS = Object.freeze({
+  squirtle: Object.freeze({
+    id: "squirtle",
+    label: "Squirtle",
+    currentHomeId: null,
+    idealHabitat: "waterside",
+    specialties: Object.freeze([])
+  }),
+  bulbasaur: Object.freeze({
+    id: "bulbasaur",
+    label: "Bulbasaur",
+    currentHomeId: null,
+    idealHabitat: "leafy",
+    specialties: Object.freeze([])
+  }),
+  charmander: Object.freeze({
+    id: "charmander",
+    label: "Charmander",
+    currentHomeId: null,
+    idealHabitat: "warm",
+    specialties: Object.freeze([
+      CREATURE_SPECIALTY.BURN
+    ])
+  }),
+  timburr: Object.freeze({
+    id: "timburr",
+    label: "Timburr",
+    currentHomeId: null,
+    idealHabitat: "workshop",
+    specialties: Object.freeze([
+      CREATURE_SPECIALTY.BUILD
+    ])
+  })
+});
+
+const CREATURE_LIST = Object.freeze(Object.values(CREATURE_DEFS));
+
+export function listCreatures() {
+  return CREATURE_LIST;
+}
+
+export function getCreatureById(creatureId) {
+  return CREATURE_DEFS[creatureId] || null;
+}
+
+export const HOME_DEFS = Object.freeze({
+  leafDen: Object.freeze({
+    id: "leafDen",
+    label: "House",
+    habitatType: "leafy"
+  })
+});
+
+const HOME_LIST = Object.freeze(Object.values(HOME_DEFS));
+
+export function listHomes() {
+  return HOME_LIST;
+}
+
+export function getHomeById(homeId) {
+  return HOME_DEFS[homeId] || null;
+}
 
 export const ITEM_DEFS = {
   [WATER_GUN_POWER_ITEM_ID]: {
@@ -77,19 +146,19 @@ export const ITEM_DEFS = {
     color: "#d2a36a",
     ink: "#2a1809",
     slotRole: "recipe",
-    description: "A starter bundle of wooden DIY plans. The Campfire recipe is circled in the corner."
+    description: "A starter bundle of wooden DIY plans. The Train House recipe is circled in the corner."
   },
   [CAMPFIRE_ITEM_ID]: {
     id: CAMPFIRE_ITEM_ID,
-    label: "Campfire",
-    bagLabel: "Campfire",
+    label: "Train House",
+    bagLabel: "Train House",
     bagDetailsEligible: true,
-    shortLabel: "Fire",
-    glyph: "F",
+    shortLabel: "Home",
+    glyph: "H",
     color: "#f07d38",
     ink: "#2a1205",
     slotRole: "placeable",
-    description: "A simple campfire made at the Workbench. Warmth makes the habitat feel more welcoming."
+    description: "Charmander's train-shaped house. It gives the habitat a warm place to gather."
   },
   [LIFE_COINS_ITEM_ID]: {
     id: LIFE_COINS_ITEM_ID,
@@ -112,42 +181,56 @@ export const ITEM_DEFS = {
     color: "#72b95a",
     ink: "#10220c",
     slotRole: "material",
-    description: "Fresh leaves gathered near restored tall grass. Soft enough for simple bedding."
+    description: "Fresh leaves gathered near restored tall grass. Useful for simple habitat projects."
+  },
+  [CARBON_ITEM_ID]: {
+    id: CARBON_ITEM_ID,
+    label: "Carbon",
+    bagLabel: "Carbon ore",
+    bagDetailsEligible: true,
+    shortLabel: "Carbon",
+    glyph: "C",
+    color: "#2f343d",
+    ink: "#f2f7ff",
+    slotRole: "material",
+    description: "A dark mineral Charmander burns to use Fire."
   },
   [STRAW_BED_RECIPE_ITEM_ID]: {
     id: STRAW_BED_RECIPE_ITEM_ID,
-    label: "Straw Bed Recipe",
-    bagLabel: "Straw Bed recipe",
+    label: "Solar Station Recipe",
+    bagLabel: "Solar Station recipe",
     bagDetailsEligible: true,
     shortLabel: "Recipe",
     glyph: "R",
     color: "#f0cf77",
     ink: "#342309",
     slotRole: "recipe",
-    description: "Bulbasaur's notes for weaving a simple Straw Bed from sturdy sticks and plant fiber."
+    description: "Bulbasaur's notes for assembling a compact Solar Station from leaves and plant fiber."
   },
   [STRAW_BED_ITEM_ID]: {
     id: STRAW_BED_ITEM_ID,
-    label: "Straw Bed",
-    bagLabel: "Straw Bed",
+    label: "Solar Station",
+    bagLabel: "Solar Station",
     bagDetailsEligible: true,
-    shortLabel: "Bed",
-    glyph: "B",
+    shortLabel: "Station",
+    glyph: "S",
     color: "#d7b65a",
     ink: "#2d2108",
     slotRole: "placeable",
-    description: "A soft woven bed that makes grassy habitats feel easier to rest in."
+    description: "A compact Solar Station that helps grassy habitats feel more alive."
   },
   [LEAF_DEN_KIT_ITEM_ID]: {
     id: LEAF_DEN_KIT_ITEM_ID,
-    label: "Leaf Den Kit",
-    bagLabel: "Leaf Den Kit",
+    label: "House Kit",
+    bagLabel: "House Kit",
     bagDetailsEligible: true,
-    shortLabel: "Den",
+    shortLabel: "House",
     glyph: "D",
     color: "#6fc46d",
     ink: "#10240d",
     slotRole: "placeable",
+    itemKind: BUILDING_KIT_ITEM_KIND,
+    buildingKitId: LEAF_DEN_KIT_ITEM_ID,
     description: "A leafy house kit from the Pokemon Center PC Shop. Professor Tangrowth says it is the first step toward proper homes."
   },
   [DITTO_FLAG_ITEM_ID]: {
@@ -303,6 +386,7 @@ export const INVENTORY_ORDER = [
   CAMPFIRE_ITEM_ID,
   LIFE_COINS_ITEM_ID,
   LEAVES_ITEM_ID,
+  CARBON_ITEM_ID,
   STRAW_BED_RECIPE_ITEM_ID,
   STRAW_BED_ITEM_ID,
   LEAF_DEN_KIT_ITEM_ID,
@@ -319,6 +403,39 @@ export const INVENTORY_ORDER = [
   "granitePickaxe",
   "burrowRepairKit",
 ];
+
+export const BUILDING_KIT_DEFS = Object.freeze({
+  [LEAF_DEN_KIT_ITEM_ID]: Object.freeze({
+    id: LEAF_DEN_KIT_ITEM_ID,
+    itemId: LEAF_DEN_KIT_ITEM_ID,
+    name: "House Kit",
+    previewModelId: "leafDenKit",
+    completedModelId: "leafDen",
+    requiredMaterials: Object.freeze([
+      Object.freeze({ itemId: "wood", quantity: LEAF_DEN_BUILD_REQUIREMENTS.wood }),
+      Object.freeze({ itemId: LEAVES_ITEM_ID, quantity: LEAF_DEN_BUILD_REQUIREMENTS[LEAVES_ITEM_ID] })
+    ]),
+    requiredSpecialties: Object.freeze([
+      CREATURE_SPECIALTY.BUILD,
+      CREATURE_SPECIALTY.BURN
+    ]),
+    buildDurationSeconds: LEAF_DEN_BUILD_DURATION_MS / 1000,
+    minFurnitureRequired: 3,
+    validPlacementRules: Object.freeze([
+      "unoccupied-ground"
+    ])
+  })
+});
+
+const BUILDING_KIT_LIST = Object.freeze(Object.values(BUILDING_KIT_DEFS));
+
+export function listBuildingKits() {
+  return BUILDING_KIT_LIST;
+}
+
+export function getBuildingKitByItemId(itemId) {
+  return BUILDING_KIT_DEFS[itemId] || null;
+}
 
 export const WORLD_LIMIT = 144;
 
@@ -396,12 +513,14 @@ export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
 export const LEPPA_TREE_DROP_OFFSET = [0.82, 0.02, 0.48];
 export const WORKBENCH_POSITION = [38.0, 0.02, -17.0];
 export const WORKBENCH_INTERACT_DISTANCE = 5.4;
+export const TANGROWTH_CAMPFIRE_ANCHOR_POSITION = [12.4, 0.02, -8.4];
+export const TANGROWTH_CAMPFIRE_ANCHOR_READY_DISTANCE = 0.42;
 export const POKEMON_TALK_INTERACT_DISTANCE = 3.1;
 export const RUINED_POKEMON_CENTER_POSITION = [25.4, 0, 12.6];
 export const RUINED_POKEMON_CENTER_INTERACT_DISTANCE = 5.4;
-export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [22.7, 0.02, 10.8];
+export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [20.95, 0.02, 10.2];
 export const POKEMON_CENTER_PC_POSITION = [30.35, 0.02, 13.65];
-export const BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION = [31.2, 0.02, 10.4];
+export const BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION = [32.3, 0.02, 9.98];
 export const BOULDER_SHADED_TALL_GRASS_RADIUS = 4.6;
 
 export const WORLD_REGIONS = [
@@ -494,6 +613,90 @@ export const WORLD_REGIONS = [
     maxZ: 72,
   },
 ];
+
+export const CARBON_ORE_ATMOSPHERE_COVERAGE_RATIO = 0.3;
+const CARBON_ORE_GRID_SPACING = 18;
+const CARBON_ORE_RESPAWN_DURATION = 24;
+const CARBON_ORE_PICKUP_RADIUS = 1.48;
+
+function hashUnit(value) {
+  const hashed = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
+  return hashed - Math.floor(hashed);
+}
+
+function getCarbonOreHash(regionIndex, x, z, salt = 0) {
+  return hashUnit(
+    (regionIndex + 1) * 9176.23 +
+    (Math.round(x * 10) + 1440) * 12.17 +
+    (Math.round(z * 10) + 1440) * 37.61 +
+    salt * 101.3
+  );
+}
+
+function createCarbonOreResourceNode(id, position, regionIndex, x, z) {
+  const scale = 0.74 + getCarbonOreHash(regionIndex, x, z, 2) * 0.28;
+  const yaw = getCarbonOreHash(regionIndex, x, z, 3) * Math.PI * 2;
+
+  return {
+    id,
+    label: "Carbon Ore",
+    itemId: CARBON_ITEM_ID,
+    markerKey: CARBON_ITEM_ID,
+    position,
+    offset: [...position],
+    scale,
+    yaw,
+    active: true,
+    usesModelInstance: true,
+    yield: 1,
+    respawnDuration: CARBON_ORE_RESPAWN_DURATION,
+    interactDistance: CARBON_ORE_PICKUP_RADIUS,
+    activeWhen: () => true,
+  };
+}
+
+function createCarbonOreResourceNodes() {
+  const nodes = [];
+  const occupied = new Set();
+
+  for (const [regionIndex, region] of WORLD_REGIONS.entries()) {
+    for (
+      let x = region.minX + CARBON_ORE_GRID_SPACING * 0.5;
+      x <= region.maxX - CARBON_ORE_GRID_SPACING * 0.5;
+      x += CARBON_ORE_GRID_SPACING
+    ) {
+      for (
+        let z = region.minZ + CARBON_ORE_GRID_SPACING * 0.5;
+        z <= region.maxZ - CARBON_ORE_GRID_SPACING * 0.5;
+        z += CARBON_ORE_GRID_SPACING
+      ) {
+        if (getCarbonOreHash(regionIndex, x, z, 1) >= CARBON_ORE_ATMOSPHERE_COVERAGE_RATIO) {
+          continue;
+        }
+
+        const jitterX = (getCarbonOreHash(regionIndex, x, z, 4) - 0.5) * 5.2;
+        const jitterZ = (getCarbonOreHash(regionIndex, x, z, 5) - 0.5) * 5.2;
+        const carbonX = Number((x + jitterX).toFixed(2));
+        const carbonZ = Number((z + jitterZ).toFixed(2));
+        const key = `${Math.round(carbonX)}:${Math.round(carbonZ)}`;
+        if (occupied.has(key)) {
+          continue;
+        }
+
+        occupied.add(key);
+        nodes.push(createCarbonOreResourceNode(
+          `carbon-ore-${nodes.length + 1}`,
+          [carbonX, 0.02, carbonZ],
+          regionIndex,
+          x,
+          z
+        ));
+      }
+    }
+  }
+
+  return nodes;
+}
 
 export const TANGROWTH_OPENING_LINE = "CHOPPER";
 
@@ -600,7 +803,7 @@ export const WORLD_MARKER_STYLES = {
   aunty: { glyph: "A", color: "#d7869b", ink: "#211015" },
   bufo: { glyph: "B", color: "#81b96b", ink: "#11200f" },
   willow: { glyph: "W", color: "#8b84d4", ink: "#131225" },
-  workbench: { glyph: "W", color: "#b08157", ink: "#1f140c" },
+  workbench: { glyph: "i", color: "#7bc7ff", ink: "#0b1f32", shape: "circle" },
   stove: { glyph: "S", color: "#db8a59", ink: "#2a1308" },
   bridge: { glyph: "B", color: "#c6a46b", ink: "#23160d" },
   gate: { glyph: "G", color: "#7b8799", ink: "#151a20" },
@@ -609,14 +812,15 @@ export const WORLD_MARKER_STYLES = {
   silkNest: { glyph: "S", color: "#8fd0d6", ink: "#102326" },
   looseGranite: { glyph: "G", color: "#8b9098", ink: "#171a1d" },
   pokemonCenter: { glyph: "+", color: "#d94a5b", ink: "#fff2f4" },
-  pokemonCenterPc: { glyph: "PC", color: "#7bc7ff", ink: "#0b1f32" },
+  pokemonCenterPc: { glyph: "i", color: "#7bc7ff", ink: "#0b1f32", shape: "circle" },
+  [CARBON_ITEM_ID]: { glyph: "C", color: "#2f343d", ink: "#f2f7ff" },
   challengeBoulder: { glyph: "B", color: "#8f98a3", ink: "#171b1f" },
 };
 
 export const PLACEHOLDER_RECIPES = {
   campfire: {
     id: "campfire",
-    title: "Campfire",
+    title: "Train House",
     stationId: "workbench",
     ingredients: {
       wood: 3,
@@ -628,7 +832,7 @@ export const PLACEHOLDER_RECIPES = {
   },
   strawBed: {
     id: "strawBed",
-    title: "Straw Bed",
+    title: "Solar Station",
     stationId: "workbench",
     ingredients: {
       [LEAVES_ITEM_ID]: 2,
@@ -636,7 +840,7 @@ export const PLACEHOLDER_RECIPES = {
     output: {
       [STRAW_BED_ITEM_ID]: 1,
     },
-    note: "A Bulbasaur recipe for a small woven bed.",
+    note: "A Bulbasaur recipe for a compact habitat Solar Station.",
   },
   bridgeKit: {
     id: "bridgeKit",
@@ -790,7 +994,7 @@ export const STORY_QUESTS = [
     },
     recipeId: "bridgeKit",
     stationId: "workbench",
-    toolkitHint: "Crafting / Campfire Kit",
+    toolkitHint: "Crafting / Train House Kit",
   },
   {
     id: "repairBridge",
@@ -1057,6 +1261,18 @@ export const NPC_DEFS = [
   },
 ];
 
+export function canClaimBoulderChallengeReward(state = {}) {
+  const flags = state.flags || {};
+
+  return Boolean(
+    !flags.boulderChallengeRewardClaimed &&
+    (
+      flags.boulderChallengeRewardReady ||
+      flags.timburrRevealed
+    )
+  );
+}
+
 export const INTERACTABLE_DEFS = [
   {
     id: "workbench",
@@ -1064,6 +1280,7 @@ export const INTERACTABLE_DEFS = [
     type: "station",
     position: [...WORKBENCH_POSITION],
     markerKey: "workbench",
+    markerHeight: 1.25,
     interactDistance: WORKBENCH_INTERACT_DISTANCE,
     activeWhen: () => true,
   },
@@ -1140,80 +1357,50 @@ export const INTERACTABLE_DEFS = [
     type: "site",
     position: [...POKEMON_CENTER_PC_POSITION],
     markerKey: "pokemonCenterPc",
+    markerHeight: 1.28,
     interactDistance: 1.85,
     activeWhen: (state) => {
-      return Boolean(
-        state.flags?.ruinedPokemonCenterInspected &&
-        (
-          !state.flags?.challengesUnlocked ||
-          (
-            state.flags?.boulderChallengeRewardReady &&
-            !state.flags?.boulderChallengeRewardClaimed
-          ) ||
-          (
-            state.flags?.newPcChallengesAvailable &&
-            !state.flags?.newPcChallengesChecked
-          ) ||
-          (
-            state.flags?.leafDenKitPurchaseAvailable &&
-            !state.flags?.leafDenKitPurchased
-          )
-        )
-      );
+      return Boolean(state.flags?.ruinedPokemonCenterInspected);
     },
   },
 ];
 
+function isCraftingLeafPileActive(state) {
+  return Boolean(
+    (state.flags.strawBedRecipeUnlocked && !state.flags.strawBedCrafted) ||
+    (state.flags.leafDenBuildAvailable && !state.flags.leafDenConstructionStarted && !state.flags.leafDenBuilt)
+  );
+}
+
+function isLeafDenBuildLeafPileActive(state) {
+  return Boolean(
+    state.flags.leafDenBuildAvailable &&
+    !state.flags.leafDenConstructionStarted &&
+    !state.flags.leafDenBuilt
+  );
+}
+
+function createLeafPileResourceNode(id, position, activeWhen = isCraftingLeafPileActive) {
+  return {
+    id,
+    label: "Leaf Pile",
+    itemId: LEAVES_ITEM_ID,
+    markerKey: LEAVES_ITEM_ID,
+    position,
+    yield: 1,
+    respawnDuration: 6,
+    interactDistance: 1.45,
+    activeWhen,
+  };
+}
+
 export const RESOURCE_NODE_DEFS = [
-  {
-    id: "leaf-pile-1",
-    label: "Leaf Pile",
-    itemId: LEAVES_ITEM_ID,
-    markerKey: LEAVES_ITEM_ID,
-    position: [7.7, 0.02, -5.1],
-    yield: 1,
-    respawnDuration: 6,
-    interactDistance: 1.45,
-    activeWhen: (state) => {
-      return Boolean(
-        (state.flags.strawBedRecipeUnlocked && !state.flags.strawBedCrafted) ||
-        (state.flags.leafDenBuildAvailable && !state.flags.leafDenConstructionStarted && !state.flags.leafDenBuilt)
-      );
-    },
-  },
-  {
-    id: "leaf-pile-2",
-    label: "Leaf Pile",
-    itemId: LEAVES_ITEM_ID,
-    markerKey: LEAVES_ITEM_ID,
-    position: [9.4, 0.02, -6.7],
-    yield: 1,
-    respawnDuration: 6,
-    interactDistance: 1.45,
-    activeWhen: (state) => {
-      return Boolean(
-        (state.flags.strawBedRecipeUnlocked && !state.flags.strawBedCrafted) ||
-        (state.flags.leafDenBuildAvailable && !state.flags.leafDenConstructionStarted && !state.flags.leafDenBuilt)
-      );
-    },
-  },
-  {
-    id: "leaf-pile-3",
-    label: "Leaf Pile",
-    itemId: LEAVES_ITEM_ID,
-    markerKey: LEAVES_ITEM_ID,
-    position: [6.3, 0.02, -6.8],
-    yield: 1,
-    respawnDuration: 6,
-    interactDistance: 1.45,
-    activeWhen: (state) => {
-      return Boolean(
-        state.flags.leafDenBuildAvailable &&
-        !state.flags.leafDenConstructionStarted &&
-        !state.flags.leafDenBuilt
-      );
-    },
-  },
+  ...createCarbonOreResourceNodes(),
+  createLeafPileResourceNode("leaf-pile-1", [7.7, 0.02, -5.1]),
+  createLeafPileResourceNode("leaf-pile-2", [9.4, 0.02, -6.7]),
+  createLeafPileResourceNode("leaf-pile-3", [6.3, 0.02, -6.8], isLeafDenBuildLeafPileActive),
+  createLeafPileResourceNode("leaf-pile-4", [15.2, 0.02, -12.4]),
+  createLeafPileResourceNode("leaf-pile-5", [24.6, 0.02, 7.8]),
   {
     id: "flax-1",
     label: "Flax Patch",

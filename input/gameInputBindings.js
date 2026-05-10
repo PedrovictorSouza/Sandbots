@@ -7,6 +7,7 @@ export const GAMEPAD_BUTTONS = Object.freeze({
   LT: 6,
   RT: 7,
   DPAD_UP: 12,
+  DPAD_DOWN: 13,
   DPAD_RIGHT: 15,
   DPAD_LEFT: 14
 });
@@ -34,6 +35,10 @@ export const GAME_INPUT_BINDINGS = Object.freeze({
   },
   pokedex: {
     keyboardCode: "Tab",
+    gamepadButton: null
+  },
+  settings: {
+    keyboardCode: null,
     gamepadButton: GAMEPAD_BUTTONS.SELECT
   },
   bag: {

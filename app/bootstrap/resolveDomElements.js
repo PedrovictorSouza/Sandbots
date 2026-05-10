@@ -19,8 +19,6 @@ export function resolveDomElements(documentRef = document) {
     questFocusTitle: documentRef.getElementById("quest-focus-title"),
     questFocusBody: documentRef.getElementById("quest-focus-body"),
     nearbyHabitatsValue: documentRef.getElementById("nearby-habitats-value"),
-    bagOnboardingTitle: documentRef.getElementById("bag-onboarding-title"),
-    bagOnboardingBody: documentRef.getElementById("bag-onboarding-body"),
     bagDetailsIcon: documentRef.getElementById("bag-details-icon"),
     bagDetailsName: documentRef.getElementById("bag-details-name"),
     bagDetailsCount: documentRef.getElementById("bag-details-count"),

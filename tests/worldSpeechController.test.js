@@ -79,6 +79,63 @@ describe("createWorldSpeechController", () => {
     expect(controller.isVisible()).toBe(false);
   });
 
+  it("renders field move switch prompts as positioned card markup", () => {
+    const mount = document.createElement("div");
+    const controller = createWorldSpeechController({ mount });
+
+    controller.showPrompt({
+      text: '<span data-field-move-switch-card="true"><strong>Water</strong></span>',
+      worldPosition: [1, 0, 2]
+    });
+
+    const prompt = mount.querySelector('[data-world-speech-variant="player-prompt"]');
+
+    expect(prompt?.dataset.worldPromptKind).toBe("field-move-switch");
+    expect(prompt?.style.transform).toContain("translate(8px");
+    expect(prompt?.style.transform).toContain("0.625");
+    expect(prompt?.querySelector("[data-field-move-switch-card='true'] strong")?.textContent).toBe("Water");
+
+    controller.hidePrompt();
+
+    expect(prompt?.hidden).toBe(true);
+    expect(prompt?.dataset.worldPromptKind).toBe("text");
+    expect(prompt?.textContent).toBe("");
+  });
+
+  it("keeps text prompts visible during their exit motion", () => {
+    vi.useFakeTimers();
+    try {
+      const mount = document.createElement("div");
+      const controller = createWorldSpeechController({ mount });
+
+      controller.showPrompt({
+        text: "Wood x33",
+        worldPosition: [1, 0, 2]
+      });
+
+      const prompt = mount.querySelector('[data-world-speech-variant="player-prompt"]');
+      const layer = mount.querySelector("[data-world-speech-layer='true']");
+
+      expect(prompt?.dataset.promptMotion).toBe("enter");
+      expect(prompt?.hidden).toBe(false);
+
+      controller.hidePrompt();
+
+      expect(prompt?.dataset.promptMotion).toBe("exit");
+      expect(prompt?.hidden).toBe(false);
+      expect(layer?.hidden).toBe(false);
+
+      vi.advanceTimersByTime(260);
+
+      expect(prompt?.hidden).toBe(true);
+      expect(prompt?.dataset.worldPromptKind).toBe("text");
+      expect(prompt?.textContent).toBe("");
+      expect(layer?.hidden).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps NPC communication bubbles behind the HUD layer", () => {
     const mount = document.createElement("div");
     createWorldSpeechController({ mount });

@@ -16,9 +16,35 @@ const BOX_MODEL_TEXTURE_PATH = new URL("../../buildings/Box/box.png", import.met
 const CLOUD_MODEL_GLTF_PATH = new URL("../../buildings/cloud/cloud.gltf", import.meta.url).href;
 const CLOUD_MODEL_BIN_PATH = new URL("../../buildings/cloud/cloud.bin", import.meta.url).href;
 const CLOUD_MODEL_TEXTURE_PATH = new URL("../../buildings/cloud/cloud.png", import.meta.url).href;
+const CARBON_ORE_MODEL_GLTF_PATH = new URL("../../Commodities/carbon/carvao.gltf", import.meta.url).href;
+const CARBON_ORE_MODEL_BIN_PATH = new URL("../../Commodities/carbon/carvao.bin", import.meta.url).href;
+const CARBON_ORE_MODEL_TEXTURE_PATH = new URL("../../Commodities/carbon/carvao.png", import.meta.url).href;
+const SOLAR_STATION_MODEL_GLTF_PATH = new URL("../../../Solar-Station/Solar-Station.gltf", import.meta.url).href;
+const SOLAR_STATION_MODEL_BIN_PATH = new URL("../../../Solar-Station/Solar-Station.bin", import.meta.url).href;
+const SOLAR_STATION_MODEL_TEXTURE_PATH = new URL("../../../Solar-Station/Solar-Station.png", import.meta.url).href;
+const TRAIN_HOUSE_MODEL_GLTF_PATH = new URL("../../../Train-house/train-house.gltf", import.meta.url).href;
+const TRAIN_HOUSE_MODEL_BIN_PATH = new URL("../../../Train-house/train-house.bin", import.meta.url).href;
+const TRAIN_HOUSE_MODEL_TEXTURE_PATH = new URL("../../../Train-house/train-house.png", import.meta.url).href;
+const HOUSE_MODEL_GLTF_PATH = new URL("../../../house/house_2.gltf", import.meta.url).href;
+const HOUSE_MODEL_TXT_PATH = new URL("../../../house/house_2.txt", import.meta.url).href;
+const ICE_GROUND_MODEL_GLTF_PATH = new URL("../../../iceground/iceground.gltf", import.meta.url).href;
+const ICE_GROUND_MODEL_BIN_PATH = new URL("../../../iceground/iceground.bin", import.meta.url).href;
+const ICE_GROUND_MODEL_TEXTURE_PATH = new URL("../../../iceground/iceground.png", import.meta.url).href;
+const GROUND_2_MODEL_GLTF_PATH = new URL("../../../ground-2/ground-2.gltf", import.meta.url).href;
+const GROUND_2_MODEL_BIN_PATH = new URL("../../../ground-2/ground-2.bin", import.meta.url).href;
+const GROUND_2_MODEL_TEXTURE_PATH = new URL("../../../ground-2/ground-2.png", import.meta.url).href;
 const DEAD_TREE_MODEL_GLTF_PATH = new URL("../../../Trees/Dead-Tree/Dead-Tree.gltf", import.meta.url).href;
 const DEAD_TREE_MODEL_BIN_PATH = new URL("../../../Trees/Dead-Tree/Dead-Tree.bin", import.meta.url).href;
 const DEAD_TREE_MODEL_TEXTURE_PATH = new URL("../../../Trees/Dead-Tree/Dead-Tree.png", import.meta.url).href;
+const TREE_2_MODEL_GLTF_PATH = new URL("../../../Trees/tree-2/tree-2.gltf", import.meta.url).href;
+const TREE_2_MODEL_BIN_PATH = new URL("../../../Trees/tree-2/tree-2.bin", import.meta.url).href;
+const TREE_2_MODEL_TEXTURE_PATH = new URL("../../../Trees/tree-2/tree-2.png", import.meta.url).href;
+const GARDEN_1_MODEL_GLTF_PATH = new URL("../../../Trees/Garden-1/garden-1.gltf", import.meta.url).href;
+const GARDEN_1_MODEL_BIN_PATH = new URL("../../../Trees/Garden-1/garden-1.bin", import.meta.url).href;
+const GARDEN_1_MODEL_TEXTURE_PATH = new URL("../../../Trees/Garden-1/garden-1.png", import.meta.url).href;
+const LEAF_DEN_MODEL_GLTF_PATH = new URL("../../../house/house_2.gltf", import.meta.url).href;
+const LEAF_DEN_MODEL_BIN_PATH = new URL("../../../house/house_2.bin", import.meta.url).href;
+const LEAF_DEN_MODEL_TEXTURE_PATH = new URL("../../../house/house_2.png", import.meta.url).href;
 const LEPPA_TREE_DEAD_MODEL_GLTF_PATH = new URL("../../../Trees/Special-tree/Dead-Tree_Special.gltf", import.meta.url).href;
 const LEPPA_TREE_DEAD_MODEL_BIN_PATH = new URL("../../../Trees/Special-tree/Dead-Tree_Special.bin", import.meta.url).href;
 const LEPPA_TREE_DEAD_MODEL_TEXTURE_PATH = new URL("../../../Trees/Special-tree/Dead-Tree_Special.png", import.meta.url).href;
@@ -119,6 +145,7 @@ export async function loadTerrainAssets({ gl, setStatus }) {
   const [
     groundDeadModel,
     groundPurifiedModel,
+    groundPurifiedAltModel,
     houseModel,
     palmModel,
     tallGrassModel,
@@ -127,8 +154,15 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     workshopModel,
     boxModel,
     deadTreeModel,
+    tree2Model,
     leppaTreeDeadModel,
+    iceGroundModel,
+    solarStationModel,
+    trainHouseModel,
+    carbonOreModel,
     cloudModel,
+    garden1Model,
+    leafDenModel,
     leppaTreeMusicalNoteImages
   ] = await Promise.all([
     loadPicoModel({
@@ -143,10 +177,17 @@ export async function loadTerrainAssets({ gl, setStatus }) {
       txtPath: "./ground/ground.txt",
       onStatus: setStatus
     }),
+    loadTexturedModel({
+      gl,
+      gltfPath: GROUND_2_MODEL_GLTF_PATH,
+      binPath: GROUND_2_MODEL_BIN_PATH,
+      texturePath: GROUND_2_MODEL_TEXTURE_PATH,
+      onStatus: setStatus
+    }),
     loadPicoModel({
       gl,
-      gltfPath: "./house_2.gltf",
-      txtPath: "./house_2.txt",
+      gltfPath: HOUSE_MODEL_GLTF_PATH,
+      txtPath: HOUSE_MODEL_TXT_PATH,
       onStatus: setStatus
     }),
     loadPicoModel({
@@ -205,10 +246,50 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     }),
     loadTexturedModel({
       gl,
+      gltfPath: TREE_2_MODEL_GLTF_PATH,
+      binPath: TREE_2_MODEL_BIN_PATH,
+      texturePath: TREE_2_MODEL_TEXTURE_PATH,
+      normalizedSize: 4.8,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
       gltfPath: LEPPA_TREE_DEAD_MODEL_GLTF_PATH,
       binPath: LEPPA_TREE_DEAD_MODEL_BIN_PATH,
       texturePath: LEPPA_TREE_DEAD_MODEL_TEXTURE_PATH,
       normalizedSize: 4.8,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: ICE_GROUND_MODEL_GLTF_PATH,
+      binPath: ICE_GROUND_MODEL_BIN_PATH,
+      texturePath: ICE_GROUND_MODEL_TEXTURE_PATH,
+      normalizedSize: 3.8,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: SOLAR_STATION_MODEL_GLTF_PATH,
+      binPath: SOLAR_STATION_MODEL_BIN_PATH,
+      texturePath: SOLAR_STATION_MODEL_TEXTURE_PATH,
+      normalizedSize: 2.3,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: TRAIN_HOUSE_MODEL_GLTF_PATH,
+      binPath: TRAIN_HOUSE_MODEL_BIN_PATH,
+      texturePath: TRAIN_HOUSE_MODEL_TEXTURE_PATH,
+      normalizedSize: 3.6,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: CARBON_ORE_MODEL_GLTF_PATH,
+      binPath: CARBON_ORE_MODEL_BIN_PATH,
+      texturePath: CARBON_ORE_MODEL_TEXTURE_PATH,
+      normalizedSize: 1.18,
       onStatus: setStatus
     }),
     loadTexturedModel({
@@ -219,12 +300,29 @@ export async function loadTerrainAssets({ gl, setStatus }) {
       normalizedSize: 8.8,
       onStatus: setStatus
     }),
+    loadTexturedModel({
+      gl,
+      gltfPath: GARDEN_1_MODEL_GLTF_PATH,
+      binPath: GARDEN_1_MODEL_BIN_PATH,
+      texturePath: GARDEN_1_MODEL_TEXTURE_PATH,
+      normalizedSize: 1.8,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
+      gltfPath: LEAF_DEN_MODEL_GLTF_PATH,
+      binPath: LEAF_DEN_MODEL_BIN_PATH,
+      texturePath: LEAF_DEN_MODEL_TEXTURE_PATH,
+      normalizedSize: 2.6,
+      onStatus: setStatus
+    }),
     Promise.all(LEPPA_TREE_MUSICAL_NOTE_IMAGE_PATHS.map((path) => loadImageAsset(path)))
   ]);
 
   return {
     groundDeadModel,
     groundPurifiedModel,
+    groundPurifiedAltModel,
     houseModel,
     palmModel,
     tallGrassModel,
@@ -233,8 +331,15 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     workshopModel,
     boxModel,
     deadTreeModel,
+    tree2Model,
     leppaTreeDeadModel,
+    iceGroundModel,
+    solarStationModel,
+    trainHouseModel,
+    carbonOreModel,
     cloudModel,
+    garden1Model,
+    leafDenModel,
     leppaTreeMusicalNoteImages,
     cloudShadowModel: createCloudShadowModel(gl)
   };

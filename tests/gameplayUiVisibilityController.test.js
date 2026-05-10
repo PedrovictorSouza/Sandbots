@@ -14,7 +14,6 @@ describe("createGameplayUiVisibilityController", () => {
     expect(uiLayer.dataset.gameplayUiState).toBe("hidden");
     expect(uiLayer.dataset.gameplayUiHud).toBe("hidden");
     expect(uiLayer.dataset.gameplayUiQuest).toBe("hidden");
-    expect(uiLayer.dataset.gameplayUiBagOnboarding).toBe("hidden");
     expect(uiLayer.dataset.gameplayUiBagDetails).toBe("hidden");
     expect(uiLayer.dataset.gameplayUiMissions).toBe("hidden");
     expect(uiLayer.dataset.gameplayUiNearbyHabitats).toBe("hidden");
@@ -38,22 +37,6 @@ describe("createGameplayUiVisibilityController", () => {
     expect(uiLayer.dataset.gameplayUiStatus).toBe("visible");
     expect(uiLayer.dataset.gameplayUiHud).toBe("hidden");
     expect(controller.isSectionVisible("status")).toBe(true);
-  });
-
-  it("can reveal the bag onboarding panel independently", () => {
-    const uiLayer = document.createElement("div");
-    const controller = createGameplayUiVisibilityController({
-      uiLayer,
-      initialVisibility: "hidden"
-    });
-
-    controller.showSections(["bagOnboarding", "inventory"]);
-
-    expect(uiLayer.dataset.gameplayUiState).toBe("custom");
-    expect(uiLayer.dataset.gameplayUiBagOnboarding).toBe("visible");
-    expect(uiLayer.dataset.gameplayUiInventory).toBe("visible");
-    expect(uiLayer.dataset.gameplayUiQuest).toBe("hidden");
-    expect(controller.isSectionVisible("bagOnboarding")).toBe(true);
   });
 
   it("can reveal the bag details panel independently", () => {

@@ -195,10 +195,6 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
             <div class="quest-focus-panel__title" id="quest-focus-title"></div>
             <div class="quest-focus-panel__body" id="quest-focus-body"></div>
           </aside>
-          <aside class="bag-onboarding-panel" aria-label="Bag onboarding">
-            <div class="bag-onboarding-panel__title" id="bag-onboarding-title"></div>
-            <div class="bag-onboarding-panel__body" id="bag-onboarding-body"></div>
-          </aside>
           <div class="hud" id="hud-panel">
             <div class="hud-context" id="hud-context" aria-live="polite"></div>
             <div class="hud-checklist" id="hud-checklist" aria-label="Quest checks"></div>

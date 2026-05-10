@@ -1,15 +1,23 @@
 import {
   BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION,
   BOULDER_SHADED_TALL_GRASS_RADIUS,
+  CARBON_ITEM_ID,
   CAMPFIRE_ITEM_ID,
   DITTO_FLAG_ITEM_ID,
   LEAF_DEN_KIT_ITEM_ID,
   LOG_CHAIR_ITEM_ID,
   STRAW_BED_ITEM_ID,
-  STORY_QUESTS
+  STORY_QUESTS,
+  WORLD_LIMIT
 } from "../gameplayContent.js";
 import { QUEST_EVENT } from "../app/quest/questData.js";
 import { HABITAT_EVENT } from "../app/sandbox/habitatData.js";
+import {
+  FIRST_TAUGHT_ACTION_IDS,
+  recordFirstTaughtActionFreedomUse,
+  startFirstTaughtActionFreedomWindow
+} from "../app/story/earlyFreedomWindow.js";
+import { reactivateHelperRobot } from "../app/story/robotReactivation.js";
 import {
   collectLeppaBerryDrops,
   dropLeppaBerryFromTree,
@@ -23,9 +31,29 @@ const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
 const BULBASAUR_RUSTLING_GRASS_DELAY = 5.5;
 const LEAFAGE_TALL_GRASS_HABITAT_COUNT = 4;
 const LEAFAGE_TALL_GRASS_GROUP_ID = "leafage-tall-grass-habitat-0";
+const LEAFAGE_FLOWER_GROUP_ID = "leafage-flower-bed-habitat-0";
+const LEAFAGE_OBJECT_ID_TALL_GRASS = "tallGrass";
+const LEAFAGE_OBJECT_ID_GARDEN_1 = "garden1";
+const LEAFAGE_OBJECT_ID_FLOWER = "flower";
 const BOULDER_SHADED_TALL_GRASS_GROUP_ID = "boulder-shaded-tall-grass-habitat-0";
 const LEAFAGE_GROUND_CELL_INTERACT_RADIUS_FACTOR = 0.82;
 const LEPPA_TREE_WATER_HINT_DISTANCE = 2.85;
+const HOUSE_WORKBENCH_RECIPE = Object.freeze({
+  id: "leafDenKit",
+  title: "House",
+  stationId: "workbench",
+  ingredients: Object.freeze({
+    wood: 20
+  }),
+  output: Object.freeze({
+    [LEAF_DEN_KIT_ITEM_ID]: 1
+  }),
+  note: "A construction kit for a proper Pokemon home."
+});
+export const CHARMANDER_FIRE_USES_PER_CARBON = 10;
+export const CHARMANDER_FIRE_CARBON_USES_FLAG = "charmanderFireCarbonUses";
+export const MAX_ACTIVE_POKEMON_FOLLOWERS = 5;
+const SOLAR_STATION_PLACEMENT_WORLD_MARGIN = 2.2;
 const POKEMON_FOLLOW_FLAGS = Object.freeze({
   squirtle: "squirtleFollowing",
   bulbasaur: "bulbasaurFollowing",
@@ -40,17 +68,76 @@ const POKEMON_FOLLOW_NAMES = Object.freeze({
 });
 const BEE_FIELD_FLOWER_GROUP_ID = "water-gun-flower-field-0";
 
-function markPokemonFollowing(storyState, pokemonId) {
-  const followFlag = POKEMON_FOLLOW_FLAGS[pokemonId];
+export function countActivePokemonFollowers(flags = {}, followFlags = POKEMON_FOLLOW_FLAGS) {
+  return Object.values(followFlags)
+    .filter((followFlag) => Boolean(flags?.[followFlag]))
+    .length;
+}
+
+export function canAddPokemonFollower(storyState, pokemonId, {
+  followFlags = POKEMON_FOLLOW_FLAGS,
+  maxFollowers = MAX_ACTIVE_POKEMON_FOLLOWERS
+} = {}) {
+  const followFlag = followFlags[pokemonId];
+  if (!followFlag) {
+    return false;
+  }
+
+  const flags = storyState?.flags || {};
+  return Boolean(flags[followFlag]) || countActivePokemonFollowers(flags, followFlags) < maxFollowers;
+}
+
+function markPokemonFollowing(storyState, pokemonId, {
+  followFlags = POKEMON_FOLLOW_FLAGS,
+  maxFollowers = MAX_ACTIVE_POKEMON_FOLLOWERS
+} = {}) {
+  const followFlag = followFlags[pokemonId];
 
   if (!followFlag) {
     return false;
   }
 
   storyState.flags ||= {};
+  if (!canAddPokemonFollower(storyState, pokemonId, { followFlags, maxFollowers })) {
+    return false;
+  }
+
   const alreadyFollowing = Boolean(storyState.flags[followFlag]);
+  reactivateHelperRobot(storyState, pokemonId, {
+    source: "field-repair"
+  });
   storyState.flags[followFlag] = true;
   return !alreadyFollowing;
+}
+
+function getCharmanderFireCarbonUses(storyState) {
+  return Math.max(
+    0,
+    Math.floor(Number(storyState?.flags?.[CHARMANDER_FIRE_CARBON_USES_FLAG] || 0))
+  );
+}
+
+export function canUseCharmanderFireWithCarbon({ storyState, inventory } = {}) {
+  return Number(inventory?.[CARBON_ITEM_ID] || 0) > 0;
+}
+
+function recordCharmanderFireCarbonUse({ storyState, inventory, syncInventoryUi }) {
+  storyState.flags ||= {};
+  const currentCarbon = Number(inventory?.[CARBON_ITEM_ID] || 0);
+  if (currentCarbon <= 0) {
+    return false;
+  }
+
+  const nextUses = getCharmanderFireCarbonUses(storyState) + 1;
+  if (nextUses >= CHARMANDER_FIRE_USES_PER_CARBON) {
+    inventory[CARBON_ITEM_ID] = Math.max(0, currentCarbon - 1);
+    storyState.flags[CHARMANDER_FIRE_CARBON_USES_FLAG] = 0;
+    syncInventoryUi(inventory);
+  } else {
+    storyState.flags[CHARMANDER_FIRE_CARBON_USES_FLAG] = nextUses;
+  }
+
+  return true;
 }
 
 export function createGameplayInteractions({
@@ -68,6 +155,7 @@ export function createGameplayInteractions({
   onCharmanderRevealed = () => {},
   onTimburrRevealed = () => {},
   onLeppaBerryGiftRequested = () => {},
+  onLeppaTreeLeafageOptionsRequested = () => {},
   onChopperLogChairGiftRequested = () => {},
   onTangrowthHouseTalkRequested = () => {},
   onLeafDenKitPlacementRequested = () => {},
@@ -81,6 +169,7 @@ export function createGameplayInteractions({
   onLogChairPlacementRequested = () => {},
   onLogChairSitRequested = () => {},
   onWorkbenchRecipesRequested = () => {},
+  onWorkbenchCraftOptionsRequested = () => {},
   onCampfireCraftRequested = () => {},
   onCampfireCrafted = () => {},
   onCampfireSpitOutRequested = () => {},
@@ -116,7 +205,9 @@ export function createGameplayInteractions({
   syncInventoryUi,
   pushNotice,
   questSystem = null,
-  habitatSystem = null
+  habitatSystem = null,
+  pokemonFollowFlags = POKEMON_FOLLOW_FLAGS,
+  maxPokemonFollowers = MAX_ACTIVE_POKEMON_FOLLOWERS
 }) {
   let missedInteractAttempts = 0;
   let missedHarvestAttempts = 0;
@@ -131,7 +222,20 @@ export function createGameplayInteractions({
     );
   }
 
-  function pushMissedHarvestNotice({ canPurifyGround = false, canUseLeafage = false } = {}) {
+  function canPlaceCraftedCampfire(storyState, inventory) {
+    return Boolean(
+      storyState?.flags?.campfireCrafted &&
+      !storyState.flags.campfireSpatOut &&
+      Number(inventory?.[CAMPFIRE_ITEM_ID] || 0) > 0 &&
+      hasItems(inventory, { [CAMPFIRE_ITEM_ID]: 1 })
+    );
+  }
+
+  function pushMissedHarvestNotice({
+    canPurifyGround = false,
+    canUseLeafage = false,
+    canUseFire = false
+  } = {}) {
     missedHarvestAttempts += 1;
 
     if (missedHarvestAttempts >= 2) {
@@ -144,6 +248,8 @@ export function createGameplayInteractions({
         "No target in range. Move closer to dry ground, grass, a tree, or a marker, then press Enter." :
         canUseLeafage ?
           "No target in range. Move closer to clear ground, then press Enter to use Leafage." :
+        canUseFire ?
+          "No white ground in range. Move closer to a white tile, then press Enter to use Fire." :
         "No resource in range. Move closer to a tree or drop, then press Enter."
     );
   }
@@ -230,6 +336,63 @@ export function createGameplayInteractions({
       isLeppaTreeWateringGroundCell(groundCell, leppaTree, storyState);
   }
 
+  function findNearbyFireGroundCell(playerPosition, iceGroundInstances = []) {
+    if (!Array.isArray(playerPosition) || !Array.isArray(iceGroundInstances)) {
+      return null;
+    }
+
+    let nearestGroundCell = null;
+    let nearestDistance = Infinity;
+
+    for (const groundCell of iceGroundInstances) {
+      if (
+        !groundCell ||
+        groundCell.active === false ||
+        !Array.isArray(groundCell.offset)
+      ) {
+        continue;
+      }
+
+      const dx = playerPosition[0] - groundCell.offset[0];
+      const dz = playerPosition[2] - groundCell.offset[2];
+      const distance = Math.hypot(dx, dz);
+      const interactDistance =
+        (groundCell.tileSpan || 0) * LEAFAGE_GROUND_CELL_INTERACT_RADIUS_FACTOR;
+
+      if (distance <= interactDistance && distance < nearestDistance) {
+        nearestGroundCell = groundCell;
+        nearestDistance = distance;
+      }
+    }
+
+    return nearestGroundCell ? {
+      groundCell: nearestGroundCell,
+      distance: nearestDistance
+    } : null;
+  }
+
+  function burnFireGroundCell(groundCell, iceGroundInstances = [], groundDeadInstances = []) {
+    if (!groundCell || !Array.isArray(iceGroundInstances) || !Array.isArray(groundDeadInstances)) {
+      return false;
+    }
+
+    const iceIndex = iceGroundInstances.indexOf(groundCell);
+    if (iceIndex === -1) {
+      return false;
+    }
+
+    const [burnedGroundCell] = iceGroundInstances.splice(iceIndex, 1);
+    burnedGroundCell.groundKind = "dead";
+    burnedGroundCell.purifiable = true;
+    burnedGroundCell.wasColdGroundBurned = true;
+
+    if (!groundDeadInstances.includes(burnedGroundCell)) {
+      groundDeadInstances.push(burnedGroundCell);
+    }
+
+    return true;
+  }
+
   function completeBulbasaurDryGrassMission(storyState) {
     const flags = storyState.flags || {};
     if (flags.bulbasaurDryGrassMissionComplete) {
@@ -237,6 +400,9 @@ export function createGameplayInteractions({
     }
 
     flags.bulbasaurDryGrassMissionComplete = true;
+    startFirstTaughtActionFreedomWindow(storyState, {
+      actionId: FIRST_TAUGHT_ACTION_IDS.WATER_DRY_GRASS
+    });
     return true;
   }
 
@@ -265,66 +431,27 @@ export function createGameplayInteractions({
     return null;
   }
 
-  function getBulbasaurHabitatPlacementTarget(playerPosition, groundGrassPatches, storyState) {
-    const rustlingGrassCellId = storyState?.flags?.rustlingGrassCellId;
-    const bulbasaurPatch = groundGrassPatches.find((groundGrassPatch) => {
-      return (
-        groundGrassPatch.cellId === rustlingGrassCellId &&
-        groundGrassPatch.state === "alive"
-      );
-    });
-
-    if (!bulbasaurPatch?.habitatGroupId) {
-      return {
-        canPlace: false,
-        center: null,
-        reason: "Bulbasaur's restored tall grass habitat is not ready."
-      };
-    }
-
-    const habitatPatches = groundGrassPatches.filter((groundGrassPatch) => {
-      return (
-        groundGrassPatch.habitatGroupId === bulbasaurPatch.habitatGroupId &&
-        groundGrassPatch.state === "alive" &&
-        Array.isArray(groundGrassPatch.position)
-      );
-    });
-
-    if (!habitatPatches.length) {
-      return {
-        canPlace: false,
-        center: null,
-        reason: "Bulbasaur's restored tall grass habitat is not ready."
-      };
-    }
-
-    const bounds = habitatPatches.reduce((nextBounds, groundGrassPatch) => ({
-      minX: Math.min(nextBounds.minX, groundGrassPatch.position[0]),
-      maxX: Math.max(nextBounds.maxX, groundGrassPatch.position[0]),
-      minZ: Math.min(nextBounds.minZ, groundGrassPatch.position[2]),
-      maxZ: Math.max(nextBounds.maxZ, groundGrassPatch.position[2])
-    }), {
-      minX: Infinity,
-      maxX: -Infinity,
-      minZ: Infinity,
-      maxZ: -Infinity
-    });
+  function getBulbasaurHabitatPlacementTarget(playerPosition) {
     const center = [
-      (bounds.minX + bounds.maxX) * 0.5,
+      Number(playerPosition?.[0]) || 0,
       0.02,
-      (bounds.minZ + bounds.maxZ) * 0.5
+      Number(playerPosition?.[2]) || 0
     ];
-    const placementMargin = 1.75;
-    const canPlace =
-      playerPosition[0] >= bounds.minX - placementMargin &&
-      playerPosition[0] <= bounds.maxX + placementMargin &&
-      playerPosition[2] >= bounds.minZ - placementMargin &&
-      playerPosition[2] <= bounds.maxZ + placementMargin;
+    const bounds = {
+      minX: -WORLD_LIMIT + SOLAR_STATION_PLACEMENT_WORLD_MARGIN,
+      maxX: WORLD_LIMIT - SOLAR_STATION_PLACEMENT_WORLD_MARGIN,
+      minZ: -WORLD_LIMIT + SOLAR_STATION_PLACEMENT_WORLD_MARGIN,
+      maxZ: WORLD_LIMIT - SOLAR_STATION_PLACEMENT_WORLD_MARGIN
+    };
 
     return {
-      canPlace,
+      canPlace: true,
       center,
-      reason: canPlace ? "" : "Move closer to Bulbasaur's restored tall grass habitat."
+      bounds,
+      gridStep: 1,
+      habitatGroupId: null,
+      showField: false,
+      reason: ""
     };
   }
 
@@ -486,23 +613,59 @@ export function createGameplayInteractions({
     );
   }
 
-  function growLeafageGrassPatch(groundCell, groundGrassPatches, storyState) {
-    if (!groundCell || hasPatchForGroundCell(groundCell.id, groundGrassPatches)) {
+  function growLeafagePatch(groundCell, groundGrassPatches, groundFlowerPatches, storyState) {
+    if (
+      !groundCell ||
+      hasPatchForGroundCell(groundCell.id, groundGrassPatches) ||
+      hasPatchForGroundCell(groundCell.id, groundFlowerPatches)
+    ) {
       return null;
     }
 
+    storyState.flags ||= {};
+    const selectedLeafageObjectId = storyState?.flags?.leafageObjectId;
+
+    if (selectedLeafageObjectId === LEAFAGE_OBJECT_ID_FLOWER) {
+      const patch = {
+        id: `leafage-flower-${groundCell.id}`,
+        cellId: groundCell.id,
+        habitatGroupId: LEAFAGE_FLOWER_GROUP_ID,
+        source: "leafage",
+        position: [
+          groundCell.offset[0],
+          (groundCell.surfaceY || 0) + 0.04,
+          groundCell.offset[2]
+        ],
+        size: [1.12, 1.12],
+        state: "alive"
+      };
+
+      groundFlowerPatches.push(patch);
+      storyState.flags.leafageFlowerCount =
+        (storyState.flags.leafageFlowerCount || 0) + 1;
+      return {
+        patch,
+        type: "flower"
+      };
+    }
+
     const habitatGroupId = getLeafageGrassGroupId(groundCell, storyState);
+    const leafageObjectId =
+      selectedLeafageObjectId === LEAFAGE_OBJECT_ID_GARDEN_1 ?
+        LEAFAGE_OBJECT_ID_GARDEN_1 :
+        LEAFAGE_OBJECT_ID_TALL_GRASS;
     const patch = {
       id: `leafage-grass-${groundCell.id}`,
       cellId: groundCell.id,
       habitatGroupId,
+      leafageObjectId,
       source: "leafage",
       position: [
         groundCell.offset[0],
         (groundCell.surfaceY || 0) + 0.02,
         groundCell.offset[2]
       ],
-      size: [1.18, 0.96],
+      size: leafageObjectId === LEAFAGE_OBJECT_ID_GARDEN_1 ? [1.42, 1.18] : [1.18, 0.96],
       state: "alive"
     };
 
@@ -514,7 +677,66 @@ export function createGameplayInteractions({
       storyState.flags.leafageTallGrassCount =
         (storyState.flags.leafageTallGrassCount || 0) + 1;
     }
-    return patch;
+    return {
+      patch,
+      type: "grass"
+    };
+  }
+
+  function findDestroyableInstantiatedPatchIndex(target, patches = []) {
+    return patches.findIndex((patch) => {
+      return (
+        (
+          patch?.source === "leafage" ||
+          patch?.state !== "alive"
+        ) &&
+        (
+          patch.id === target.id ||
+          (target.cellId && patch.cellId === target.cellId)
+        )
+      );
+    });
+  }
+
+  function destroyInstantiatedObjectPatch(target, groundGrassPatches, groundFlowerPatches, storyState) {
+    let patchCollection = groundGrassPatches;
+    let patchIndex = findDestroyableInstantiatedPatchIndex(target, patchCollection);
+
+    if (patchIndex < 0) {
+      patchCollection = groundFlowerPatches;
+      patchIndex = findDestroyableInstantiatedPatchIndex(target, patchCollection);
+    }
+
+    if (patchIndex < 0) {
+      pushNotice("Nothing to destroy here.");
+      return false;
+    }
+
+    const [patch] = patchCollection.splice(patchIndex, 1);
+    const countFlag = patch.source === "leafage" ?
+      (
+        patch.habitatGroupId === BOULDER_SHADED_TALL_GRASS_GROUP_ID ?
+          "boulderShadedTallGrassCount" :
+          patch.habitatGroupId === LEAFAGE_FLOWER_GROUP_ID ?
+            "leafageFlowerCount" :
+            "leafageTallGrassCount"
+      ) :
+      null;
+
+    if (countFlag && storyState?.flags && Number(storyState.flags[countFlag] || 0) > 0) {
+      storyState.flags[countFlag] = Math.max(0, Number(storyState.flags[countFlag] || 0) - 1);
+    }
+
+    pushNotice(
+      patch.state !== "alive" ?
+        "Dry Grass cut." :
+        patch.habitatGroupId === LEAFAGE_FLOWER_GROUP_ID ?
+        "Flower destroyed." :
+        patch.leafageObjectId === LEAFAGE_OBJECT_ID_GARDEN_1 ?
+        "Garden-1 destroyed." :
+        "Tall Grass destroyed."
+    );
+    return true;
   }
 
   function getBoulderShadedTallGrassHabitat(groundGrassPatches) {
@@ -645,6 +867,127 @@ export function createGameplayInteractions({
     return true;
   }
 
+  function craftStrawBedAtWorkbench({ storyState, inventory } = {}) {
+    const strawBedRecipe = placeholderRecipes.strawBed;
+
+    if (!storyState?.flags || !inventory || !strawBedRecipe) {
+      return false;
+    }
+
+    if (storyState.flags.strawBedCrafted) {
+      return false;
+    }
+
+    if (!hasItems(inventory, strawBedRecipe.ingredients)) {
+      pushNotice(`Missing: ${formatRequirementSummary(strawBedRecipe.ingredients, inventory)}`);
+      return false;
+    }
+
+    consumeItems(inventory, strawBedRecipe.ingredients);
+    addItems(inventory, strawBedRecipe.output);
+    storyState.flags.strawBedCrafted = true;
+    syncInventoryUi(inventory);
+    questSystem?.emit?.({
+      type: QUEST_EVENT.BUILD,
+      targetId: STRAW_BED_ITEM_ID,
+      amount: 1
+    });
+    onStrawBedCrafted({
+      recipe: strawBedRecipe
+    });
+    return true;
+  }
+
+  function craftLeafDenKitAtWorkbench({ storyState, inventory } = {}) {
+    if (!storyState?.flags || !inventory) {
+      return false;
+    }
+
+    if (!storyState.flags.leafDenKitPurchaseAvailable && !storyState.flags.leafDenBuildAvailable) {
+      pushNotice("House is still locked.");
+      return false;
+    }
+
+    if (!hasItems(inventory, HOUSE_WORKBENCH_RECIPE.ingredients)) {
+      pushNotice(`Missing: ${formatRequirementSummary(HOUSE_WORKBENCH_RECIPE.ingredients, inventory)}`);
+      return false;
+    }
+
+    consumeItems(inventory, HOUSE_WORKBENCH_RECIPE.ingredients);
+    addItems(inventory, HOUSE_WORKBENCH_RECIPE.output);
+    storyState.flags.leafDenKitPurchased = true;
+    storyState.flags.leafDenBuildAvailable = true;
+    storyState.flags.leafDenKitSelected = true;
+    syncInventoryUi(inventory);
+    questSystem?.emit?.({
+      type: QUEST_EVENT.BUILD,
+      targetId: LEAF_DEN_KIT_ITEM_ID,
+      amount: 1
+    });
+    pushNotice("You created a House Kit.");
+    return true;
+  }
+
+  function getLockedRecipeStatus(recipe, inventory = {}) {
+    const requirementSummary = formatRequirementSummary(recipe?.ingredients || {}, inventory);
+    return requirementSummary ? `Locked · Needs ${requirementSummary}` : "Locked";
+  }
+
+  function getWorkbenchRecipeOptions(storyState, inventory = {}) {
+    const flags = storyState?.flags || {};
+    const recipeOptions = [];
+
+    if (placeholderRecipes.campfire) {
+      const campfireUnlocked = Boolean(flags.workbenchDiyRecipesReceived);
+      recipeOptions.push({
+        recipe: placeholderRecipes.campfire,
+        disabled: Boolean(flags.campfireCrafted || !campfireUnlocked),
+        status: flags.campfireCrafted ?
+          "Created" :
+          campfireUnlocked ?
+            null :
+            getLockedRecipeStatus(placeholderRecipes.campfire, inventory)
+      });
+    }
+
+    if (placeholderRecipes.strawBed) {
+      const strawBedUnlocked = Boolean(flags.strawBedRecipeUnlocked);
+      recipeOptions.push({
+        recipe: placeholderRecipes.strawBed,
+        disabled: Boolean(flags.strawBedCrafted || !strawBedUnlocked),
+        status: flags.strawBedCrafted ?
+          "Created" :
+          strawBedUnlocked ?
+            null :
+            getLockedRecipeStatus(placeholderRecipes.strawBed, inventory)
+      });
+    }
+
+    const houseCreated = Boolean(
+      flags.leafDenKitPurchased ||
+      flags.leafDenKitPlaced ||
+      flags.leafDenBuilt ||
+      Number(inventory[LEAF_DEN_KIT_ITEM_ID] || 0) > 0
+    );
+    const houseUnlocked = Boolean(
+      houseCreated ||
+      flags.leafDenKitPurchaseAvailable ||
+      flags.leafDenBuildAvailable
+    );
+
+    recipeOptions.push({
+      recipe: HOUSE_WORKBENCH_RECIPE,
+      disabled: Boolean(!houseUnlocked),
+      status: houseCreated ?
+        `Needs ${formatRequirementSummary(HOUSE_WORKBENCH_RECIPE.ingredients, inventory)}` :
+        houseUnlocked ?
+          null :
+          "Locked"
+    });
+
+    return recipeOptions;
+  }
+
   function handleStationInteraction(stationId, storyState, inventory) {
     if (
       stationId === "workbench" &&
@@ -657,46 +1000,11 @@ export function createGameplayInteractions({
 
     if (
       stationId === "workbench" &&
-      storyState.flags.workbenchDiyRecipesReceived &&
-      !storyState.flags.campfireCrafted
+      getWorkbenchRecipeOptions(storyState, inventory).length > 0
     ) {
-      const campfireRecipe = placeholderRecipes.campfire;
+      const recipes = getWorkbenchRecipeOptions(storyState, inventory);
 
-      if (!hasItems(inventory, campfireRecipe.ingredients)) {
-        pushNotice(`Missing: ${formatRequirementSummary(campfireRecipe.ingredients, inventory)}`);
-        return false;
-      }
-
-      onCampfireCraftRequested({
-        recipe: campfireRecipe
-      });
-      return true;
-    }
-
-    if (
-      stationId === "workbench" &&
-      storyState.flags.strawBedRecipeUnlocked &&
-      !storyState.flags.strawBedCrafted
-    ) {
-      const strawBedRecipe = placeholderRecipes.strawBed;
-
-      if (!hasItems(inventory, strawBedRecipe.ingredients)) {
-        pushNotice(`Missing: ${formatRequirementSummary(strawBedRecipe.ingredients, inventory)}`);
-        return false;
-      }
-
-      consumeItems(inventory, strawBedRecipe.ingredients);
-      addItems(inventory, strawBedRecipe.output);
-      storyState.flags.strawBedCrafted = true;
-      syncInventoryUi(inventory);
-      questSystem?.emit?.({
-        type: QUEST_EVENT.BUILD,
-        targetId: STRAW_BED_ITEM_ID,
-        amount: 1
-      });
-      onStrawBedCrafted({
-        recipe: strawBedRecipe
-      });
+      onWorkbenchCraftOptionsRequested({ recipes });
       return true;
     }
 
@@ -740,22 +1048,6 @@ export function createGameplayInteractions({
     const npcProfile = npcProfiles[npcId];
 
     if (npcId === "tangrowth") {
-      if (
-        storyState.flags.campfireCrafted &&
-        !storyState.flags.campfireSpatOut
-      ) {
-        if (!storyState.flags.campfireSelectedForTangrowth) {
-          pushNotice("Open the bag with X and select the Campfire first.");
-          return false;
-        }
-
-        onDialogueOpen();
-        onCampfireSpitOutRequested({
-          targetId: npcId
-        });
-        return true;
-      }
-
       if (
         storyState.flags.tangrowthLogChairRequestAvailable &&
         !storyState.flags.logChairReceived
@@ -1078,11 +1370,14 @@ export function createGameplayInteractions({
     storyState,
     inventory = null,
     groundDeadInstances = [],
+    iceGroundInstances = [],
     groundPurifiedInstances = [],
     groundGrassPatches = [],
     groundFlowerPatches = [],
     canPurifyGround = false,
-    canUseLeafage = false
+    canUseLeafage = false,
+    canUseFire = false,
+    allowPlacement = true
   }) {
     const nearbyHarvestTarget = findNearbyHarvestTarget(
       playerPosition,
@@ -1098,6 +1393,7 @@ export function createGameplayInteractions({
         nearbyHarvestTarget;
 
     if (
+      allowPlacement &&
       storyState?.flags?.logChairReceived &&
       !storyState?.flags?.logChairPlaced &&
       (inventory?.[LOG_CHAIR_ITEM_ID] || 0) > 0
@@ -1109,8 +1405,8 @@ export function createGameplayInteractions({
     }
 
     if (
+      allowPlacement &&
       storyState?.flags?.strawBedCrafted &&
-      storyState?.flags?.strawBedSelectedForBulbasaur &&
       !storyState?.flags?.strawBedPlacedInBulbasaurHabitat &&
       (inventory?.[STRAW_BED_ITEM_ID] || 0) > 0
     ) {
@@ -1125,9 +1421,9 @@ export function createGameplayInteractions({
     }
 
     if (
+      allowPlacement &&
       storyState?.flags?.leafDenBuildAvailable &&
       storyState?.flags?.leafDenKitSelected &&
-      !storyState?.flags?.leafDenKitPlaced &&
       (inventory?.[LEAF_DEN_KIT_ITEM_ID] || 0) > 0
     ) {
       return {
@@ -1137,6 +1433,7 @@ export function createGameplayInteractions({
     }
 
     if (
+      allowPlacement &&
       storyState?.flags?.leafDenFurnitureRequestAvailable &&
       storyState?.flags?.leafDenInteriorEntered &&
       !storyState?.flags?.leafDenFurnitureRequestComplete &&
@@ -1149,6 +1446,7 @@ export function createGameplayInteractions({
     }
 
     if (
+      allowPlacement &&
       storyState?.flags?.dittoFlagReceived &&
       storyState?.flags?.dittoFlagSelectedForHouse &&
       !storyState?.flags?.dittoFlagPlacedOnHouse &&
@@ -1184,6 +1482,17 @@ export function createGameplayInteractions({
       };
     }
 
+    const nearbyFireTarget = canUseFire ?
+      findNearbyFireGroundCell(playerPosition, iceGroundInstances) :
+      null;
+
+    if (nearbyFireTarget) {
+      return {
+        fireGroundCell: nearbyFireTarget.groundCell,
+        distance: nearbyFireTarget.distance
+      };
+    }
+
     if (!canPurifyGround) {
       return nearestTarget;
     }
@@ -1216,6 +1525,7 @@ export function createGameplayInteractions({
     storyState,
     inventory,
     groundGrassPatches = [],
+    groundFlowerPatches = [],
     logChair = null,
     leafDen = null,
     leppaTree = null,
@@ -1262,6 +1572,10 @@ export function createGameplayInteractions({
         return leppaTree?.position || null;
       }
 
+      if (target.kind === "leppaTreeLeafageOptions") {
+        return leppaTree?.position || null;
+      }
+
       return null;
     };
 
@@ -1280,6 +1594,14 @@ export function createGameplayInteractions({
 
       onNpcInteractionStart(interactionStartEvent);
     };
+
+    if (canPlaceCraftedCampfire(storyState, inventory)) {
+      missedInteractAttempts = 0;
+      onCampfireSpitOutRequested({
+        playerPosition
+      });
+      return true;
+    }
 
     const nearbyTarget = findNearbyInteractable(
       playerPosition,
@@ -1363,7 +1685,7 @@ export function createGameplayInteractions({
       if (
         (storyState.flags.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
       ) {
-        storyState.flags.bulbasaurDryGrassMissionComplete = true;
+        completeBulbasaurDryGrassMission(storyState);
       }
       onBulbasaurDryGrassMissionAccepted();
       return true;
@@ -1434,6 +1756,23 @@ export function createGameplayInteractions({
       return true;
     }
 
+    if (target.kind === "leppaTreeLeafageOptions") {
+      notifyInteractionStart(target);
+      onLeppaTreeLeafageOptionsRequested({
+        targetId: target.id
+      });
+      return true;
+    }
+
+    if (target.action === "destroyInstantiatedObject") {
+      return destroyInstantiatedObjectPatch(
+        target,
+        groundGrassPatches,
+        groundFlowerPatches,
+        storyState
+      );
+    }
+
     if (target.kind === "leppaBerryGift") {
       notifyInteractionStart(target);
       markPokemonFollowing(storyState, target.id);
@@ -1484,7 +1823,14 @@ export function createGameplayInteractions({
 
     if (target.kind === "pokemonCompanion") {
       notifyInteractionStart(target);
-      markPokemonFollowing(storyState, target.id);
+      if (!markPokemonFollowing(storyState, target.id, {
+        followFlags: pokemonFollowFlags,
+        maxFollowers: maxPokemonFollowers
+      })) {
+        pushNotice("Follower group is full.");
+        return true;
+      }
+
       pushNotice(`${POKEMON_FOLLOW_NAMES[target.id] || target.label || "Pokemon"} is following you.`);
       return true;
     }
@@ -1545,13 +1891,17 @@ export function createGameplayInteractions({
     leafDen = null,
     leppaBerryDrops = [],
     groundDeadInstances = [],
+    iceGroundInstances = [],
     groundFlowerPatches = [],
     groundPurifiedInstances = [],
     groundGrassPatches = [],
     canPurifyGround = false,
     canUseLeafage = false,
+    canUseFire = false,
     useWaterGun = false,
-    forcedHarvestTarget = null
+    useFire = false,
+    forcedHarvestTarget = null,
+    allowPlacement = true
   }) {
     const nearbyHarvestTarget = forcedHarvestTarget || findNearbyActionTarget({
       playerPosition,
@@ -1563,11 +1913,14 @@ export function createGameplayInteractions({
       storyState,
       inventory,
       groundDeadInstances,
+      iceGroundInstances,
       groundPurifiedInstances,
       groundGrassPatches,
       groundFlowerPatches,
       canPurifyGround,
-      canUseLeafage
+      canUseLeafage,
+      canUseFire,
+      allowPlacement
     });
 
     if (nearbyHarvestTarget) {
@@ -1635,7 +1988,8 @@ export function createGameplayInteractions({
         playerPosition,
         palmModel,
         palmInstances,
-        storyState
+        storyState,
+        woodDrops
       );
 
       if (!wateredPalm.hit) {
@@ -1669,25 +2023,47 @@ export function createGameplayInteractions({
         })?.groundCell;
 
       if (leafageGroundCell) {
-        const leafageGrassPatch = growLeafageGrassPatch(
+        const leafagePatchResult = growLeafagePatch(
           leafageGroundCell,
           groundGrassPatches,
+          groundFlowerPatches,
           storyState
         );
 
-        if (leafageGrassPatch) {
+        if (leafagePatchResult?.patch) {
+          const { patch: leafagePatch, type: leafagePatchType } = leafagePatchResult;
+
           questSystem?.emit?.({
             type: QUEST_EVENT.PLACE,
             targetId: "leafy-home-patch"
           });
           onNaturePatchRevived({
-            patch: leafageGrassPatch,
-            type: "grass"
+            patch: leafagePatch,
+            type: leafagePatchType
           });
           habitatSystem?.recordEvent?.({
             type: HABITAT_EVENT.REVIVE_PATCH,
-            targetId: "grass"
+            targetId: leafagePatchType
           });
+
+          if (leafagePatchType === "flower") {
+            const leafageFlowerBedHabitat = getRestoredFlowerBedHabitat(
+              leafagePatch,
+              groundFlowerPatches
+            );
+
+            if (recordRestoredFlowerBedHabitat(storyState, leafageFlowerBedHabitat)) {
+              pushNotice("A pretty flower bed bloomed.", 3.6);
+              habitatSystem?.recordEvent?.({
+                type: HABITAT_EVENT.RESTORE_HABITAT,
+                targetId: "pretty-flower-bed"
+              });
+              return true;
+            }
+
+            pushNotice("Leafage grew a flower.");
+            return true;
+          }
 
           const boulderShadedTallGrassHabitat = recordBoulderShadedTallGrassHabitat(
             storyState,
@@ -1717,7 +2093,11 @@ export function createGameplayInteractions({
             return true;
           }
 
-          pushNotice("Leafage grew tall grass.");
+          pushNotice(
+            leafagePatch.leafageObjectId === LEAFAGE_OBJECT_ID_GARDEN_1 ?
+              "Leafage grew a garden." :
+              "Leafage grew tall grass."
+          );
           return true;
         }
       }
@@ -1725,6 +2105,35 @@ export function createGameplayInteractions({
       const nearbyDryGroundCell = findNearbyGroundCell(playerPosition, groundDeadInstances);
       if (nearbyDryGroundCell?.groundCell) {
         pushNotice("Leafage needs restored ground. Use Water Gun here first.");
+        return false;
+      }
+    }
+
+    if (canUseFire || useFire) {
+      const fireGroundCell =
+        nearbyHarvestTarget?.fireGroundCell ||
+        findNearbyFireGroundCell(playerPosition, iceGroundInstances)?.groundCell;
+
+      if (fireGroundCell) {
+        if (!canUseCharmanderFireWithCarbon({ storyState, inventory })) {
+          pushNotice("Charmander needs Carbon to use Fire.");
+          return false;
+        }
+
+        const burned = burnFireGroundCell(
+          fireGroundCell,
+          iceGroundInstances,
+          groundDeadInstances
+        );
+
+        if (burned) {
+          recordCharmanderFireCarbonUse({ storyState, inventory, syncInventoryUi });
+          pushNotice("Fire burned the white ground into dry ground.");
+          return true;
+        }
+      }
+
+      if (useFire || forcedHarvestTarget?.fireGroundCell) {
         return false;
       }
     }
@@ -1771,13 +2180,21 @@ export function createGameplayInteractions({
         );
 
         if (revivedGrass) {
+          const dryGrassMissionAlreadyComplete = Boolean(
+            storyState.flags.bulbasaurDryGrassMissionComplete
+          );
           storyState.flags.restoredGrassCount =
             (storyState.flags.restoredGrassCount || 0) + 1;
           if (
+            !dryGrassMissionAlreadyComplete &&
             storyState.flags.bulbasaurDryGrassMissionAccepted &&
             storyState.flags.restoredGrassCount >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT
           ) {
             completeBulbasaurDryGrassMission(storyState);
+          } else if (dryGrassMissionAlreadyComplete) {
+            recordFirstTaughtActionFreedomUse(storyState, {
+              actionId: FIRST_TAUGHT_ACTION_IDS.WATER_DRY_GRASS
+            });
           }
           questSystem?.emit?.({
             type: QUEST_EVENT.BUILD,
@@ -1887,12 +2304,14 @@ export function createGameplayInteractions({
       }
     }
 
-    pushMissedHarvestNotice({ canPurifyGround, canUseLeafage });
+    pushMissedHarvestNotice({ canPurifyGround, canUseLeafage, canUseFire });
     return false;
   }
 
   return {
     craftCampfireAtWorkbench,
+    craftLeafDenKitAtWorkbench,
+    craftStrawBedAtWorkbench,
     findNearbyActionTarget,
     performHarvestAction,
     performInteractAction,

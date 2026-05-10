@@ -276,38 +276,42 @@ export const COMPANION_ABILITIES = deepFreeze([
     narrativePurpose: "Lets water problems become routing choices instead of static blockers."
   },
   {
-    id: "charmander-ember",
+    id: "charmander-fire",
     companionId: "charmander",
     companionName: "Charmander",
     element: "fire",
-    abilityId: "ember",
-    moveId: "ember",
-    label: "Ember",
-    status: COMPANION_ABILITY_STATUS.PLANNED,
-    kind: COMPANION_ABILITY_KIND.HELPER_EVENT,
+    abilityId: "fire",
+    moveId: "fire",
+    label: "Fire",
+    status: COMPANION_ABILITY_STATUS.PARTIAL,
+    kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
-      source: "planned-skill",
+      source: "story-beat",
       storyBeatId: "charmander-discovery",
-      when: "Charmander is discovered in the Leafage tall grass habitat. The formal player skill still needs design."
+      questEvent: {
+        type: "UNLOCK",
+        targetId: "fire"
+      },
+      when: "Charmander is discovered in the Leafage tall grass habitat."
     },
     currentRuntime: {
       storyBeatId: "charmander-campfire-lit",
       storyFlag: "charmanderCampfireLit",
-      behavior: "Charmander currently follows the player and lights the Campfire as a companion event."
+      behavior: "Charmander can be selected as a field move companion and can move into the Train House."
     },
     runtime: {
-      skillDefId: null,
-      activeFieldMove: false
+      skillDefId: "fire",
+      activeFieldMove: true
     },
     targets: [
-      "campfire",
-      "future-fire-target"
+      "train-house",
+      "white-ground"
     ],
     worldEffects: [
-      "lights campfires",
-      "enables fire-based habitat interactions"
+      "turns the Train House into Charmander's home",
+      "turns white ground into dry ground for Water Gun restoration"
     ],
-    notes: "This captures the intended fire ability slot before it becomes a formal player field move.",
+    notes: "Field move: selectable after Charmander discovery; supports Charmander's home and terrain burn interactions.",
     narrativePurpose: "Uses warmth to turn shelter and gathering places into emotional recovery beats."
   }
 ]);

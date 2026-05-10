@@ -220,9 +220,48 @@ function getTrackedTaskDescription(storyState = {}, task) {
   return task?.description || "";
 }
 
+function getTrackedTaskSubtasks(storyState = {}, task) {
+  if (typeof task?.subtasks !== "function") {
+    return [];
+  }
+
+  const subtasks = task.subtasks(storyState);
+  return Array.isArray(subtasks) ? subtasks.filter(Boolean) : [];
+}
+
+function renderTrackedTaskSubtasksHtml(storyState = {}, task) {
+  const subtasks = getTrackedTaskSubtasks(storyState, task);
+  if (!subtasks.length) {
+    return "";
+  }
+
+  return `
+    <span class="hud-checklist__subtasks" style="display:grid;gap:4px;margin-top:7px;">
+      ${subtasks.map((subtask) => `
+        <span
+          class="hud-checklist__subtask"
+          data-subtask-id="${escapeHtml(subtask.id || subtask.label || "")}"
+          data-done="${subtask.done ? "true" : "false"}"
+          style="display:grid;grid-template-columns:14px minmax(0, 1fr);gap:6px;align-items:start;color:${subtask.done ? "#9cffb1" : "var(--game-ui-muted)"};"
+        >
+          <span
+            class="hud-checklist__subtask-box"
+            aria-hidden="true"
+            style="width:12px;height:12px;margin-top:2px;border:2px solid ${subtask.done ? "#9cffb1" : "#f5c16a"};background:${subtask.done ? "#2a8f45" : "transparent"};box-shadow:0 0 0 2px rgba(0,0,0,.22);"
+          ></span>
+          <span class="hud-checklist__subtask-copy" style="min-width:0;font-size:16px;line-height:1.08;text-transform:none;">
+            ${escapeHtml(subtask.label || "")}${subtask.progress ? ` · ${escapeHtml(subtask.progress)}` : ""}
+          </span>
+        </span>
+      `).join("")}
+    </span>
+  `;
+}
+
 function renderTrackedTaskChecklistHtml(storyState = {}, options = {}) {
   return getTrackedTaskRenderEntries(storyState, options).map((entry) => {
     const description = getTrackedTaskDescription(storyState, entry.task);
+    const subtasksHtml = renderTrackedTaskSubtasksHtml(storyState, entry.task);
 
     return `
       <div
@@ -235,6 +274,7 @@ function renderTrackedTaskChecklistHtml(storyState = {}, options = {}) {
         <span class="hud-checklist__content">
           <strong class="hud-checklist__task-title">${escapeHtml(entry.task.title)}</strong>
           <span class="hud-checklist__task-copy">${escapeHtml(description)}</span>
+          ${subtasksHtml}
         </span>
       </div>
     `;
@@ -273,6 +313,18 @@ function renderQuestMissionCardHtml(quest) {
       <span>${escapeHtml(formatObjectiveLabel(objective))} ${escapeHtml(formatQuestObjective(objective))}</span>
     `).join("")
   });
+}
+
+function shouldRenderQuestLogCard(quest, activeQuest) {
+  if (!quest) {
+    return false;
+  }
+
+  if (quest.id === activeQuest?.id) {
+    return true;
+  }
+
+  return !(quest.id === "learn-to-move" && quest.status === "completed");
 }
 
 function renderTrackedTaskCardHtml(storyState = {}, entry) {
@@ -335,9 +387,11 @@ export function createQuestLog({
 
     const questLog = questSystem.getQuestLog();
     const activeQuest = getActiveQuest();
-    const activeQuestCardsHtml = activeQuest ? renderQuestMissionCardHtml(activeQuest) : "";
+    const activeQuestCardsHtml = shouldRenderQuestLogCard(activeQuest, activeQuest) ?
+      renderQuestMissionCardHtml(activeQuest) :
+      "";
     const remainingQuestCardsHtml = questLog
-      .filter((quest) => quest.id !== activeQuest?.id)
+      .filter((quest) => quest.id !== activeQuest?.id && shouldRenderQuestLogCard(quest, activeQuest))
       .map(renderQuestMissionCardHtml)
       .join("");
     const trackedCardsHtml = getTrackedTaskRenderEntries(storyState, options)

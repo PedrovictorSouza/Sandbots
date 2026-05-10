@@ -93,4 +93,32 @@ describe("createGameplayDialogueController", () => {
       "next-effects"
     ]);
   });
+
+  it("opens a name-entry keyboard with typing, delete, navigation and confirm", () => {
+    const uiLayer = document.createElement("div");
+    const onComplete = vi.fn();
+    const controller = createGameplayDialogueController({ uiLayer });
+
+    controller.openNameEntry({ onComplete });
+
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyA", key: "a" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyD", key: "d" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "Backspace", key: "Backspace" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyA", key: "a" }));
+
+    expect(uiLayer.textContent).toContain("AA");
+
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowDown", key: "ArrowDown" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowDown", key: "ArrowDown" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowDown", key: "ArrowDown" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowRight", key: "ArrowRight" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowRight", key: "ArrowRight" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      playerName: "AA",
+      nameConfirmation: "yes"
+    });
+    expect(controller.isActive()).toBe(false);
+  });
 });

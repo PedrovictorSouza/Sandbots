@@ -1,10 +1,15 @@
 import {
+  CARBON_ITEM_ID,
   NPC_DEFS,
   OUTPOST_INSTANCE_LAYOUT,
   RUINED_POKEMON_CENTER_POSITION,
   WORLD_LIMIT,
   WORKBENCH_POSITION
 } from "../../gameplayContent.js";
+import {
+  bindPurifiedGroundVariantInstances,
+  syncPurifiedGroundVariantInstances
+} from "../../groundGrid.js";
 import { buildIntroRoomScene } from "../scenes/introRoom/buildIntroRoomScene.js";
 import { createFacingStaticController } from "../../world/islandWorld.js";
 import { createChopperNpcActor } from "./chopperNpcActor.js";
@@ -18,6 +23,17 @@ const WORKSHOP_BASE_YAW = -0.18;
 const WORKSHOP_DISMANTLED_GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const WORKSHOP_DISMANTLED_MIN_RADIUS = 0.936;
 const WORKSHOP_DISMANTLED_RADIUS_STEP = 0.338;
+const SOLAR_STATION_MODEL_FACE_YAW_OFFSET = 0;
+const SOLAR_STATION_MODEL_SCALE = 8;
+const SOLAR_STATION_MODEL_GROUND_Y = 0.02;
+const TRAIN_HOUSE_MODEL_FACE_YAW_OFFSET = 0;
+const TRAIN_HOUSE_MODEL_SCALE = 3;
+const TRAIN_HOUSE_MODEL_GROUND_Y = 0.02;
+const LEAF_DEN_MODEL_FACE_YAW_OFFSET = 0;
+const LEAF_DEN_MODEL_SCALE = 2;
+const LEAF_DEN_MODEL_GROUND_Y = 0.02;
+const LEAFAGE_GARDEN_MODEL_FACE_YAW_OFFSET = 0;
+const LEAFAGE_GARDEN_MODEL_SCALE = 1.15;
 const CLOUD_MODEL_FACE_YAW_OFFSET = 0;
 const CLOUD_ATMOSPHERE_COUNT = 16;
 const CLOUD_ATMOSPHERE_GROUND_Y = 0.075;
@@ -27,6 +43,7 @@ const CLOUD_SHADOW_LIGHT_OFFSET_Z = 2.15;
 const PLAYER_DUST_CLOUD_DRAW_DISTANCE = 34;
 const PLAYER_DUST_CLOUD_BRIGHTNESS = 0.94;
 const BEE_FIELD_DRAW_DISTANCE = 72;
+const CHARMANDER_MODEL_SCALE = 0.75;
 
 function withTerrainSupportDrawDistance(sceneObject) {
   return {
@@ -154,26 +171,43 @@ export function buildSceneAssembly(session, assets) {
   const {
     groundDeadModel,
     groundPurifiedModel,
+    groundPurifiedAltModel,
     houseModel,
     palmModel,
+    tree2Model,
     deadTreeModel,
     leppaTreeDeadModel,
+    iceGroundModel,
+    solarStationModel,
+    trainHouseModel,
     tallGrassModel,
     deadGrassModel,
     workbenchModel,
     workshopModel,
     boxModel,
+    carbonOreModel,
     cloudModel,
     cloudShadowModel,
+    garden1Model,
+    leafDenModel,
     chopperBodyModel,
     chopperPropellerModel,
     playerModel,
     robot1Model,
     robot2Model,
+    charmanderModel,
     beeModel,
     gameplayOpeningShipModel,
     characterFactory
   } = assets;
+
+  session.groundPurifiedLightInstances = session.groundPurifiedLightInstances || [];
+  session.groundPurifiedAltInstances = session.groundPurifiedAltInstances || [];
+  bindPurifiedGroundVariantInstances(session.groundPurifiedInstances, {
+    lightInstances: session.groundPurifiedLightInstances,
+    darkInstances: session.groundPurifiedAltInstances
+  });
+  syncPurifiedGroundVariantInstances(session.groundPurifiedInstances);
 
   session.sceneObjects = [
     {
@@ -183,9 +217,21 @@ export function buildSceneAssembly(session, assets) {
       drawDistanceFromCameraTarget: TERRAIN_DRAW_DISTANCE_FROM_CAMERA_TARGET,
       distantTerrainDrawDistanceFromCameraTarget: DISTANT_TERRAIN_DRAW_DISTANCE_FROM_CAMERA_TARGET
     },
+    {
+      model: iceGroundModel,
+      instances: session.iceGroundInstances || [],
+      brightness: 0.96,
+      drawDistanceFromCameraTarget: TERRAIN_DRAW_DISTANCE_FROM_CAMERA_TARGET,
+      distantTerrainDrawDistanceFromCameraTarget: DISTANT_TERRAIN_DRAW_DISTANCE_FROM_CAMERA_TARGET
+    },
     withTerrainSupportDrawDistance({
       model: groundPurifiedModel,
-      instances: session.groundPurifiedInstances,
+      instances: session.groundPurifiedLightInstances,
+      brightness: 0.75
+    }),
+    withTerrainSupportDrawDistance({
+      model: groundPurifiedAltModel || groundPurifiedModel,
+      instances: session.groundPurifiedAltInstances,
       brightness: 0.75
     })
   ];
@@ -209,6 +255,31 @@ export function buildSceneAssembly(session, assets) {
       model: tallGrassModel,
       instances: session.tallGrassInstances,
       brightness: 1.06
+    }));
+  }
+
+  session.leafageGardenModel = garden1Model || null;
+  session.leafageGardenModelFaceYawOffset = LEAFAGE_GARDEN_MODEL_FACE_YAW_OFFSET;
+  session.leafageGardenModelScale = LEAFAGE_GARDEN_MODEL_SCALE;
+  session.leafageGardenInstances = session.leafageGardenInstances || [];
+
+  if (garden1Model) {
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: garden1Model,
+      instances: session.leafageGardenInstances,
+      brightness: 1.04
+    }));
+  }
+
+  session.carbonOreInstances = session.resourceNodes.filter((resourceNode) => {
+    return resourceNode.itemId === CARBON_ITEM_ID && resourceNode.usesModelInstance;
+  });
+
+  if (carbonOreModel && session.carbonOreInstances.length) {
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: carbonOreModel,
+      instances: session.carbonOreInstances,
+      brightness: 0.92
     }));
   }
 
@@ -241,7 +312,18 @@ export function buildSceneAssembly(session, assets) {
   if (palmModel) {
     session.sceneObjects.push(withTerrainSupportDrawDistance({
       model: palmModel,
-      instances: session.palmInstances.map((instance) => instance.aliveInstance || instance)
+      instances: session.palmInstances
+        .map((instance) => instance.aliveInstance || instance)
+        .filter((instance) => instance.aliveModelKey !== "tree2" || !tree2Model)
+    }));
+  }
+
+  if (tree2Model) {
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: tree2Model,
+      instances: session.palmInstances
+        .map((instance) => instance.aliveInstance || instance)
+        .filter((instance) => instance.aliveModelKey === "tree2")
     }));
   }
 
@@ -284,6 +366,86 @@ export function buildSceneAssembly(session, assets) {
         brightness: 0.62
       }));
     });
+  }
+
+  if (solarStationModel) {
+    const strawBedPosition = session.strawBed?.position || null;
+    if (session.strawBed) {
+      session.strawBed.kind = "solarStation";
+      session.strawBed.size = [0, 0];
+    }
+
+    session.strawBedModelInstance = {
+      id: "straw-bed-solar-station-model",
+      offset: Array.isArray(strawBedPosition) ?
+        [strawBedPosition[0], SOLAR_STATION_MODEL_GROUND_Y, strawBedPosition[2]] :
+        [0, SOLAR_STATION_MODEL_GROUND_Y, 0],
+      scale: SOLAR_STATION_MODEL_SCALE,
+      yaw: SOLAR_STATION_MODEL_FACE_YAW_OFFSET,
+      active: Boolean(strawBedPosition)
+    };
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: solarStationModel,
+      instances: [session.strawBedModelInstance],
+      brightness: 1
+    }));
+  }
+
+  if (trainHouseModel) {
+    const campfirePosition = session.campfire?.position || null;
+    session.campfireTrainHouseModelInstance = {
+      id: "campfire-train-house-model",
+      offset: Array.isArray(campfirePosition) ?
+        [campfirePosition[0], TRAIN_HOUSE_MODEL_GROUND_Y, campfirePosition[2]] :
+        [0, TRAIN_HOUSE_MODEL_GROUND_Y, 0],
+      scale: TRAIN_HOUSE_MODEL_SCALE,
+      yaw: TRAIN_HOUSE_MODEL_FACE_YAW_OFFSET,
+      active: Boolean(campfirePosition)
+    };
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: trainHouseModel,
+      instances: [session.campfireTrainHouseModelInstance],
+      brightness: 1
+    }));
+  }
+
+  if (leafDenModel) {
+    const leafDenPosition = session.leafDen?.position || null;
+    session.leafDenModelInstance = {
+      id: "leaf-den-model",
+      offset: Array.isArray(leafDenPosition) ?
+        [leafDenPosition[0], LEAF_DEN_MODEL_GROUND_Y, leafDenPosition[2]] :
+        [0, LEAF_DEN_MODEL_GROUND_Y, 0],
+      scale: LEAF_DEN_MODEL_SCALE,
+      yaw: LEAF_DEN_MODEL_FACE_YAW_OFFSET,
+      active: false
+    };
+    session.leafDenPlacementPreviewModelInstance = {
+      id: "leaf-den-placement-preview-model",
+      offset: [0, LEAF_DEN_MODEL_GROUND_Y, 0],
+      scale: LEAF_DEN_MODEL_SCALE,
+      yaw: LEAF_DEN_MODEL_FACE_YAW_OFFSET,
+      active: false
+    };
+    session.playerHouseModelInstances = (session.playerHouses || []).map((house, index) => ({
+      id: `${house.id || `player-house-${index}`}-model`,
+      offset: Array.isArray(house.position) ?
+        [house.position[0], LEAF_DEN_MODEL_GROUND_Y, house.position[2]] :
+        [0, LEAF_DEN_MODEL_GROUND_Y, 0],
+      scale: LEAF_DEN_MODEL_SCALE,
+      yaw: LEAF_DEN_MODEL_FACE_YAW_OFFSET + Number(house.yaw || 0),
+      active: Boolean(house.position)
+    }));
+    session.leafDenModelInstances = [
+      session.leafDenModelInstance,
+      session.leafDenPlacementPreviewModelInstance,
+      ...session.playerHouseModelInstances
+    ];
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: leafDenModel,
+      instances: session.leafDenModelInstances,
+      brightness: 1.04
+    }));
   }
 
   if (session.leppaTree) {
@@ -362,6 +524,21 @@ export function buildSceneAssembly(session, assets) {
     session.sceneObjects.push(withTerrainSupportDrawDistance({
       model: robot2Model,
       instances: [session.bulbasaurEncounter.modelInstance],
+      brightness: 1
+    }));
+  }
+
+  if (charmanderModel && session.charmanderEncounter) {
+    session.charmanderEncounter.model = charmanderModel;
+    session.charmanderEncounter.modelInstance = {
+      offset: session.charmanderEncounter.position || [0, 0.04, 0],
+      scale: CHARMANDER_MODEL_SCALE,
+      yaw: 0,
+      active: false
+    };
+    session.sceneObjects.push(withTerrainSupportDrawDistance({
+      model: charmanderModel,
+      instances: [session.charmanderEncounter.modelInstance],
       brightness: 1
     }));
   }

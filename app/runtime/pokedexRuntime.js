@@ -1,4 +1,4 @@
-const POKEDEX_OVERLAY_ENABLED = false;
+const POKEDEX_OVERLAY_ENABLED = true;
 
 export function createPokedexRuntime({
   createLazyUiModule,
@@ -8,7 +8,8 @@ export function createPokedexRuntime({
   isBuilderPanelOpen = () => false,
   closeBuilderPanel = () => {},
   loadPokedexOverlay,
-  onScriptedClose = () => {}
+  onScriptedClose = () => {},
+  allowDebugLockedOpen = false
 }) {
   const state = {
     unlocked: false,
@@ -79,7 +80,7 @@ export function createPokedexRuntime({
   function setOpen(
     open,
     {
-      force = false,
+      allowLockedOpen = false,
       markSeen = true,
       scripted = false,
       entryId = null,
@@ -87,8 +88,8 @@ export function createPokedexRuntime({
       requestId = null
     } = {}
   ) {
-    if (open && !state.unlocked && !force) {
-      return;
+    if (open && !state.unlocked && !(allowLockedOpen && allowDebugLockedOpen)) {
+      return false;
     }
 
     if (!POKEDEX_OVERLAY_ENABLED) {
@@ -162,6 +163,8 @@ export function createPokedexRuntime({
     setSeen,
     closeFromUser
   };
+
+  syncUi();
 
   return runtime;
 }

@@ -68,7 +68,6 @@
 
 .ui-layer[data-mode="game"][data-gameplay-ui-hud="hidden"] .hud,
 .ui-layer[data-mode="game"][data-gameplay-ui-quest="hidden"] .quest-focus-panel,
-.ui-layer[data-mode="game"][data-gameplay-ui-bag-onboarding="hidden"] .bag-onboarding-panel,
 .ui-layer[data-mode="game"][data-gameplay-ui-bag-details="hidden"] .bag-details-panel,
 .ui-layer[data-mode="game"][data-gameplay-ui-missions="hidden"] .missions-panel,
 .ui-layer[data-mode="game"][data-gameplay-ui-nearby-habitats="hidden"] .nearby-habitats-panel,
@@ -84,7 +83,6 @@
 
 .quest-focus-panel,
 .nearby-habitats-panel,
-.bag-onboarding-panel,
 .bag-details-panel {
   opacity: 0;
   visibility: hidden;
@@ -105,7 +103,6 @@
 
 .ui-layer[data-mode="game"][data-gameplay-ui-quest="visible"] .quest-focus-panel,
 .ui-layer[data-mode="game"][data-gameplay-ui-nearby-habitats="visible"] .nearby-habitats-panel,
-.ui-layer[data-mode="game"][data-gameplay-ui-bag-onboarding="visible"] .bag-onboarding-panel,
 .ui-layer[data-mode="game"][data-gameplay-ui-bag-details="visible"] .bag-details-panel {
   opacity: 1;
   visibility: visible;
@@ -153,48 +150,6 @@
   border-top: 1px solid rgba(255, 255, 255, 0.18);
   font-size: 17px;
   line-height: 1.5;
-}
-
-.bag-onboarding-panel {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
-  width: 420px;
-  transform: translateY(-8px);
-}
-
-.bag-onboarding-panel__title {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.bag-onboarding-panel__body {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  font-size: 17px;
-  line-height: 1.5;
-}
-
-.bag-onboarding-panel__body p + p {
-  margin-top: 10px;
-}
-
-.bag-onboarding-panel__key {
-  display: inline-grid;
-  place-items: center;
-  min-width: 1.55em;
-  height: 1.55em;
-  margin: 0 0.12em;
-  padding: 0 0.3em;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  font-size: 0.88em;
-  font-weight: 700;
-  line-height: 1;
 }
 
 .bag-details-panel {
@@ -486,19 +441,6 @@
     transform 120ms steps(2, end);
 }
 
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .hud,
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .missions-panel,
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .inventory,
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .active-companion-hud,
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .status,
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .skills-panel,
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .quest-focus-panel,
-.ui-layer[data-mode="game"][data-gameplay-dialogue-active="true"] .nearby-habitats-panel {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
 .hud,
 .inventory,
 .skills-panel,
@@ -506,7 +448,6 @@
 .mission-card,
 .quest-focus-panel,
 .nearby-habitats-panel,
-.bag-onboarding-panel,
 .bag-details-panel,
 .act-two-dialogue__body,
 .act-two-dialogue__speaker {
@@ -560,8 +501,49 @@
   text-transform: uppercase;
 }
 
+.act-two-tutorial__speech[data-world-speech-variant="player-prompt"][data-world-prompt-kind="text"] .act-two-tutorial__speech-bubble {
+  will-change: opacity, transform;
+}
+
+.act-two-tutorial__speech[data-world-speech-variant="player-prompt"][data-world-prompt-kind="text"][data-prompt-motion="enter"] .act-two-tutorial__speech-bubble {
+  animation: player-counter-prompt-pop-in 260ms cubic-bezier(0.2, 1.35, 0.26, 1) both;
+}
+
+.act-two-tutorial__speech[data-world-speech-variant="player-prompt"][data-world-prompt-kind="text"][data-prompt-motion="exit"] .act-two-tutorial__speech-bubble {
+  animation: player-counter-prompt-float-out 260ms cubic-bezier(0.42, 0, 0.36, 1) both;
+}
+
 .act-two-tutorial__speech[data-world-speech-variant="player-prompt"] .act-two-tutorial__speech-bubble::after {
   display: none;
+}
+
+@keyframes player-counter-prompt-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.68);
+  }
+
+  64% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes player-counter-prompt-float-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-26px) scale(0.84);
+  }
 }
 
 .act-two-tutorial__speech[data-world-speech-variant="task-pop"] {
@@ -1296,8 +1278,6 @@
 
 .active-companion-hud__portrait-stack {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 18px;
-  gap: 2px;
   width: var(--active-companion-portrait-size);
   height: var(--active-companion-portrait-size);
   image-rendering: pixelated;
@@ -1316,34 +1296,6 @@
   image-rendering: pixelated;
 }
 
-.active-companion-hud__switch-controls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px;
-  min-height: 0;
-}
-
-.active-companion-hud__switch-button {
-  display: inline-grid;
-  grid-template-columns: auto auto;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 0;
-  height: 18px;
-  border: 2px solid #fff1e8;
-  background: rgba(17, 17, 27, 0.88);
-  color: #fff1e8;
-  font-size: 12px;
-  line-height: 1;
-  text-shadow: none;
-}
-
-.active-companion-hud__switch-pad {
-  color: #8ee8ff;
-  font-size: 9px;
-}
-
 .active-companion-hud__portrait-image {
   display: block;
   width: 100%;
@@ -1357,7 +1309,8 @@
   min-width: 0;
   max-height: 100%;
   overflow: hidden;
-  gap: 2px;
+  align-content: center;
+  gap: 1px;
 }
 
 .active-companion-hud__move,
@@ -1372,18 +1325,26 @@
 
 .active-companion-hud__move {
   color: #fff1e8;
-  font-size: 36px;
+  font-size: 24px;
 }
 
 .active-companion-hud__name {
   color: #b9f3ff;
-  font-size: 26px;
+  font-size: 18px;
 }
 
 .active-companion-hud__hint {
-  color: #fff;
-  font-size: 25px;
+  display: block;
   padding-left: 4px;
+}
+
+.active-companion-hud__hint-image {
+  display: block;
+  width: auto;
+  height: 26px;
+  max-width: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .active-companion-hud[data-companion-id="bulbasaur"] {

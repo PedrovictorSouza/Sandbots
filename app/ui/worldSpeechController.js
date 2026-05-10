@@ -7,11 +7,14 @@ const LARGE_TASK_POP_MESSAGES = new Set([
   "YOU TOOK YOUR FIRST STEPS!",
   "YOU RESTORED THE TALL GRASS!"
 ]);
+const FIELD_MOVE_SWITCH_CARD_MARKER = "data-field-move-switch-card";
+const PLAYER_PROMPT_EXIT_MOTION_MS = 260;
 
 export function createWorldSpeechController({ mount } = {}) {
   if (!(mount instanceof HTMLElement)) {
     throw new Error("World speech controller requires a valid mount element.");
   }
+  const windowRef = mount.ownerDocument?.defaultView || globalThis;
 
   const layer = document.createElement("div");
   layer.dataset.worldSpeechLayer = "true";
@@ -50,6 +53,7 @@ export function createWorldSpeechController({ mount } = {}) {
   layer.append(playerPrompt.speech);
   layer.append(taskPop.speech);
   mount.append(layer);
+  let playerPromptExitTimeout = null;
 
   const state = {
     active: false,
@@ -63,6 +67,26 @@ export function createWorldSpeechController({ mount } = {}) {
     taskPopWorldPosition: [0, 0, 0]
   };
 
+  function clearPlayerPromptExitTimeout() {
+    if (playerPromptExitTimeout === null) {
+      return;
+    }
+
+    windowRef.clearTimeout?.(playerPromptExitTimeout);
+    playerPromptExitTimeout = null;
+  }
+
+  function finishPromptHide() {
+    clearPlayerPromptExitTimeout();
+    playerPrompt.speech.hidden = true;
+    playerPrompt.speech.dataset.worldPromptKind = "text";
+    delete playerPrompt.speech.dataset.promptMotion;
+    playerPrompt.speech.style.transform = "";
+    playerPrompt.speech.style.transformOrigin = "";
+    playerPrompt.bubble.textContent = "";
+    layer.hidden = !state.active && !state.taskPopActive;
+  }
+
   function show({ text, worldPosition, anchorHeight = 2.35 } = {}) {
     state.active = true;
     state.anchorHeight = anchorHeight;
@@ -75,22 +99,57 @@ export function createWorldSpeechController({ mount } = {}) {
   function hide() {
     state.active = false;
     speech.hidden = true;
-    layer.hidden = !state.promptActive && !state.taskPopActive;
+    layer.hidden = playerPrompt.speech.hidden && !state.taskPopActive;
   }
 
   function showPrompt({ text, worldPosition, anchorHeight = 1.95 } = {}) {
+    const promptText = text || "";
+    const isFieldMoveSwitchCard = String(promptText).includes(FIELD_MOVE_SWITCH_CARD_MARKER);
+
+    clearPlayerPromptExitTimeout();
     state.promptActive = true;
     state.promptAnchorHeight = anchorHeight;
     state.promptWorldPosition = worldPosition ? [...worldPosition] : [0, 0, 0];
-    playerPrompt.bubble.textContent = text || "";
+    playerPrompt.speech.dataset.worldPromptKind = isFieldMoveSwitchCard ? "field-move-switch" : "text";
+    playerPrompt.speech.dataset.promptMotion = isFieldMoveSwitchCard ? "none" : "enter";
+    playerPrompt.speech.style.transform = isFieldMoveSwitchCard ?
+      "translate(104px, -58%) scale(calc(var(--overlay-scale) * 0.625))" :
+      "";
+    playerPrompt.speech.style.transformOrigin = isFieldMoveSwitchCard ? "center center" : "";
+
+    if (isFieldMoveSwitchCard) {
+      playerPrompt.bubble.innerHTML = promptText;
+    } else {
+      playerPrompt.bubble.textContent = promptText;
+    }
     playerPrompt.speech.hidden = false;
     layer.hidden = false;
+
+    if (!isFieldMoveSwitchCard) {
+      void playerPrompt.bubble.offsetWidth;
+      playerPrompt.speech.dataset.promptMotion = "enter";
+    }
   }
 
   function hidePrompt() {
+    const promptKind = playerPrompt.speech.dataset.worldPromptKind || "text";
+
     state.promptActive = false;
-    playerPrompt.speech.hidden = true;
-    layer.hidden = !state.active && !state.taskPopActive;
+    if (promptKind !== "text" || playerPrompt.speech.hidden) {
+      finishPromptHide();
+      return;
+    }
+
+    playerPrompt.speech.dataset.promptMotion = "exit";
+    layer.hidden = false;
+    playerPromptExitTimeout = windowRef.setTimeout?.(
+      finishPromptHide,
+      PLAYER_PROMPT_EXIT_MOTION_MS
+    ) ?? null;
+
+    if (playerPromptExitTimeout === null) {
+      finishPromptHide();
+    }
   }
 
   function showTaskPop({ text, worldPosition, anchorHeight = 2.68 } = {}) {
@@ -112,7 +171,7 @@ export function createWorldSpeechController({ mount } = {}) {
   function hideTaskPop() {
     state.taskPopActive = false;
     taskPop.speech.hidden = true;
-    layer.hidden = !state.active && !state.promptActive;
+    layer.hidden = !state.active && playerPrompt.speech.hidden;
   }
 
   function setWorldPosition(worldPosition) {

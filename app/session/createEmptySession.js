@@ -1,5 +1,6 @@
 import { INTERACTABLE_DEFS } from "../../gameplayContent.js";
 import { createResourceNodes } from "../../world/islandWorld.js";
+import { createSnowstormParticleField } from "./snowstormParticleField.js";
 
 export function createEmptySession() {
   return {
@@ -20,6 +21,7 @@ export function createEmptySession() {
     challengeBoulderTexture: null,
     colliderGizmoTextures: null,
     campfire: null,
+    campfireTrainHouseModelInstance: null,
     campfireTexture: null,
     deadFlowerTexture: null,
     deadGrassTexture: null,
@@ -32,6 +34,7 @@ export function createEmptySession() {
     groundDeadInstances: [],
     groundFlowerPatches: [],
     groundGrassPatches: [],
+    iceGroundInstances: [],
     groundPurifiedInstances: [],
     gameplayOpeningRequested: false,
     gameplayOpeningShip: null,
@@ -46,6 +49,7 @@ export function createEmptySession() {
     leafDenFurniture: [],
     leafDenKitTexture: null,
     leafDenTexture: null,
+    leavesTexture: null,
     logChair: null,
     logChairTexture: null,
     markerTextures: {},
@@ -65,6 +69,8 @@ export function createEmptySession() {
     resourceNodes: createResourceNodes(),
     sceneObjects: [],
     skyTexture: null,
+    snowflakeTexture: null,
+    snowstorm: createSnowstormParticleField(),
     spawnActTwoPlayer: () => {},
     strawBed: null,
     strawBedTexture: null,
@@ -73,8 +79,12 @@ export function createEmptySession() {
     squirtleWaterStamina: null,
     squirtleWaterStaminaBackTexture: null,
     squirtleWaterStaminaFillTexture: null,
+    charmanderCarbonEnergy: null,
+    charmanderCarbonFillTexture: null,
     squirtleChargingParticleTexture: null,
     squirtleWaterSprayTexture: null,
+    leafageGardenInstances: [],
+    leafageGardenModel: null,
     tallGrassInstances: [],
     tallGrassModel: null,
     timburrEncounter: null,

@@ -49,6 +49,23 @@ const FIELD_MOVE_PRESENTATION = Object.freeze({
       ground: "[Enter] Use Leafage to grow tall grass"
     }
   },
+  fire: {
+    learnedFromNpcId: "charmander",
+    effects: ["burn-white-ground", "prepare-dry-ground"],
+    inputHint: "RT / Enter near target",
+    design: {
+      benefit: "Turns white ground into dry ground so Water Gun can restore it later.",
+      limit: "Only works on white ground, and still needs the terrain action wiring.",
+      feedback: "Charmander selection and target prompt first; terrain conversion feedback comes with the action implementation.",
+      firstSafeUse: "A white ground tile near the restored habitat route."
+    },
+    activeGuidance: "Fire: burn white ground into dry ground.",
+    firstUseGuidance: "Fire: use it on white ground, then swap to Water Gun.",
+    firstUseCompleteFlags: ["fireWhiteGroundBurned"],
+    targetPrompts: {
+      ground: "[Enter] Use Fire on white ground"
+    }
+  },
   cut: {
     learnedFromNpcId: "woodcutter-helper",
     effects: ["cut-grass", "cut-vines", "cut-wooden-objects", "gather-wood-materials"],

@@ -1,0 +1,19 @@
+{
+  "asset": { "version": "2.0" },
+  "scene": 0,
+  "scenes": [{ "nodes": [0,1,2,3] }],
+  "nodes": [{"mesh":0},{"mesh":1},{"mesh":2},{"mesh":3}],
+  "meshes": [{"primitives":[{"attributes":{"POSITION":0,"TEXCOORD_0":1},"indices":2,"material":0}]},{"primitives":[{"attributes":{"POSITION":3,"TEXCOORD_0":4},"indices":5,"material":0}]},{"primitives":[{"attributes":{"POSITION":6,"TEXCOORD_0":7},"indices":8,"material":0}]},{"primitives":[{"attributes":{"POSITION":9,"TEXCOORD_0":10},"indices":11,"material":0}]}],
+  "materials": [{
+    "pbrMetallicRoughness": {
+      "baseColorTexture": { "index": 0 },
+      "metallicFactor": 0.0,
+      "roughnessFactor": 1.0
+    }
+  }],
+  "textures": [{ "source": 0 }],
+  "images": [{ "uri": "tree-2.png" }],
+  "accessors": [{"bufferView":0,"byteOffset":0,"componentType":5126,"count":18,"type":"VEC3","min":[-0.25,-1.25,-0.25],"max":[0.25,0.75,0.25]},{"bufferView":1,"byteOffset":0,"componentType":5126,"count":18,"type":"VEC2"},{"bufferView":2,"byteOffset":0,"componentType":5123,"count":18,"type":"SCALAR"},{"bufferView":3,"byteOffset":0,"componentType":5126,"count":84,"type":"VEC3","min":[-0.75,-0.25,-1],"max":[0.75,0.5,1]},{"bufferView":4,"byteOffset":0,"componentType":5126,"count":84,"type":"VEC2"},{"bufferView":5,"byteOffset":0,"componentType":5123,"count":84,"type":"SCALAR"},{"bufferView":6,"byteOffset":0,"componentType":5126,"count":84,"type":"VEC3","min":[-0.75,0.25,-0.75],"max":[0.75,1.25,0.75]},{"bufferView":7,"byteOffset":0,"componentType":5126,"count":84,"type":"VEC2"},{"bufferView":8,"byteOffset":0,"componentType":5123,"count":84,"type":"SCALAR"},{"bufferView":9,"byteOffset":0,"componentType":5126,"count":84,"type":"VEC3","min":[-0.5,1,-0.5],"max":[0.5,1.75,0.5]},{"bufferView":10,"byteOffset":0,"componentType":5126,"count":84,"type":"VEC2"},{"bufferView":11,"byteOffset":0,"componentType":5123,"count":84,"type":"SCALAR"}],
+  "bufferViews": [{"buffer":0,"byteOffset":0,"byteLength":216,"target":34962},{"buffer":0,"byteOffset":216,"byteLength":144,"target":34962},{"buffer":0,"byteOffset":360,"byteLength":36,"target":34963},{"buffer":0,"byteOffset":396,"byteLength":1008,"target":34962},{"buffer":0,"byteOffset":1404,"byteLength":672,"target":34962},{"buffer":0,"byteOffset":2076,"byteLength":168,"target":34963},{"buffer":0,"byteOffset":2244,"byteLength":1008,"target":34962},{"buffer":0,"byteOffset":3252,"byteLength":672,"target":34962},{"buffer":0,"byteOffset":3924,"byteLength":168,"target":34963},{"buffer":0,"byteOffset":4092,"byteLength":1008,"target":34962},{"buffer":0,"byteOffset":5100,"byteLength":672,"target":34962},{"buffer":0,"byteOffset":5772,"byteLength":168,"target":34963}],
+  "buffers": [{ "uri": "tree-2.bin", "byteLength": 5940 }]
+}

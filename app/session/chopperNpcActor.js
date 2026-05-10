@@ -345,6 +345,7 @@ export function updateChopperNpcActor(actor, {
   deltaTime = 0,
   storyState,
   isNpcActive,
+  isDialogueActive = false,
   guidePosition = null,
   investigationTarget = null
 } = {}) {
@@ -359,10 +360,16 @@ export function updateChopperNpcActor(actor, {
   actor.active = typeof isNpcActive === "function" ?
     isNpcActive(actor.npcActor, storyState) :
     true;
-  const investigating = updateInvestigation(actor, deltaTime, investigationTarget);
-  if (!investigating) {
-    updateGuide(actor, deltaTime, storyState, guidePosition);
-    updatePatrol(actor, deltaTime, storyState);
+  const dialogueActive = typeof isDialogueActive === "function" ?
+    isDialogueActive() :
+    Boolean(isDialogueActive);
+
+  if (!dialogueActive) {
+    const investigating = updateInvestigation(actor, deltaTime, investigationTarget);
+    if (!investigating) {
+      updateGuide(actor, deltaTime, storyState, guidePosition);
+      updatePatrol(actor, deltaTime, storyState);
+    }
   }
 
   const time = actor.elapsed;

@@ -22,6 +22,25 @@ const INVENTORY_SLOT_ROLE_LABELS = Object.freeze({
   other: "Item"
 });
 
+const FOLLOWER_SUPPLY_EXCLUDED_ITEM_IDS = new Set([
+  "bulbasaur",
+  "bulbasaurFollowing",
+  "charmander",
+  "charmanderFollowing",
+  "squirtle",
+  "squirtleFollowing",
+  "timburr",
+  "timburrFollowing"
+]);
+
+function normalizeExclusionSet(value) {
+  if (!value) {
+    return null;
+  }
+
+  return value instanceof Set ? value : new Set(value);
+}
+
 export function getInventorySlotRole(item = {}) {
   return item.slotRole || "other";
 }
@@ -31,13 +50,32 @@ export function getInventorySlotRoleLabel(item = {}) {
   return item.slotRoleLabel || INVENTORY_SLOT_ROLE_LABELS[role] || INVENTORY_SLOT_ROLE_LABELS.other;
 }
 
-export function getInventoryPresentationOrder(inventory = {}, inventoryOrder = [], itemDefs = {}) {
+export function getInventoryPresentationOrder(
+  inventory = {},
+  inventoryOrder = [],
+  itemDefs = {},
+  options = {}
+) {
   const orderIndexByItemId = new Map(
     inventoryOrder.map((itemId, index) => [itemId, index])
   );
+  const excludedItemIds = normalizeExclusionSet(options.excludedItemIds);
+  const excludedRoles = normalizeExclusionSet(options.excludedRoles);
 
   return inventoryOrder
-    .filter((itemId) => (inventory[itemId] || 0) > 0)
+    .filter((itemId) => {
+      const item = itemDefs[itemId] || {};
+      const role = getInventorySlotRole(item);
+      return (
+        (inventory[itemId] || 0) > 0 &&
+        !excludedItemIds?.has(itemId) &&
+        !excludedRoles?.has(role) &&
+        !FOLLOWER_SUPPLY_EXCLUDED_ITEM_IDS.has(itemId) &&
+        !itemId.endsWith("Following") &&
+        role !== "companion" &&
+        role !== "pokemon"
+      );
+    })
     .sort((leftItemId, rightItemId) => {
       const leftItem = itemDefs[leftItemId] || {};
       const rightItem = itemDefs[rightItemId] || {};

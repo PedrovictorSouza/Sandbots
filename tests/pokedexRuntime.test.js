@@ -37,58 +37,106 @@ function createRuntime(overrides = {}) {
 }
 
 describe("createPokedexRuntime", () => {
-  it("keeps the Pokedex screen hidden even after unlock", () => {
+  it("keeps the Pokedex locked until discovery, then opens the discovered entry", () => {
     const { alertButton, calls, clearGameFlowInput, runtime } = createRuntime();
 
-    runtime.setOpen(true, {
+    const lockedOpenResult = runtime.setOpen(true, {
       entryId: "squirtle"
     });
 
+    expect(lockedOpenResult).toBe(false);
     expect(runtime.state.open).toBe(false);
+    expect(alertButton.hidden).toBe(true);
     expect(calls).toHaveLength(0);
     expect(clearGameFlowInput).not.toHaveBeenCalled();
 
     runtime.unlock();
+    expect(alertButton.hidden).toBe(false);
+    expect(alertButton.dataset.pulse).toBe("true");
+
     runtime.setOpen(true, {
       entryId: "squirtle"
     });
 
-    expect(runtime.state.open).toBe(false);
+    expect(runtime.state.open).toBe(true);
     expect(runtime.state.seen).toBe(true);
-    expect(alertButton.hidden).toBe(true);
+    expect(alertButton.hidden).toBe(false);
     expect(alertButton.dataset.pulse).toBe("false");
     expect(clearGameFlowInput).toHaveBeenCalledTimes(1);
-    expect(calls).toHaveLength(0);
+    expect(calls).toEqual([
+      {
+        methodName: "setOpen",
+        args: [
+          true,
+          {
+            page: "details",
+            entryId: "squirtle"
+          }
+        ]
+      }
+    ]);
   });
 
-  it("keeps the alert button disabled after unlock", () => {
+  it("reveals the alert button after unlock and opens from it", () => {
     const { alertButton, runtime } = createRuntime();
 
     runtime.unlock();
     runtime.setSeen(false);
     alertButton.click();
 
-    expect(runtime.state.open).toBe(false);
+    expect(runtime.state.open).toBe(true);
     expect(runtime.state.seen).toBe(true);
-    expect(alertButton.hidden).toBe(true);
+    expect(alertButton.hidden).toBe(false);
     expect(alertButton.dataset.pulse).toBe("false");
   });
 
-  it("resumes scripted tutorial flow without opening the disabled screen", async () => {
+  it("does not bypass the locked state unless debug/test mode allows it", async () => {
     const onScriptedClose = vi.fn();
-    const { calls, runtime } = createRuntime({
+    const { calls, clearGameFlowInput, runtime } = createRuntime({
       onScriptedClose
     });
 
     runtime.setOpen(true, {
-      force: true,
+      allowLockedOpen: true,
       scripted: true
     });
     await Promise.resolve();
 
     expect(runtime.state.open).toBe(false);
     expect(runtime.state.scripted).toBe(false);
-    expect(onScriptedClose).toHaveBeenCalledTimes(1);
+    expect(runtime.state.seen).toBe(false);
+    expect(onScriptedClose).not.toHaveBeenCalled();
+    expect(clearGameFlowInput).not.toHaveBeenCalled();
     expect(calls).toHaveLength(0);
+  });
+
+  it("allows explicit debug/test locked opens for scripted flow tests", async () => {
+    const onScriptedClose = vi.fn();
+    const { calls, runtime } = createRuntime({
+      allowDebugLockedOpen: true,
+      onScriptedClose
+    });
+
+    runtime.setOpen(true, {
+      allowLockedOpen: true,
+      scripted: true
+    });
+    await Promise.resolve();
+
+    expect(runtime.state.open).toBe(true);
+    expect(runtime.state.scripted).toBe(true);
+    expect(onScriptedClose).not.toHaveBeenCalled();
+    expect(calls).toEqual([
+      {
+        methodName: "setOpen",
+        args: [
+          true,
+          {
+            page: "details",
+            entryId: null
+          }
+        ]
+      }
+    ]);
   });
 });

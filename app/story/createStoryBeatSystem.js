@@ -2,6 +2,9 @@ import {
   SMALL_ISLAND_STORY_BEATS,
   STORY_BEAT_EFFECT
 } from "./storyBeatData.js";
+import { getPlayerDisplayName } from "../player/playerProfile.js";
+
+const PLAYER_NAME_TOKEN = /\{\{\s*playerName\s*\}\}/g;
 
 function findPokedexEntryIdFromHabitats(habitats = []) {
   return habitats.find((habitat) => habitat?.pokedexEntryId)?.pokedexEntryId || null;
@@ -15,11 +18,45 @@ function normalizeFallbackLines(lines) {
   return lines.map((line) => ({ ...line }));
 }
 
+function getInterpolationPlayerName(context = {}, playerProfile = null) {
+  if (Object.prototype.hasOwnProperty.call(context, "playerName")) {
+    return getPlayerDisplayName({ playerName: context.playerName });
+  }
+
+  return getPlayerDisplayName(
+    context.playerProfile ||
+    context.playerMemory ||
+    playerProfile ||
+    {}
+  );
+}
+
+export function interpolateDialogueLine(line, context = {}, playerProfile = null) {
+  if (!line || typeof line.text !== "string") {
+    return { ...line };
+  }
+
+  return {
+    ...line,
+    text: line.text.replace(
+      PLAYER_NAME_TOKEN,
+      getInterpolationPlayerName(context, playerProfile)
+    )
+  };
+}
+
+function interpolateDialogueLines(lines, context = {}, playerProfile = null) {
+  return normalizeFallbackLines(lines).map((line) => (
+    interpolateDialogueLine(line, context, playerProfile)
+  ));
+}
+
 export function createStoryBeatSystem({
   beats = SMALL_ISLAND_STORY_BEATS,
   dialogueSystem,
   gameplayDialogue,
   storyState,
+  playerProfile = null,
   questSystem = null,
   pokedexRuntime = null,
   trackFieldTask = () => {},
@@ -42,15 +79,23 @@ export function createStoryBeatSystem({
       return [];
     }
 
-    if (typeof beat.buildLines === "function") {
-      return normalizeFallbackLines(beat.buildLines(context));
-    }
-
     const dialogueLines = beat.dialogueId ?
       dialogueSystem?.getConversation?.(beat.dialogueId) || [] :
       [];
 
-    return dialogueLines.length ? dialogueLines : normalizeFallbackLines(beat.fallbackLines);
+    if (typeof beat.buildLines === "function") {
+      return interpolateDialogueLines(
+        beat.buildLines(context, { dialogueLines }),
+        context,
+        playerProfile
+      );
+    }
+
+    return interpolateDialogueLines(
+      dialogueLines.length ? dialogueLines : beat.fallbackLines,
+      context,
+      playerProfile
+    );
   }
 
   function hasCompleted(beatId) {

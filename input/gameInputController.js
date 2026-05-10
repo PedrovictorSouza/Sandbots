@@ -1,4 +1,4 @@
-import { GAME_INPUT_BINDINGS } from "./gameInputBindings.js";
+import { GAME_INPUT_BINDINGS, GAMEPAD_BUTTONS } from "./gameInputBindings.js";
 
 function isTypingTarget(target) {
   if (!(target instanceof HTMLElement)) {
@@ -22,6 +22,10 @@ const POINTER_YAW_SENSITIVITY = 0.0032;
 const POINTER_PITCH_SENSITIVITY = 0.0024;
 const GAMEPAD_LOOK_SPEED = 2.35;
 const GAMEPAD_DEADZONE = 0.16;
+const GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD = 0.45;
+const GAMEPAD_DIALOGUE_ANALOG_NAVIGATION_THRESHOLD = 0.45;
+const GAMEPAD_LEFT_SHOULDER_BUTTON = 4;
+const GAMEPAD_RIGHT_SHOULDER_BUTTON = 5;
 
 function applyDeadzone(value) {
   const magnitude = Math.abs(value);
@@ -46,12 +50,16 @@ export function createGameInputController({
   requestInteract,
   requestPauseToggle,
   requestPokedexOpen = () => {},
+  requestSettingsOpen = () => {},
   requestFollowerCall = () => {},
   requestMoveCycle = () => {},
   shouldBagButtonInteract = () => false,
   shouldGamepadButtonHarvest = () => false,
   isWorkbenchModalOpen = () => false,
   handleWorkbenchModalKeydown = () => false,
+  isSettingsOpen = () => false,
+  handleSettingsKeydown = () => false,
+  isGameplayDialogueActive = () => false,
   inspectBag = () => {},
   windowRef = null
 }) {
@@ -69,13 +77,24 @@ export function createGameInputController({
   let gamepadCameraZoomButtonPressed = false;
   let gamepadPauseButtonPressed = false;
   let gamepadPokedexButtonPressed = false;
+  let gamepadSettingsButtonPressed = false;
   let gamepadBagButtonPressed = false;
   let gamepadFollowerCallButtonPressed = false;
+  let gamepadSettingsPreviousTabButtonPressed = false;
+  let gamepadSettingsNextTabButtonPressed = false;
+  let gamepadSettingsNavigateDownButtonPressed = false;
+  let gamepadSettingsNavigateUpAxisPressed = false;
+  let gamepadSettingsNavigateDownAxisPressed = false;
+  let gamepadDialogueNavigateLeftAxisPressed = false;
+  let gamepadDialogueNavigateRightAxisPressed = false;
+  let gamepadDialogueNavigateUpAxisPressed = false;
+  let gamepadDialogueNavigateDownAxisPressed = false;
   let gamepadPreviousMoveButtonPressed = false;
   let gamepadNextMoveButtonPressed = false;
   let primaryActionPressed = false;
   let cameraZoomCycleRequests = 0;
   let jumpRequests = 0;
+  let placementRotationRequests = 0;
 
   function createPrimaryButtonEvent() {
     return {
@@ -121,9 +140,45 @@ export function createGameInputController({
     };
   }
 
+  function createSettingsCancelButtonEvent() {
+    return {
+      code: "KeyB",
+      key: "b",
+      repeat: false,
+      target: null,
+      preventDefault() {}
+    };
+  }
+
+  function createSettingsNavigationButtonEvent(direction) {
+    const code = direction < 0 ? "ArrowUp" : "ArrowDown";
+
+    return {
+      code,
+      key: code,
+      repeat: false,
+      target: null,
+      preventDefault() {}
+    };
+  }
+
+  function createSettingsTabButtonEvent(direction) {
+    const code = direction < 0 ? "PageUp" : "PageDown";
+
+    return {
+      code,
+      key: code,
+      repeat: false,
+      target: null,
+      preventDefault() {}
+    };
+  }
+
   function shouldIgnoreLookInput(target) {
     return (
       isWorkbenchModalOpen() ||
+      isSettingsOpen() ||
+      isGameplayDialogueActive() ||
       isPokedexOpen() ||
       sceneDirector.blocksGameplayInput() ||
       isBuilderPanelOpen() ||
@@ -175,6 +230,13 @@ export function createGameInputController({
     if (!typingTarget && isWorkbenchModalOpen()) {
       clearGameFlowInput();
       handleWorkbenchModalKeydown(event);
+      event.preventDefault();
+      return;
+    }
+
+    if (!typingTarget && isSettingsOpen()) {
+      clearGameFlowInput();
+      handleSettingsKeydown(event);
       event.preventDefault();
       return;
     }
@@ -249,6 +311,8 @@ export function createGameInputController({
       if (!event.repeat) {
         if (shouldBagButtonInteract()) {
           requestInteract();
+        } else if (shouldGamepadButtonHarvest({ source: "gamepadBag" })) {
+          requestHarvest({ source: "gamepadBag" });
         } else {
           inspectBag();
         }
@@ -335,6 +399,12 @@ export function createGameInputController({
     }
 
     if (isWorkbenchModalOpen()) {
+      clearGameFlowInput();
+      event.preventDefault();
+      return;
+    }
+
+    if (isSettingsOpen()) {
       clearGameFlowInput();
       event.preventDefault();
       return;
@@ -432,10 +502,19 @@ export function createGameInputController({
     let zoomButtonPressed = false;
     let pauseButtonPressed = false;
     let pokedexButtonPressed = false;
+    let settingsButtonPressed = false;
     let bagButtonPressed = false;
     let followerCallButtonPressed = false;
+    let settingsPreviousTabButtonPressed = false;
+    let settingsNextTabButtonPressed = false;
+    let settingsNavigateDownButtonPressed = false;
+    let settingsNavigateAxisY = 0;
+    let dialogueNavigateAxisX = 0;
+    let dialogueNavigateAxisY = 0;
     let previousMoveButtonPressed = false;
     let nextMoveButtonPressed = false;
+    const settingsOpen = isSettingsOpen();
+    const gameplayDialogueActive = isGameplayDialogueActive();
 
     const navigatorRef = windowRef?.navigator;
     const gamepads = navigatorRef?.getGamepads?.();
@@ -447,8 +526,18 @@ export function createGameInputController({
       gamepadCameraZoomButtonPressed = false;
       gamepadPauseButtonPressed = false;
       gamepadPokedexButtonPressed = false;
+      gamepadSettingsButtonPressed = false;
       gamepadBagButtonPressed = false;
       gamepadFollowerCallButtonPressed = false;
+      gamepadSettingsPreviousTabButtonPressed = false;
+      gamepadSettingsNextTabButtonPressed = false;
+      gamepadSettingsNavigateDownButtonPressed = false;
+      gamepadSettingsNavigateUpAxisPressed = false;
+      gamepadSettingsNavigateDownAxisPressed = false;
+      gamepadDialogueNavigateLeftAxisPressed = false;
+      gamepadDialogueNavigateRightAxisPressed = false;
+      gamepadDialogueNavigateUpAxisPressed = false;
+      gamepadDialogueNavigateDownAxisPressed = false;
       gamepadPreviousMoveButtonPressed = false;
       gamepadNextMoveButtonPressed = false;
       return;
@@ -470,12 +559,24 @@ export function createGameInputController({
         Number(gamepad.buttons?.[GAME_INPUT_BINDINGS.cameraZoomCycle.gamepadButton]?.value || 0) > 0.55;
       pauseButtonPressed = pauseButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.pause.gamepadButton]?.pressed);
-      pokedexButtonPressed = pokedexButtonPressed ||
-        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.pokedex.gamepadButton]?.pressed);
+      if (Number.isInteger(GAME_INPUT_BINDINGS.pokedex.gamepadButton)) {
+        pokedexButtonPressed = pokedexButtonPressed ||
+          Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.pokedex.gamepadButton]?.pressed);
+      }
+      if (Number.isInteger(GAME_INPUT_BINDINGS.settings.gamepadButton)) {
+        settingsButtonPressed = settingsButtonPressed ||
+          Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.settings.gamepadButton]?.pressed);
+      }
       bagButtonPressed = bagButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.bag.gamepadButton]?.pressed);
       followerCallButtonPressed = followerCallButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.followerCall.gamepadButton]?.pressed);
+      settingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed ||
+        Boolean(gamepad.buttons?.[GAMEPAD_LEFT_SHOULDER_BUTTON]?.pressed);
+      settingsNextTabButtonPressed = settingsNextTabButtonPressed ||
+        Boolean(gamepad.buttons?.[GAMEPAD_RIGHT_SHOULDER_BUTTON]?.pressed);
+      settingsNavigateDownButtonPressed = settingsNavigateDownButtonPressed ||
+        Boolean(gamepad.buttons?.[GAMEPAD_BUTTONS.DPAD_DOWN]?.pressed);
       previousMoveButtonPressed = previousMoveButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.previousMove.gamepadButton]?.pressed);
       nextMoveButtonPressed = nextMoveButtonPressed ||
@@ -490,7 +591,18 @@ export function createGameInputController({
       const lookX = applyDeadzone(Number(gamepad.axes?.[2] || 0));
       const lookY = applyDeadzone(Number(gamepad.axes?.[3] || 0));
 
-      if (moveX !== 0 || moveY !== 0) {
+      if (settingsOpen) {
+        if (Math.abs(moveY) > Math.abs(settingsNavigateAxisY)) {
+          settingsNavigateAxisY = moveY;
+        }
+      } else if (gameplayDialogueActive) {
+        if (Math.abs(moveX) > Math.abs(dialogueNavigateAxisX)) {
+          dialogueNavigateAxisX = moveX;
+        }
+        if (Math.abs(moveY) > Math.abs(dialogueNavigateAxisY)) {
+          dialogueNavigateAxisY = moveY;
+        }
+      } else if (moveX !== 0 || moveY !== 0) {
         gamepadMovement.x = moveX;
         gamepadMovement.y = moveY;
       }
@@ -516,14 +628,212 @@ export function createGameInputController({
         handleWorkbenchModalKeydown(createJumpButtonEvent());
       }
 
+      if (previousMoveButtonPressed && !gamepadPreviousMoveButtonPressed) {
+        handleWorkbenchModalKeydown(createPokedexPageButtonEvent(-1));
+      }
+
+      if (nextMoveButtonPressed && !gamepadNextMoveButtonPressed) {
+        handleWorkbenchModalKeydown(createPokedexPageButtonEvent(1));
+      }
+
+      if (followerCallButtonPressed && !gamepadFollowerCallButtonPressed) {
+        handleWorkbenchModalKeydown(createSettingsNavigationButtonEvent(-1));
+      }
+
+      if (settingsNavigateDownButtonPressed && !gamepadSettingsNavigateDownButtonPressed) {
+        handleWorkbenchModalKeydown(createSettingsNavigationButtonEvent(1));
+      }
+
       gamepadActionButtonPressed = actionButtonPressed;
       gamepadRunButtonPressed = runButtonPressed;
       gamepadJumpButtonPressed = jumpButtonPressed;
       gamepadCameraZoomButtonPressed = zoomButtonPressed;
       gamepadPauseButtonPressed = pauseButtonPressed;
       gamepadPokedexButtonPressed = pokedexButtonPressed;
+      gamepadSettingsButtonPressed = settingsButtonPressed;
       gamepadBagButtonPressed = bagButtonPressed;
       gamepadFollowerCallButtonPressed = followerCallButtonPressed;
+      gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
+      gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
+      gamepadSettingsNavigateDownButtonPressed = settingsNavigateDownButtonPressed;
+      gamepadSettingsNavigateUpAxisPressed = false;
+      gamepadSettingsNavigateDownAxisPressed = false;
+      gamepadDialogueNavigateLeftAxisPressed = false;
+      gamepadDialogueNavigateRightAxisPressed = false;
+      gamepadDialogueNavigateUpAxisPressed = false;
+      gamepadDialogueNavigateDownAxisPressed = false;
+      gamepadPreviousMoveButtonPressed = previousMoveButtonPressed;
+      gamepadNextMoveButtonPressed = nextMoveButtonPressed;
+      primaryActionPressed = false;
+      return;
+    }
+
+    if (settingsOpen) {
+      const settingsNavigateUpAxisPressed =
+        settingsNavigateAxisY <= -GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD;
+      const settingsNavigateDownAxisPressed =
+        settingsNavigateAxisY >= GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD;
+      clearGameFlowInput();
+
+      if (jumpButtonPressed && !gamepadJumpButtonPressed) {
+        handleSettingsKeydown(createSettingsCancelButtonEvent());
+      }
+
+      if (actionButtonPressed && !gamepadActionButtonPressed) {
+        handleSettingsKeydown(createPrimaryButtonEvent());
+      }
+
+      if (settingsPreviousTabButtonPressed && !gamepadSettingsPreviousTabButtonPressed) {
+        handleSettingsKeydown(createSettingsTabButtonEvent(-1));
+      }
+
+      if (settingsNextTabButtonPressed && !gamepadSettingsNextTabButtonPressed) {
+        handleSettingsKeydown(createSettingsTabButtonEvent(1));
+      }
+
+      if (
+        (
+          followerCallButtonPressed &&
+          !gamepadFollowerCallButtonPressed
+        ) ||
+        (
+          settingsNavigateUpAxisPressed &&
+          !gamepadSettingsNavigateUpAxisPressed
+        )
+      ) {
+        handleSettingsKeydown(createSettingsNavigationButtonEvent(-1));
+      }
+
+      if (
+        (
+          settingsNavigateDownButtonPressed &&
+          !gamepadSettingsNavigateDownButtonPressed
+        ) ||
+        (
+          settingsNavigateDownAxisPressed &&
+          !gamepadSettingsNavigateDownAxisPressed
+        )
+      ) {
+        handleSettingsKeydown(createSettingsNavigationButtonEvent(1));
+      }
+
+      gamepadActionButtonPressed = actionButtonPressed;
+      gamepadRunButtonPressed = runButtonPressed;
+      gamepadJumpButtonPressed = jumpButtonPressed;
+      gamepadCameraZoomButtonPressed = zoomButtonPressed;
+      gamepadPauseButtonPressed = pauseButtonPressed;
+      gamepadPokedexButtonPressed = pokedexButtonPressed;
+      gamepadSettingsButtonPressed = settingsButtonPressed;
+      gamepadBagButtonPressed = bagButtonPressed;
+      gamepadFollowerCallButtonPressed = followerCallButtonPressed;
+      gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
+      gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
+      gamepadSettingsNavigateDownButtonPressed = settingsNavigateDownButtonPressed;
+      gamepadSettingsNavigateUpAxisPressed = settingsNavigateUpAxisPressed;
+      gamepadSettingsNavigateDownAxisPressed = settingsNavigateDownAxisPressed;
+      gamepadDialogueNavigateLeftAxisPressed = false;
+      gamepadDialogueNavigateRightAxisPressed = false;
+      gamepadDialogueNavigateUpAxisPressed = false;
+      gamepadDialogueNavigateDownAxisPressed = false;
+      gamepadPreviousMoveButtonPressed = previousMoveButtonPressed;
+      gamepadNextMoveButtonPressed = nextMoveButtonPressed;
+      primaryActionPressed = false;
+      return;
+    }
+
+    if (gameplayDialogueActive) {
+      const dialogueNavigateLeftAxisPressed =
+        dialogueNavigateAxisX <= -GAMEPAD_DIALOGUE_ANALOG_NAVIGATION_THRESHOLD;
+      const dialogueNavigateRightAxisPressed =
+        dialogueNavigateAxisX >= GAMEPAD_DIALOGUE_ANALOG_NAVIGATION_THRESHOLD;
+      const dialogueNavigateUpAxisPressed =
+        dialogueNavigateAxisY <= -GAMEPAD_DIALOGUE_ANALOG_NAVIGATION_THRESHOLD;
+      const dialogueNavigateDownAxisPressed =
+        dialogueNavigateAxisY >= GAMEPAD_DIALOGUE_ANALOG_NAVIGATION_THRESHOLD;
+      clearGameFlowInput();
+
+      if (jumpButtonPressed && !gamepadJumpButtonPressed) {
+        sceneDirector.handleKeydown(createJumpButtonEvent());
+      }
+
+      if (actionButtonPressed && !gamepadActionButtonPressed) {
+        sceneDirector.handleKeydown(createPrimaryButtonEvent());
+      }
+
+      if (bagButtonPressed && !gamepadBagButtonPressed) {
+        sceneDirector.handleKeydown(createBagButtonEvent());
+      }
+
+      if (
+        (
+          previousMoveButtonPressed &&
+          !gamepadPreviousMoveButtonPressed
+        ) ||
+        (
+          dialogueNavigateLeftAxisPressed &&
+          !gamepadDialogueNavigateLeftAxisPressed
+        )
+      ) {
+        sceneDirector.handleKeydown(createPokedexPageButtonEvent(-1));
+      }
+
+      if (
+        (
+          nextMoveButtonPressed &&
+          !gamepadNextMoveButtonPressed
+        ) ||
+        (
+          dialogueNavigateRightAxisPressed &&
+          !gamepadDialogueNavigateRightAxisPressed
+        )
+      ) {
+        sceneDirector.handleKeydown(createPokedexPageButtonEvent(1));
+      }
+
+      if (
+        (
+          followerCallButtonPressed &&
+          !gamepadFollowerCallButtonPressed
+        ) ||
+        (
+          dialogueNavigateUpAxisPressed &&
+          !gamepadDialogueNavigateUpAxisPressed
+        )
+      ) {
+        sceneDirector.handleKeydown(createSettingsNavigationButtonEvent(-1));
+      }
+
+      if (
+        (
+          settingsNavigateDownButtonPressed &&
+          !gamepadSettingsNavigateDownButtonPressed
+        ) ||
+        (
+          dialogueNavigateDownAxisPressed &&
+          !gamepadDialogueNavigateDownAxisPressed
+        )
+      ) {
+        sceneDirector.handleKeydown(createSettingsNavigationButtonEvent(1));
+      }
+
+      gamepadActionButtonPressed = actionButtonPressed;
+      gamepadRunButtonPressed = runButtonPressed;
+      gamepadJumpButtonPressed = jumpButtonPressed;
+      gamepadCameraZoomButtonPressed = zoomButtonPressed;
+      gamepadPauseButtonPressed = pauseButtonPressed;
+      gamepadPokedexButtonPressed = pokedexButtonPressed;
+      gamepadSettingsButtonPressed = settingsButtonPressed;
+      gamepadBagButtonPressed = bagButtonPressed;
+      gamepadFollowerCallButtonPressed = followerCallButtonPressed;
+      gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
+      gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
+      gamepadSettingsNavigateDownButtonPressed = settingsNavigateDownButtonPressed;
+      gamepadSettingsNavigateUpAxisPressed = false;
+      gamepadSettingsNavigateDownAxisPressed = false;
+      gamepadDialogueNavigateLeftAxisPressed = dialogueNavigateLeftAxisPressed;
+      gamepadDialogueNavigateRightAxisPressed = dialogueNavigateRightAxisPressed;
+      gamepadDialogueNavigateUpAxisPressed = dialogueNavigateUpAxisPressed;
+      gamepadDialogueNavigateDownAxisPressed = dialogueNavigateDownAxisPressed;
       gamepadPreviousMoveButtonPressed = previousMoveButtonPressed;
       gamepadNextMoveButtonPressed = nextMoveButtonPressed;
       primaryActionPressed = false;
@@ -564,6 +874,24 @@ export function createGameInputController({
 
     gamepadNextMoveButtonPressed = nextMoveButtonPressed;
 
+    if (
+      settingsPreviousTabButtonPressed &&
+      !gamepadSettingsPreviousTabButtonPressed &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      placementRotationRequests -= 1;
+    }
+
+    if (
+      settingsNextTabButtonPressed &&
+      !gamepadSettingsNextTabButtonPressed &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      placementRotationRequests += 1;
+    }
+
     gamepadRunButtonPressed = runButtonPressed;
     primaryActionPressed = actionButtonPressed;
 
@@ -595,6 +923,17 @@ export function createGameInputController({
     }
 
     gamepadPokedexButtonPressed = pokedexButtonPressed;
+
+    if (
+      settingsButtonPressed &&
+      !gamepadSettingsButtonPressed &&
+      !isSettingsOpen() &&
+      !sceneDirector.blocksGameplayInput()
+    ) {
+      requestSettingsOpen();
+    }
+
+    gamepadSettingsButtonPressed = settingsButtonPressed;
 
     if (
       bagButtonPressed &&
@@ -641,6 +980,11 @@ export function createGameInputController({
     }
 
     gamepadFollowerCallButtonPressed = followerCallButtonPressed;
+    gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
+    gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
+    gamepadSettingsNavigateDownButtonPressed = settingsNavigateDownButtonPressed;
+    gamepadSettingsNavigateUpAxisPressed = false;
+    gamepadSettingsNavigateDownAxisPressed = false;
 
     if (actionButtonPressed && !gamepadActionButtonPressed) {
       const primaryEvent = createPrimaryButtonEvent();
@@ -672,6 +1016,12 @@ export function createGameInputController({
 
     jumpRequests -= 1;
     return true;
+  }
+
+  function consumePlacementRotationRequest() {
+    const requests = placementRotationRequests;
+    placementRotationRequests = 0;
+    return requests;
   }
 
   function consumeCameraLookDelta() {
@@ -715,6 +1065,7 @@ export function createGameInputController({
     clearCameraLookInput,
     consumeCameraZoomCycleRequest,
     consumeJumpRequest,
+    consumePlacementRotationRequest,
     getAnalogMovement,
     isRunActive,
     isPrimaryActionActive

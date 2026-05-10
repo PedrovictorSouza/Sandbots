@@ -14,6 +14,7 @@ import { createPlayerDustState } from "./playerDustParticles.js";
 import { createNatureRevivalEffectState } from "./natureRevivalEffects.js";
 import { createColliderGizmoTextures } from "./colliderGizmos.js";
 import { createGameplayOpeningShipState } from "./gameplayOpeningShip.js";
+import { createSnowflakeCanvas } from "./snowstormParticleField.js";
 
 const BULBASAUR_REPAIR_MODULE_POSITION = [8.55, 0.04, -5.7];
 const BULBASAUR_REPAIR_BOX_POSITION = [
@@ -230,6 +231,28 @@ function createSquirtleStaminaFillCanvas() {
   return canvas;
 }
 
+function createCharmanderCarbonFillCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 16;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(0, 0, 0, 0)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(255, 112, 26, 0.98)";
+  context.fillRect(0, 0, 96, 16);
+  context.fillStyle = "rgba(255, 224, 98, 0.92)";
+  context.fillRect(4, 2, 52, 4);
+  context.fillStyle = "rgba(151, 44, 12, 0.82)";
+  context.fillRect(6, 12, 84, 3);
+  context.fillStyle = "rgba(255, 245, 188, 0.86)";
+  context.fillRect(62, 3, 10, 3);
+
+  return canvas;
+}
+
 function createSquirtleChargingParticleCanvas() {
   const canvas = document.createElement("canvas");
   canvas.width = 24;
@@ -413,45 +436,179 @@ function createCampfireCanvas() {
 
   const context = canvas.getContext("2d");
   context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "rgba(0, 0, 0, 0)";
-  context.fillRect(0, 0, canvas.width, canvas.height);
 
   context.fillStyle = "rgba(33, 24, 18, 0.28)";
   context.beginPath();
-  context.ellipse(32, 53, 24, 6, 0, 0, Math.PI * 2);
+  context.ellipse(32, 55, 25, 6, 0, 0, Math.PI * 2);
   context.fill();
 
-  context.strokeStyle = "#6f452b";
-  context.lineWidth = 7;
-  context.lineCap = "round";
-  context.beginPath();
-  context.moveTo(17, 47);
-  context.lineTo(47, 36);
-  context.stroke();
-  context.beginPath();
-  context.moveTo(18, 36);
-  context.lineTo(48, 47);
-  context.stroke();
+  function drawTurbulentFlame({
+    centerX,
+    baseY,
+    width,
+    height,
+    seed = 0,
+    alpha = 1,
+    blur = 0
+  }) {
+    const gradient = context.createRadialGradient(
+      centerX,
+      baseY,
+      2,
+      centerX,
+      baseY - height * 0.35,
+      height
+    );
+    gradient.addColorStop(0, "#3b5cff");
+    gradient.addColorStop(0.2, "#ffd95a");
+    gradient.addColorStop(0.6, "#ffbe35");
+    gradient.addColorStop(1, "#d63221");
 
-  context.fillStyle = "#e9432f";
+    context.save();
+    context.globalAlpha = alpha;
+    context.filter = blur > 0 ? `blur(${blur}px)` : "none";
+    context.fillStyle = gradient;
+    context.beginPath();
+
+    const leftBaseX = centerX - width * 0.5;
+    const rightBaseX = centerX + width * 0.5;
+    context.moveTo(leftBaseX, baseY);
+
+    for (let step = 1; step <= 6; step += 1) {
+      const t = step / 6;
+      const taper = 1 - t;
+      const wave = Math.sin(seed + t * 8.5) * width * 0.08 * taper;
+      context.lineTo(
+        centerX - width * 0.5 * taper + wave,
+        baseY - height * t
+      );
+    }
+
+    context.lineTo(centerX + Math.sin(seed) * width * 0.06, baseY - height * 1.06);
+
+    for (let step = 6; step >= 1; step -= 1) {
+      const t = step / 6;
+      const taper = 1 - t;
+      const wave = Math.cos(seed + t * 7.5) * width * 0.08 * taper;
+      context.lineTo(
+        centerX + width * 0.5 * taper + wave,
+        baseY - height * t
+      );
+    }
+
+    context.lineTo(rightBaseX, baseY);
+    context.closePath();
+    context.fill();
+    context.restore();
+  }
+
+  drawTurbulentFlame({
+    centerX: 32,
+    baseY: 50,
+    width: 34,
+    height: 39,
+    seed: 6.9,
+    alpha: 0.92
+  });
+  drawTurbulentFlame({
+    centerX: 23,
+    baseY: 51,
+    width: 22,
+    height: 28,
+    seed: 16.9,
+    alpha: 0.72
+  });
+  drawTurbulentFlame({
+    centerX: 41,
+    baseY: 51,
+    width: 22,
+    height: 29,
+    seed: 3.2,
+    alpha: 0.72
+  });
+  drawTurbulentFlame({
+    centerX: 32,
+    baseY: 49,
+    width: 16,
+    height: 25,
+    seed: 11.4,
+    alpha: 0.9,
+    blur: 0.25
+  });
+
+  context.save();
+  context.filter = "blur(5px)";
+  context.fillStyle = "#bd5c0d";
   context.beginPath();
-  context.moveTo(32, 43);
-  context.bezierCurveTo(17, 34, 26, 18, 32, 10);
-  context.bezierCurveTo(43, 22, 48, 34, 32, 43);
+  context.ellipse(32, 45, 17, 5, 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  context.fillStyle = "#38210e";
+  context.beginPath();
+  context.moveTo(13, 49);
+  context.quadraticCurveTo(13, 42, 20, 42);
+  context.lineTo(44, 42);
+  context.quadraticCurveTo(51, 42, 51, 49);
+  context.lineTo(51, 56);
+  context.quadraticCurveTo(51, 61, 46, 61);
+  context.lineTo(18, 61);
+  context.quadraticCurveTo(13, 61, 13, 56);
+  context.closePath();
   context.fill();
 
-  context.fillStyle = "#ff9a32";
+  context.strokeStyle = "#130707";
+  context.lineWidth = 2;
+  for (let y = 47; y <= 56; y += 4) {
+    context.beginPath();
+    context.moveTo(17, y);
+    context.lineTo(47, y - 2);
+    context.stroke();
+  }
+
+  return canvas;
+}
+
+function createCharmanderFlameParticleCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  const glow = context.createRadialGradient(32, 34, 2, 32, 34, 29);
+  glow.addColorStop(0, "rgba(255, 238, 94, 0.95)");
+  glow.addColorStop(0.32, "rgba(255, 137, 25, 0.82)");
+  glow.addColorStop(0.72, "rgba(239, 36, 18, 0.44)");
+  glow.addColorStop(1, "rgba(239, 36, 18, 0)");
+
+  context.fillStyle = glow;
   context.beginPath();
-  context.moveTo(32, 43);
-  context.bezierCurveTo(24, 35, 30, 24, 35, 17);
-  context.bezierCurveTo(42, 29, 42, 37, 32, 43);
+  context.ellipse(32, 35, 28, 24, 0, 0, Math.PI * 2);
   context.fill();
 
-  context.fillStyle = "#ffe06d";
+  const flame = context.createLinearGradient(32, 8, 32, 55);
+  flame.addColorStop(0, "rgba(255, 247, 131, 0)");
+  flame.addColorStop(0.28, "rgba(255, 230, 65, 0.98)");
+  flame.addColorStop(0.62, "rgba(255, 111, 20, 0.96)");
+  flame.addColorStop(1, "rgba(205, 20, 13, 0)");
+
+  context.fillStyle = flame;
   context.beginPath();
-  context.moveTo(31, 42);
-  context.bezierCurveTo(27, 35, 31, 30, 34, 25);
-  context.bezierCurveTo(38, 34, 37, 39, 31, 42);
+  context.moveTo(32, 7);
+  context.bezierCurveTo(22, 21, 14, 32, 20, 49);
+  context.bezierCurveTo(27, 60, 44, 60, 48, 47);
+  context.bezierCurveTo(53, 30, 39, 22, 32, 7);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "rgba(255, 246, 159, 0.86)";
+  context.beginPath();
+  context.moveTo(33, 18);
+  context.bezierCurveTo(27, 27, 25, 38, 30, 48);
+  context.bezierCurveTo(36, 46, 41, 39, 39, 31);
+  context.bezierCurveTo(38, 25, 35, 22, 33, 18);
   context.fill();
 
   return canvas;
@@ -729,6 +886,7 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   const {
     characterFactory,
     woodImage,
+    leaveImage,
     skyImage,
     gameplayOpeningShipModel,
     robot1Model,
@@ -748,11 +906,15 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   );
 
   session.woodTexture = worldTextureFactory.fromImage(woodImage);
+  session.leavesTexture = worldTextureFactory.fromImage(leaveImage);
   session.leppaBerryTexture = worldTextureFactory.fromCanvas(createLeppaBerryCanvas());
   session.logChairTexture = worldTextureFactory.fromCanvas(createLogChairCanvas());
   session.logChairStarTexture = worldTextureFactory.fromCanvas(createSavePointStarCanvas());
   session.strawBedTexture = worldTextureFactory.fromCanvas(createStrawBedCanvas());
   session.campfireTexture = worldTextureFactory.fromCanvas(createCampfireCanvas());
+  session.charmanderFireTexture = worldTextureFactory.fromCanvas(
+    createCharmanderFlameParticleCanvas()
+  );
   session.leafDenKitTexture = worldTextureFactory.fromCanvas(createLeafDenKitCanvas());
   session.leafDenTexture = worldTextureFactory.fromCanvas(createLeafDenCanvas());
   session.dittoFlagTexture = worldTextureFactory.fromCanvas(createDittoFlagCanvas());
@@ -768,6 +930,7 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
   session.skyTexture = skyImage ?
     worldTextureFactory.fromImage(skyImage, { filter: worldTextureFactory.LINEAR }) :
     null;
+  session.snowflakeTexture = worldTextureFactory.fromCanvas(createSnowflakeCanvas());
   session.playerDustTexture = worldTextureFactory.fromCanvas(createPlayerDustCanvas());
   session.playerDust = createPlayerDustState();
   session.playerModelInstance = {
@@ -787,6 +950,7 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     .map((image) => worldTextureFactory.fromImage(image));
   session.squirtleWaterStaminaBackTexture = worldTextureFactory.fromCanvas(createSquirtleStaminaBackCanvas());
   session.squirtleWaterStaminaFillTexture = worldTextureFactory.fromCanvas(createSquirtleStaminaFillCanvas());
+  session.charmanderCarbonFillTexture = worldTextureFactory.fromCanvas(createCharmanderCarbonFillCanvas());
   session.squirtleChargingParticleTexture = worldTextureFactory.fromCanvas(createSquirtleChargingParticleCanvas());
   session.squirtleWaterSprayTexture = worldTextureFactory.fromCanvas(createSquirtleWaterSprayCanvas());
   session.squirtleWaterGunQueue = [];

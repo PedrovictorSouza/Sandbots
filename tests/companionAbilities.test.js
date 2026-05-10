@@ -10,6 +10,7 @@ import {
 
 const EXPECTED_MOVE_LIST = [
   ["leafage", "Bulbasaur", "creates patches of tall grass"],
+  ["fire", "Charmander", "turns white ground into dry ground for Water Gun restoration"],
   ["waterGun", "Squirtle", "revitalizes dried up terrain"],
   ["cut", "Scyther", "cuts lumber"],
   ["rockSmash", "Hitmonchan", "destroys blocks of terrain"],
@@ -34,17 +35,17 @@ describe("companion ability registry", () => {
       status: COMPANION_ABILITY_STATUS.ACTIVE
     });
     expect(getCompanionAbilityByCompanion("charmander")).toMatchObject({
-      abilityId: "ember",
+      abilityId: "fire",
       element: "fire",
-      kind: COMPANION_ABILITY_KIND.HELPER_EVENT,
-      status: COMPANION_ABILITY_STATUS.PLANNED
+      kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
+      status: COMPANION_ABILITY_STATUS.PARTIAL
     });
   });
 
   it("can be queried by future unlock ability id", () => {
     expect(getCompanionAbilityByAbilityId("waterGun")?.companionName).toBe("Squirtle");
     expect(getCompanionAbilityByAbilityId("leafage")?.companionName).toBe("Bulbasaur");
-    expect(getCompanionAbilityByAbilityId("ember")?.companionName).toBe("Charmander");
+    expect(getCompanionAbilityByAbilityId("fire")?.companionName).toBe("Charmander");
     expect(getCompanionAbilityByAbilityId("unknown")).toBeNull();
   });
 
@@ -81,7 +82,7 @@ describe("companion ability registry", () => {
     expect(getCompanionAbilityByAbilityId("waterGun")?.narrativePurpose).toContain("reverse drought");
     expect(getCompanionAbilityByAbilityId("leafage")?.narrativePurpose).toContain("social invitation");
     expect(getCompanionAbilityByAbilityId("rockSmash")?.narrativePurpose).toContain("ridge repair story");
-    expect(getCompanionAbilityByAbilityId("ember")?.narrativePurpose).toContain("emotional recovery");
+    expect(getCompanionAbilityByAbilityId("fire")?.narrativePurpose).toContain("emotional recovery");
   });
 
   it("exposes the registry as immutable shared content", () => {

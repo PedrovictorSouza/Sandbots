@@ -7,6 +7,8 @@ import {
   buildLogChairPlacement,
   buildNearbyPrompt,
   buildStrawBedPlacement,
+  collectLeafDrops,
+  collectLeafResourceNodes,
   collectLeppaBerryDrops,
   dropLeppaBerryFromTree,
   findNearbyInteractable,
@@ -16,15 +18,21 @@ import {
   getLeppaTreeSurroundingGroundCells,
   reviveLeppaTreeFromWateredTiles,
   updateBulbasaurStrawBedChallengeCompletion,
+  validateBuildingKitPlacement,
   waterNearbyPalm
 } from "../world/islandWorld.js";
 import {
+  INTERACTABLE_DEFS,
+  LEAVES_ITEM_ID,
   LEPPA_BERRY_ITEM_ID,
   POKEMON_TALK_INTERACT_DISTANCE,
+  POKEMON_CENTER_PC_POSITION,
+  RUINED_POKEMON_CENTER_GUIDE_POSITION,
   RUINED_POKEMON_CENTER_INTERACT_DISTANCE,
   RUINED_POKEMON_CENTER_POSITION,
   WORKBENCH_INTERACT_DISTANCE,
-  WORKBENCH_POSITION
+  WORKBENCH_POSITION,
+  canClaimBoulderChallengeReward
 } from "../gameplayContent.js";
 
 describe("findNearbyInteractable", () => {
@@ -113,6 +121,63 @@ describe("findNearbyInteractable", () => {
     });
   });
 
+  it("keeps the Pokemon Center guide stop outside the solid collider and within inspect reach", () => {
+    const colliderCenter = [
+      RUINED_POKEMON_CENTER_POSITION[0],
+      RUINED_POKEMON_CENTER_POSITION[2] + 0.15
+    ];
+    const colliderHalfWidth = (7.6 / 2) + 0.18;
+    const colliderHalfDepth = (6.2 / 2) + 0.18;
+    const guideInsideSolidCollider =
+      Math.abs(RUINED_POKEMON_CENTER_GUIDE_POSITION[0] - colliderCenter[0]) <=
+        colliderHalfWidth &&
+      Math.abs(RUINED_POKEMON_CENTER_GUIDE_POSITION[2] - colliderCenter[1]) <=
+        colliderHalfDepth;
+    const guideInspectDistance = Math.hypot(
+      RUINED_POKEMON_CENTER_GUIDE_POSITION[0] - RUINED_POKEMON_CENTER_POSITION[0],
+      RUINED_POKEMON_CENTER_GUIDE_POSITION[2] - RUINED_POKEMON_CENTER_POSITION[2]
+    );
+
+    expect(guideInsideSolidCollider).toBe(false);
+    expect(guideInspectDistance).toBeLessThanOrEqual(RUINED_POKEMON_CENTER_INTERACT_DISTANCE);
+  });
+
+  it("prioritizes Pokemon Center inspection over nearby Tangrowth guide chatter", () => {
+    const result = findNearbyInteractable(
+      [...RUINED_POKEMON_CENTER_GUIDE_POSITION],
+      [
+        {
+          id: "tangrowth",
+          label: "Chopper",
+          activeWhen: () => true,
+          character: {
+            getPosition: () => [...RUINED_POKEMON_CENTER_GUIDE_POSITION]
+          }
+        }
+      ],
+      [
+        {
+          id: "ruinedPokemonCenter",
+          label: "Ruined Pokemon Center",
+          type: "site",
+          position: [...RUINED_POKEMON_CENTER_POSITION],
+          interactDistance: RUINED_POKEMON_CENTER_INTERACT_DISTANCE,
+          activeWhen: () => true
+        }
+      ],
+      { flags: { pokemonCenterGuideStarted: true } }
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "site",
+        id: "ruinedPokemonCenter",
+        label: "Ruined Pokemon Center"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
   it("detects an active rustling grass encounter", () => {
     const result = findNearbyInteractable(
       [8.1, 0, -3.9],
@@ -171,7 +236,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "pokemonCompanion",
         id: "bulbasaur",
-        label: "Talk to Bulbasaur",
+        label: "Follow me: Bulbasaur",
         position: [0, 0.02, 0]
       },
       distance: expect.any(Number)
@@ -617,6 +682,34 @@ describe("findNearbyInteractable", () => {
     });
   });
 
+  it("holds Bulbasaur request turn-in while the early freedom window is active", () => {
+    const result = findNearbyInteractable(
+      [8.1, 0, -3.9],
+      [],
+      [],
+      {
+        flags: {
+          bulbasaurRevealed: true,
+          bulbasaurDryGrassMissionAccepted: true,
+          bulbasaurDryGrassMissionComplete: true,
+          firstRequiredTaughtActionFreedomWindowActive: true,
+          restoredGrassCount: 10,
+          rustlingGrassCellId: "ground-3-1"
+        }
+      },
+      [
+        {
+          id: "grass-3",
+          cellId: "ground-3-1",
+          position: [8.4, 0.02, -4.2],
+          state: "alive"
+        }
+      ]
+    );
+
+    expect(result).toBe(null);
+  });
+
   it("detects the Timburr rustling grass challenge interaction", () => {
     const result = findNearbyInteractable(
       [31.3, 0, 10.6],
@@ -686,6 +779,15 @@ describe("findNearbyInteractable", () => {
     expect(findNearbyLeppaTree([2.4, 0, 2.2], leppaTree, storyState)).toEqual({
       leppaTree,
       action: "headbutt",
+      distance: expect.any(Number)
+    });
+
+    storyState.flags.leppaBerryDropped = true;
+    leppaTree.berryDropped = true;
+
+    expect(findNearbyLeppaTree([5.5, 0, 2], leppaTree, storyState)).toEqual({
+      leppaTree,
+      action: "leafageOptions",
       distance: expect.any(Number)
     });
   });
@@ -770,7 +872,7 @@ describe("findNearbyInteractable", () => {
     });
   });
 
-  it("detects Bulbasaur's Straw Bed recipe prompt after the first challenge set", () => {
+  it("detects Bulbasaur's Solar Station recipe prompt after the first challenge set", () => {
     const result = findNearbyInteractable(
       [8.1, 0, -3.9],
       [],
@@ -806,7 +908,7 @@ describe("findNearbyInteractable", () => {
     });
   });
 
-  it("detects Bulbasaur's request turn-in after the Straw Bed is placed", () => {
+  it("detects Bulbasaur's request turn-in after the Solar Station is placed", () => {
     const result = findNearbyInteractable(
       [8.1, 0, -3.9],
       [],
@@ -842,7 +944,7 @@ describe("findNearbyInteractable", () => {
     });
   });
 
-  it("counts a tree only once for Bulbasaur's Straw Bed challenge", () => {
+  it("counts a tree only once for Bulbasaur's Solar Station challenge", () => {
     const treeModel = {
       size: [2, 4, 2]
     };
@@ -864,8 +966,21 @@ describe("findNearbyInteractable", () => {
       }
     };
 
-    const firstWatering = waterNearbyPalm([1.2, 0, 1.1], treeModel, palmInstances, storyState);
-    const duplicateWatering = waterNearbyPalm([1.2, 0, 1.1], treeModel, palmInstances, storyState);
+    const fieldDrops = [];
+    const firstWatering = waterNearbyPalm(
+      [1.2, 0, 1.1],
+      treeModel,
+      palmInstances,
+      storyState,
+      fieldDrops
+    );
+    const duplicateWatering = waterNearbyPalm(
+      [1.2, 0, 1.1],
+      treeModel,
+      palmInstances,
+      storyState,
+      fieldDrops
+    );
 
     expect(firstWatering).toMatchObject({
       hit: true,
@@ -877,9 +992,60 @@ describe("findNearbyInteractable", () => {
       counted: false,
       challengeComplete: false
     });
+    expect(fieldDrops).toHaveLength(1);
+    expect(fieldDrops.every((drop) => drop.itemId === LEAVES_ITEM_ID)).toBe(true);
+    expect(duplicateWatering.leafDrops).toEqual([]);
     expect(storyState.flags.wateredTreeCount).toBe(5);
     expect(storyState.flags.bulbasaurStrawBedChallengeComplete).toBe(true);
     expect(updateBulbasaurStrawBedChallengeCompletion(storyState)).toBe(false);
+  });
+
+  it("collects leaf drops like wood drops when the player walks over them", () => {
+    const inventory = {
+      [LEAVES_ITEM_ID]: 0
+    };
+    const fieldDrops = [
+      {
+        id: "leaf-palm-0-1",
+        itemId: LEAVES_ITEM_ID,
+        position: [1, 0.03, 1],
+        size: [0.66, 0.66],
+        uvRect: [0, 0, 1, 1],
+        pickupRadius: 0.64,
+        collected: false
+      }
+    ];
+
+    expect(collectLeafDrops([1.1, 0, 1.05], fieldDrops, inventory)).toBe(1);
+    expect(inventory[LEAVES_ITEM_ID]).toBe(1);
+    expect(fieldDrops[0].collected).toBe(true);
+  });
+
+  it("collects leaf piles from the ground into supplies", () => {
+    const inventory = {
+      [LEAVES_ITEM_ID]: 0
+    };
+    const resourceNodes = [
+      {
+        id: "leaf-pile-test",
+        itemId: LEAVES_ITEM_ID,
+        position: [1, 0.03, 1],
+        yield: 2,
+        respawnDuration: 12,
+        interactDistance: 0.75,
+        cooldown: 0,
+        activeWhen: () => true
+      }
+    ];
+
+    expect(collectLeafResourceNodes(
+      [1.1, 0, 1.05],
+      resourceNodes,
+      { flags: {} },
+      inventory
+    )).toBe(2);
+    expect(inventory[LEAVES_ITEM_ID]).toBe(2);
+    expect(resourceNodes[0].cooldown).toBe(12);
   });
 
   it("detects the placed log chair as a sit target", () => {
@@ -964,6 +1130,52 @@ describe("findNearbyInteractable", () => {
     });
   });
 
+  it("keeps the Pokemon Center PC active when Timburr was revealed before the reward-ready flag", () => {
+    const pokemonCenterPc = INTERACTABLE_DEFS.find((interactable) => {
+      return interactable.id === "pokemonCenterPc";
+    });
+    const storyState = {
+      flags: {
+        ruinedPokemonCenterInspected: true,
+        timburrRevealed: true,
+        boulderChallengeRewardReady: false,
+        boulderChallengeRewardClaimed: false
+      }
+    };
+
+    expect(canClaimBoulderChallengeReward(storyState)).toBe(true);
+    expect(pokemonCenterPc.activeWhen(storyState)).toBe(true);
+    expect(findNearbyInteractable(
+      POKEMON_CENTER_PC_POSITION,
+      [],
+      [pokemonCenterPc],
+      storyState
+    )).toEqual({
+      target: {
+        kind: "site",
+        id: "pokemonCenterPc",
+        label: "Pokemon Center PC"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
+  it("keeps the Pokemon Center PC active after inspection even without a pending reward", () => {
+    const pokemonCenterPc = INTERACTABLE_DEFS.find((interactable) => {
+      return interactable.id === "pokemonCenterPc";
+    });
+
+    expect(pokemonCenterPc.activeWhen({
+      flags: {
+        ruinedPokemonCenterInspected: true,
+        challengesUnlocked: true,
+        boulderChallengeRewardClaimed: true,
+        newPcChallengesChecked: true,
+        leafDenKitPurchased: true
+      }
+    })).toBe(true);
+  });
+
   it("describes the log chair placement action in the nearby prompt", () => {
     expect(buildNearbyPrompt({
       harvestTarget: {
@@ -977,7 +1189,7 @@ describe("findNearbyInteractable", () => {
     })).toBe("[Enter] Place the Log Chair nearby");
   });
 
-  it("detects the placed Leaf Den Kit as a construction target", () => {
+  it("detects the placed House Kit as a construction target", () => {
     const leafDen = buildLeafDenKitPlacement([4, 0, 4]);
     const storyState = {
       flags: {
@@ -989,6 +1201,19 @@ describe("findNearbyInteractable", () => {
     expect(findNearbyLeafDen(leafDen.position, leafDen, storyState)).toEqual({
       leafDen,
       distance: expect.any(Number)
+    });
+
+    expect(leafDen).toMatchObject({
+      kind: "constructionSite",
+      constructionSiteId: "leaf-den-0",
+      buildingKitId: "leafDenKit",
+      constructionName: "House",
+      constructionStatus: "incomplete",
+      interactionBox: {
+        id: "leaf-den-0-interaction-box",
+        markerKey: "workbench",
+        offset: [1.02, 1.18, -0.42]
+      }
     });
 
     expect(findNearbyInteractable(
@@ -1003,42 +1228,42 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "leafDenConstruction",
         id: "leafDen",
-        label: "Leaf Den Kit"
+        label: "House"
       },
       distance: expect.any(Number)
     });
   });
 
-  it("describes Leaf Den Kit placement and construction prompts", () => {
+  it("describes House Kit placement and construction prompts", () => {
     expect(buildNearbyPrompt({
       harvestTarget: {
         leafDenKitPlacement: true
       },
       quest: {
-        title: "Building the Leaf Den",
+        title: "Build a House",
         actionLabel: "Place"
       }
-    })).toBe("[Enter] Place the Leaf Den Kit");
+    })).toBe("[Enter] Place the House Kit");
 
     expect(buildNearbyPrompt({
       interactTarget: {
         target: {
           kind: "leafDenConstruction",
           id: "leafDen",
-          label: "Leaf Den Kit"
+          label: "House"
         }
       },
       quest: {
-        title: "Building the Leaf Den",
+        title: "Build a House",
         actionLabel: "Inspect"
       },
       storyState: {
         flags: {}
       }
-    })).toBe("[E / X] Leaf Den Kit • Start construction");
+    })).toBe("[E / X] House • Start construction");
   });
 
-  it("detects the completed Leaf Den as an entrance", () => {
+  it("detects the completed House as an entrance", () => {
     const leafDen = buildLeafDenKitPlacement([4, 0, 4]);
     const storyState = {
       flags: {
@@ -1060,7 +1285,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "leafDenEntrance",
         id: "leafDen",
-        label: "Leaf Den"
+        label: "House"
       },
       distance: expect.any(Number)
     });
@@ -1070,17 +1295,17 @@ describe("findNearbyInteractable", () => {
         target: {
           kind: "leafDenEntrance",
           id: "leafDen",
-          label: "Leaf Den"
+          label: "House"
         }
       },
       quest: {
-        title: "Furnitures inside Leaf Den",
+        title: "Furnitures inside House",
         actionLabel: "Enter"
       }
-    })).toBe("[E / X] Leaf Den • Enter");
+    })).toBe("[E / X] House • Enter");
   });
 
-  it("detects Timburr as the Leaf Den furniture request turn-in", () => {
+  it("detects Timburr as the House furniture request turn-in", () => {
     const storyState = {
       flags: {
         leafDenFurnitureRequestAvailable: true,
@@ -1153,7 +1378,7 @@ describe("findNearbyInteractable", () => {
     });
   });
 
-  it("builds a Straw Bed placement on the supplied habitat anchor", () => {
+  it("builds a Solar Station placement on the supplied habitat anchor", () => {
     expect(buildStrawBedPlacement([8.5, 0.02, -5.5])).toEqual({
       id: "straw-bed-0",
       position: [8.5, 0.02, -5.5],
@@ -1162,7 +1387,40 @@ describe("findNearbyInteractable", () => {
     });
   });
 
-  it("describes the Straw Bed placement action in the nearby prompt", () => {
+  it("validates BuildingKit placement terrain and occupied space", () => {
+    expect(validateBuildingKitPlacement({
+      position: [4, 0.02, 5],
+      size: [1.95, 1.45],
+      blockers: []
+    })).toEqual({
+      valid: true,
+      reason: "valid"
+    });
+
+    expect(validateBuildingKitPlacement({
+      position: [145, 0.02, 0],
+      size: [1.95, 1.45]
+    })).toEqual({
+      valid: false,
+      reason: "invalid-terrain"
+    });
+
+    expect(validateBuildingKitPlacement({
+      position: [4, 0.02, 5],
+      size: [1.95, 1.45],
+      blockers: [
+        {
+          position: [4.4, 0.02, 5.2],
+          size: [1.2, 1.2]
+        }
+      ]
+    })).toMatchObject({
+      valid: false,
+      reason: "occupied-space"
+    });
+  });
+
+  it("describes the Solar Station placement action in the nearby prompt", () => {
     expect(buildNearbyPrompt({
       harvestTarget: {
         strawBedPlacement: {
@@ -1170,10 +1428,10 @@ describe("findNearbyInteractable", () => {
         }
       },
       quest: {
-        title: "Straw Bed Recipe",
+        title: "Solar Station Recipe",
         actionLabel: "Place"
       }
-    })).toBe("[Enter] Place the Straw Bed in Bulbasaur's habitat");
+    })).toBe("[E / X] Place the Solar Station on open terrain");
   });
 
   it("describes the Ditto Flag placement action in the nearby prompt", () => {
@@ -1189,7 +1447,7 @@ describe("findNearbyInteractable", () => {
         title: "Place Ditto Flag on your house",
         actionLabel: "Place"
       }
-    })).toBe("[Enter] Place the Ditto Flag on the Leaf Den");
+    })).toBe("[Enter] Place the Ditto Flag on the House");
   });
 
   it("uses A or E copy for Workbench interaction prompts", () => {
@@ -1207,6 +1465,97 @@ describe("findNearbyInteractable", () => {
       },
       getItemLabel: (itemId) => itemId
     })).toBe("[E / X] Workbench • Workbench");
+  });
+
+  it("describes the revived Leppa tree Leafage selector in the nearby prompt", () => {
+    expect(buildNearbyPrompt({
+      interactTarget: {
+        target: {
+          kind: "leppaTreeLeafageOptions",
+          label: "Leafage Options"
+        }
+      },
+      quest: {
+        title: "Any quest",
+        actionLabel: "Choose"
+      }
+    })).toBe("[E / X] Leafage Options • Choose Leafage object");
+  });
+
+  it("detects a nearby Leafage-instantiated object as destroyable", () => {
+    const result = findNearbyInteractable(
+      [1.15, 0, 0.2],
+      [],
+      [],
+      { flags: {} },
+      [
+        {
+          id: "leafage-grass-ground-1",
+          cellId: "ground-1",
+          source: "leafage",
+          leafageObjectId: "garden1",
+          state: "alive",
+          position: [1, 0.02, 0],
+          size: [1.42, 1.18]
+        }
+      ]
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "site",
+        id: "leafage-grass-ground-1",
+        label: "Garden-1",
+        action: "destroyInstantiatedObject",
+        cellId: "ground-1"
+      },
+      distance: expect.any(Number)
+    });
+    expect(buildNearbyPrompt({
+      interactTarget: result,
+      quest: {
+        title: "Any quest",
+        actionLabel: "Destroy"
+      }
+    })).toBe("[E / X] Garden-1 • Destroy");
+  });
+
+  it("detects a nearby Leafage-instantiated flower as destroyable", () => {
+    const result = findNearbyInteractable(
+      [1.15, 0, 0.2],
+      [],
+      [],
+      { flags: {} },
+      [],
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      [
+        {
+          id: "leafage-flower-ground-1",
+          cellId: "ground-1",
+          habitatGroupId: "leafage-flower-bed-habitat-0",
+          source: "leafage",
+          state: "alive",
+          position: [1, 0.02, 0],
+          size: [1.12, 1.12]
+        }
+      ]
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "site",
+        id: "leafage-flower-ground-1",
+        label: "Flower",
+        action: "destroyInstantiatedObject",
+        cellId: "ground-1"
+      },
+      distance: expect.any(Number)
+    });
   });
 
   it("describes the Leafage grow action in the nearby prompt", () => {

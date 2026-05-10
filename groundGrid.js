@@ -6,14 +6,69 @@ export const DEAD_PATCH_STATE = "dead";
 export const ALIVE_PATCH_STATE = "alive";
 export const DEAD_GRASS_STATE = DEAD_PATCH_STATE;
 export const GREEN_GRASS_STATE = ALIVE_PATCH_STATE;
+export const DEAD_GROUND_KIND = "dead";
+export const COLD_GROUND_KIND = "cold";
 
 const GROUND_CELL_INDEX_MIN_SIZE = 128;
+const PURIFIED_GROUND_VARIANT_INSTANCES = Symbol.for("small-island.purifiedGroundVariantInstances");
+const GROUND_CELL_ID_PATTERN = /^ground-(\d+)-(\d+)$/;
 const groundCellIndexCache = new WeakMap();
 
 function getMaxTileSpan(groundInstances) {
   return groundInstances.reduce((maxTileSpan, groundCell) => {
     return Math.max(maxTileSpan, Number(groundCell?.tileSpan) || 0);
   }, 0);
+}
+
+export function isAlternatePurifiedGroundCell(groundCell) {
+  const match = typeof groundCell?.id === "string" ?
+    GROUND_CELL_ID_PATTERN.exec(groundCell.id) :
+    null;
+
+  if (!match) {
+    return false;
+  }
+
+  const xIndex = Number(match[1]);
+  const zIndex = Number(match[2]);
+  return (xIndex + zIndex) % 2 === 1;
+}
+
+export function bindPurifiedGroundVariantInstances(
+  purifiedGroundInstances,
+  {
+    lightInstances = [],
+    darkInstances = []
+  } = {}
+) {
+  if (!Array.isArray(purifiedGroundInstances)) {
+    return;
+  }
+
+  Object.defineProperty(purifiedGroundInstances, PURIFIED_GROUND_VARIANT_INSTANCES, {
+    value: {
+      lightInstances,
+      darkInstances
+    },
+    configurable: true
+  });
+}
+
+export function syncPurifiedGroundVariantInstances(purifiedGroundInstances) {
+  const variants = purifiedGroundInstances?.[PURIFIED_GROUND_VARIANT_INSTANCES];
+  if (!variants) {
+    return;
+  }
+
+  variants.lightInstances.length = 0;
+  variants.darkInstances.length = 0;
+
+  for (const groundCell of purifiedGroundInstances) {
+    const targetInstances = isAlternatePurifiedGroundCell(groundCell) ?
+      variants.darkInstances :
+      variants.lightInstances;
+    targetInstances.push(groundCell);
+  }
 }
 
 export function createGroundCellSpatialIndex(groundInstances) {
@@ -157,6 +212,113 @@ function isGroundCellInSafeZone(groundCell, safeZones = []) {
     const dz = cellZ - safeZone.position[1];
     return dx * dx + dz * dz <= safeZone.radius * safeZone.radius;
   });
+}
+
+function clampRatio(value) {
+  return Math.min(1, Math.max(0, Number(value) || 0));
+}
+
+function getGroundCellCoverageGroup(groundCell, coverageZones = [], fallbackRatio = 0) {
+  if (!Array.isArray(groundCell?.offset) || !Array.isArray(coverageZones)) {
+    return {
+      key: "default",
+      coverageRatio: fallbackRatio
+    };
+  }
+
+  const cellX = groundCell.offset[0];
+  const cellZ = groundCell.offset[2];
+
+  for (let zoneIndex = 0; zoneIndex < coverageZones.length; zoneIndex += 1) {
+    const coverageZone = coverageZones[zoneIndex];
+    if (!Array.isArray(coverageZone?.position) || !(coverageZone.radius > 0)) {
+      continue;
+    }
+
+    const dx = cellX - coverageZone.position[0];
+    const dz = cellZ - coverageZone.position[1];
+
+    if (dx * dx + dz * dz <= coverageZone.radius * coverageZone.radius) {
+      return {
+        key: `zone-${zoneIndex}`,
+        coverageRatio: clampRatio(coverageZone.coverageRatio)
+      };
+    }
+  }
+
+  return {
+    key: "default",
+    coverageRatio: fallbackRatio
+  };
+}
+
+export function partitionColdGroundInstances(groundInstances, {
+  coldCoverageRatio = 0.8,
+  coverageZones = [],
+  seed = "cold-ground"
+} = {}) {
+  const deadGroundInstances = [];
+  const coldGroundInstances = [];
+
+  if (!Array.isArray(groundInstances) || !groundInstances.length) {
+    return {
+      deadGroundInstances,
+      coldGroundInstances
+    };
+  }
+
+  const defaultCoverageRatio = clampRatio(coldCoverageRatio);
+  const coverageGroups = new Map();
+  const coldGroundCellIds = new Set();
+
+  for (const groundCell of groundInstances) {
+    const coverageGroup = getGroundCellCoverageGroup(
+      groundCell,
+      coverageZones,
+      defaultCoverageRatio
+    );
+
+    if (!coverageGroups.has(coverageGroup.key)) {
+      coverageGroups.set(coverageGroup.key, {
+        coverageRatio: coverageGroup.coverageRatio,
+        cells: []
+      });
+    }
+
+    coverageGroups.get(coverageGroup.key).cells.push({
+      groundCell,
+      hash: getStableHash(`${seed}:${coverageGroup.key}:${groundCell.id}`)
+    });
+  }
+
+  for (const group of coverageGroups.values()) {
+    const coldCount = Math.round(group.cells.length * group.coverageRatio);
+    const selectedCells = group.cells
+      .sort((left, right) => left.hash - right.hash)
+      .slice(0, coldCount);
+
+    for (const { groundCell } of selectedCells) {
+      coldGroundCellIds.add(groundCell.id);
+    }
+  }
+
+  for (const groundCell of groundInstances) {
+    if (coldGroundCellIds.has(groundCell.id)) {
+      groundCell.groundKind = COLD_GROUND_KIND;
+      groundCell.purifiable = false;
+      coldGroundInstances.push(groundCell);
+      continue;
+    }
+
+    groundCell.groundKind = DEAD_GROUND_KIND;
+    groundCell.purifiable = true;
+    deadGroundInstances.push(groundCell);
+  }
+
+  return {
+    deadGroundInstances,
+    coldGroundInstances
+  };
 }
 
 function createPatchFromGroundCell({
@@ -384,6 +546,13 @@ export function purifyGroundCell(groundCell, corruptedGroundInstances, purifiedG
 
   const [corruptedGroundCell] = corruptedGroundInstances.splice(corruptedIndex, 1);
   purifiedGroundInstances.push(corruptedGroundCell);
+  const variants = purifiedGroundInstances?.[PURIFIED_GROUND_VARIANT_INSTANCES];
+  if (variants) {
+    const targetInstances = isAlternatePurifiedGroundCell(corruptedGroundCell) ?
+      variants.darkInstances :
+      variants.lightInstances;
+    targetInstances.push(corruptedGroundCell);
+  }
   return true;
 }
 

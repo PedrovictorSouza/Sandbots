@@ -1,7 +1,6 @@
 const GAMEPLAY_UI_SECTIONS = Object.freeze([
   "hud",
   "quest",
-  "bagOnboarding",
   "bagDetails",
   "missions",
   "nearbyHabitats",
@@ -9,6 +8,10 @@ const GAMEPLAY_UI_SECTIONS = Object.freeze([
   "inventory",
   "status",
   "builder"
+]);
+const PERSISTENT_GAMEPLAY_UI_SECTIONS = Object.freeze([
+  "hud",
+  "inventory"
 ]);
 
 function toDatasetKey(sectionId) {
@@ -54,7 +57,10 @@ export function createGameplayUiVisibilityController({
     assertValidSections(sectionIds);
 
     for (const sectionId of sectionIds) {
-      sectionVisibility[sectionId] = visible;
+      sectionVisibility[sectionId] =
+        !visible && PERSISTENT_GAMEPLAY_UI_SECTIONS.includes(sectionId) ?
+          true :
+          visible;
     }
 
     syncUiLayerState();

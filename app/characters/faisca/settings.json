@@ -1,0 +1,17 @@
+{
+  "window_width":768,
+  "theme":"classic",
+  "texture_grid_size":16,
+  "invert_zoom":false,
+  "warn_on_exit":true,
+  "window_height":787,
+  "os_mouse":false,
+  "snap_is_default":true,
+  "auto_save_frequency":10,
+  "last_path":"",
+  "recent_files":["faisca.txt","Solar-Station.txt","unnamed_12.txt","unnamed_11.txt","bee.txt"],
+  "gif_file_increment":true,
+  "rmb_action":1,
+  "show_grid":true,
+  "invert_mouse_controls":false
+}

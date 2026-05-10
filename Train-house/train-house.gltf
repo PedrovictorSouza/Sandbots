@@ -1,0 +1,19 @@
+{
+  "asset": { "version": "2.0" },
+  "scene": 0,
+  "scenes": [{ "nodes": [0,1,2,3,4] }],
+  "nodes": [{"mesh":0},{"mesh":1},{"mesh":2},{"mesh":3},{"mesh":4}],
+  "meshes": [{"primitives":[{"attributes":{"POSITION":0,"TEXCOORD_0":1},"indices":2,"material":0}]},{"primitives":[{"attributes":{"POSITION":3,"TEXCOORD_0":4},"indices":5,"material":0}]},{"primitives":[{"attributes":{"POSITION":6,"TEXCOORD_0":7},"indices":8,"material":0}]},{"primitives":[{"attributes":{"POSITION":9,"TEXCOORD_0":10},"indices":11,"material":0}]},{"primitives":[{"attributes":{"POSITION":12,"TEXCOORD_0":13},"indices":14,"material":0}]}],
+  "materials": [{
+    "pbrMetallicRoughness": {
+      "baseColorTexture": { "index": 0 },
+      "metallicFactor": 0.0,
+      "roughnessFactor": 1.0
+    }
+  }],
+  "textures": [{ "source": 0 }],
+  "images": [{ "uri": "train-house.png" }],
+  "accessors": [{"bufferView":0,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC3","min":[-1,-0.5,-2.25],"max":[1,1.25,1.75]},{"bufferView":1,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC2"},{"bufferView":2,"byteOffset":0,"componentType":5123,"count":60,"type":"SCALAR"},{"bufferView":3,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC3","min":[-1,-1,-2.25],"max":[1,-0.5,1.75]},{"bufferView":4,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC2"},{"bufferView":5,"byteOffset":0,"componentType":5123,"count":60,"type":"SCALAR"},{"bufferView":6,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC3","min":[-0.025,-0.375,1.725],"max":[0.775,2.6,3.275]},{"bufferView":7,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC2"},{"bufferView":8,"byteOffset":0,"componentType":5123,"count":60,"type":"SCALAR"},{"bufferView":9,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC3","min":[-0.025,-0.525,0.875],"max":[0.775,0.525,2.6]},{"bufferView":10,"byteOffset":0,"componentType":5126,"count":60,"type":"VEC2"},{"bufferView":11,"byteOffset":0,"componentType":5123,"count":60,"type":"SCALAR"},{"bufferView":12,"byteOffset":0,"componentType":5126,"count":36,"type":"VEC3","min":[-2,-1,-1.75],"max":[-1,0,-0.75]},{"bufferView":13,"byteOffset":0,"componentType":5126,"count":36,"type":"VEC2"},{"bufferView":14,"byteOffset":0,"componentType":5123,"count":36,"type":"SCALAR"}],
+  "bufferViews": [{"buffer":0,"byteOffset":0,"byteLength":720,"target":34962},{"buffer":0,"byteOffset":720,"byteLength":480,"target":34962},{"buffer":0,"byteOffset":1200,"byteLength":120,"target":34963},{"buffer":0,"byteOffset":1320,"byteLength":720,"target":34962},{"buffer":0,"byteOffset":2040,"byteLength":480,"target":34962},{"buffer":0,"byteOffset":2520,"byteLength":120,"target":34963},{"buffer":0,"byteOffset":2640,"byteLength":720,"target":34962},{"buffer":0,"byteOffset":3360,"byteLength":480,"target":34962},{"buffer":0,"byteOffset":3840,"byteLength":120,"target":34963},{"buffer":0,"byteOffset":3960,"byteLength":720,"target":34962},{"buffer":0,"byteOffset":4680,"byteLength":480,"target":34962},{"buffer":0,"byteOffset":5160,"byteLength":120,"target":34963},{"buffer":0,"byteOffset":5280,"byteLength":432,"target":34962},{"buffer":0,"byteOffset":5712,"byteLength":288,"target":34962},{"buffer":0,"byteOffset":6000,"byteLength":72,"target":34963}],
+  "buffers": [{ "uri": "train-house.bin", "byteLength": 6072 }]
+}

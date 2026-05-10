@@ -291,11 +291,11 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: "",
-          text: "You found a Pokedex! it's even quipped with a camera that can take selfies!"
+          text: "You found a FieldDex! It still has a working entry for the Pokemon you just helped."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Oho! that's a pokedex i found ages ago!",
+          text: "Oho! that's an old field device i found ages ago! It records island discoveries.",
           choices: POKEDEX_CHOICES,
           responseKey: "pokedexChoice"
         }

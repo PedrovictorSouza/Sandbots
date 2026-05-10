@@ -691,7 +691,39 @@ function createTextureFromSource(gl, source, { filter = gl.NEAREST } = {}) {
   return texture;
 }
 
-function createPlaceholderTokenCanvas({ glyph, color, ink }) {
+function drawPixelCircleToken(context, { color, ink }) {
+  const outline = ink || "rgba(0, 0, 0, 0.42)";
+  const bands = [
+    [24, 6, 16, 4],
+    [16, 10, 32, 4],
+    [12, 14, 40, 4],
+    [8, 18, 48, 28],
+    [12, 46, 40, 4],
+    [16, 50, 32, 4],
+    [24, 54, 16, 4]
+  ];
+
+  context.fillStyle = "rgba(0, 0, 0, 0.24)";
+  for (const [x, y, width, height] of bands) {
+    context.fillRect(x + 2, y + 3, width, height);
+  }
+
+  context.fillStyle = outline;
+  for (const [x, y, width, height] of bands) {
+    context.fillRect(x - 2, y - 2, width + 4, height + 4);
+  }
+
+  context.fillStyle = color;
+  for (const [x, y, width, height] of bands) {
+    context.fillRect(x, y, width, height);
+  }
+
+  context.fillStyle = "rgba(255, 255, 255, 0.2)";
+  context.fillRect(18, 14, 28, 8);
+  context.fillRect(14, 22, 12, 6);
+}
+
+function createPlaceholderTokenCanvas({ glyph, color, ink, shape = "square" }) {
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
@@ -701,21 +733,25 @@ function createPlaceholderTokenCanvas({ glyph, color, ink }) {
   context.fillStyle = "rgba(0, 0, 0, 0)";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.fillStyle = color;
-  context.fillRect(10, 10, 44, 44);
+  if (shape === "circle") {
+    drawPixelCircleToken(context, { color, ink });
+  } else {
+    context.fillStyle = color;
+    context.fillRect(10, 10, 44, 44);
 
-  context.fillStyle = "rgba(255, 255, 255, 0.14)";
-  context.fillRect(14, 14, 36, 12);
+    context.fillStyle = "rgba(255, 255, 255, 0.14)";
+    context.fillRect(14, 14, 36, 12);
 
-  context.strokeStyle = "rgba(0, 0, 0, 0.25)";
-  context.lineWidth = 4;
-  context.strokeRect(10, 10, 44, 44);
+    context.strokeStyle = "rgba(0, 0, 0, 0.25)";
+    context.lineWidth = 4;
+    context.strokeRect(10, 10, 44, 44);
+  }
 
   context.fillStyle = ink;
-  context.font = "bold 28px monospace";
+  context.font = shape === "circle" ? "bold 34px monospace" : "bold 28px monospace";
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(glyph, canvas.width * 0.5, canvas.height * 0.58);
+  context.fillText(glyph, canvas.width * 0.5, shape === "circle" ? 35 : canvas.height * 0.58);
 
   return canvas;
 }

@@ -11,13 +11,34 @@ import {
 
 const ACTIVE_COMPANION_THUMBNAILS = Object.freeze({
   squirtle: new URL("./images/Robot-1-thumb.png", import.meta.url).href,
-  bulbasaur: new URL("./images/Robot-2-thumb.png", import.meta.url).href
+  bulbasaur: new URL("./images/Robot-2-thumb.png", import.meta.url).href,
+  charmander: new URL("./images/Robot-3-thumb.png", import.meta.url).href
 });
+const ACTIVE_COMPANION_ARROW_ICON_URL = new URL("./images/arrow.png", import.meta.url).href;
+const ACTIVE_COMPANION_LT_ICON_URL = new URL("./images/Lt-thumb.png", import.meta.url).href;
 const INVENTORY_ITEM_IMAGES = Object.freeze({
-  wood: new URL("../../Objects/wood.png", import.meta.url).href
+  leaves: new URL("../../Objects/leave.png", import.meta.url).href,
+  wood: new URL("../../Objects/wood.png", import.meta.url).href,
+  carbon: new URL("../Commodities/carbon/carvao.png", import.meta.url).href
 });
+const SUPPLY_HUD_EXCLUDED_SLOT_ROLES = Object.freeze([
+  "currency",
+  "key",
+  "recipe"
+]);
 const MISSION_COMPLETE_SFX_URL = new URL("../soundFx/mission-complete.mp3", import.meta.url).href;
-const MISSION_COMPLETE_SFX_VOLUME = 0.72;
+const MISSION_COMPLETE_SFX_VOLUME = 0.792;
+const SUPPLY_PICKUP_FLY_DURATION_MS = 1000;
+
+function clamp01(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function easeOutBack(value) {
+  const progress = clamp01(value);
+  const overshoot = 1.70158;
+  return 1 + (overshoot + 1) * Math.pow(progress - 1, 3) + overshoot * Math.pow(progress - 1, 2);
+}
 
 export function createGameHudController({
   statusElement,
@@ -73,6 +94,10 @@ export function createGameHudController({
     timer: 0
   };
   const missionCompleteAudioPool = [];
+  const supplyPickupFlyQueue = [];
+  let supplyPickupFlyAnimating = false;
+  let supplyPickupFlyLayer = null;
+  let supplyPickupFlyStyleElement = null;
   const uiCache = {
     inventoryHtml: "",
     missionsHtml: "",
@@ -202,16 +227,6 @@ export function createGameHudController({
             decoding="async"
           >
         </span>
-        <span class="active-companion-hud__switch-controls">
-          <span class="active-companion-hud__switch-button">
-            <span class="active-companion-hud__switch-key">←</span>
-            <span class="active-companion-hud__switch-pad">D←</span>
-          </span>
-          <span class="active-companion-hud__switch-button">
-            <span class="active-companion-hud__switch-key">→</span>
-            <span class="active-companion-hud__switch-pad">D→</span>
-          </span>
-        </span>
       </span>
     `;
   }
@@ -232,6 +247,268 @@ export function createGameHudController({
     }
 
     return escapeHtml(item.glyph || "?");
+  }
+
+  function getHudDocument() {
+    return inventoryGridElement?.ownerDocument || globalThis.document || null;
+  }
+
+  function getHudWindow() {
+    return getHudDocument()?.defaultView || globalThis.window || null;
+  }
+
+  function getAnimationNow() {
+    const hudWindow = getHudWindow();
+    return hudWindow?.performance?.now?.() || globalThis.performance?.now?.() || Date.now();
+  }
+
+  function requestHudAnimationFrame(callback) {
+    const hudWindow = getHudWindow();
+    const requestFrame = hudWindow?.requestAnimationFrame || globalThis.requestAnimationFrame;
+
+    if (typeof requestFrame === "function") {
+      return requestFrame.call(hudWindow || globalThis, callback);
+    }
+
+    return setTimeout(() => callback(getAnimationNow()), 16);
+  }
+
+  function ensureSupplyPickupFlyStyles() {
+    const documentRef = getHudDocument();
+
+    if (!documentRef || supplyPickupFlyStyleElement?.isConnected) {
+      return;
+    }
+
+    supplyPickupFlyStyleElement = documentRef.createElement("style");
+    supplyPickupFlyStyleElement.textContent = `
+      .supply-pickup-fly-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10000;
+      }
+
+      .supply-pickup-fly {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        will-change: transform, opacity;
+      }
+
+      .supply-pickup-fly__icon {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border: 3px solid #fff1cf;
+        background: var(--slot-color, #ffe08a);
+        color: var(--slot-ink, #271806);
+        box-shadow: 0 3px 0 rgba(43, 32, 44, 0.8);
+        font-family: var(--game-ui-font, monospace);
+        font-size: 20px;
+        line-height: 1;
+        overflow: hidden;
+        image-rendering: pixelated;
+      }
+
+      .supply-pickup-fly__icon .inventory-slot__image {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        image-rendering: pixelated;
+      }
+
+      .inventory-slot[data-pickup-pulse="true"] .inventory-slot__icon {
+        animation: supplyPickupSlotPulse 360ms cubic-bezier(0.2, 1.5, 0.4, 1);
+      }
+
+      @keyframes supplyPickupSlotPulse {
+        0% { transform: scale(1); filter: brightness(1); }
+        45% { transform: scale(1.24); filter: brightness(1.35); }
+        100% { transform: scale(1); filter: brightness(1); }
+      }
+    `;
+    documentRef.head?.appendChild(supplyPickupFlyStyleElement);
+  }
+
+  function getSupplyPickupFlyLayer() {
+    const documentRef = getHudDocument();
+
+    if (!documentRef?.body) {
+      return null;
+    }
+
+    ensureSupplyPickupFlyStyles();
+
+    if (supplyPickupFlyLayer?.isConnected) {
+      return supplyPickupFlyLayer;
+    }
+
+    supplyPickupFlyLayer = documentRef.createElement("div");
+    supplyPickupFlyLayer.className = "supply-pickup-fly-layer";
+    supplyPickupFlyLayer.setAttribute("aria-hidden", "true");
+    documentRef.body.appendChild(supplyPickupFlyLayer);
+    return supplyPickupFlyLayer;
+  }
+
+  function getSupplySlotElement(itemId) {
+    if (!inventoryGridElement || !itemId) {
+      return null;
+    }
+
+    return [...inventoryGridElement.querySelectorAll(".inventory-slot[data-filled='true']")]
+      .find((slot) => slot.dataset.itemId === itemId) || null;
+  }
+
+  function getFallbackSupplyPickupOrigin() {
+    const hudWindow = getHudWindow();
+    return {
+      x: (hudWindow?.innerWidth || 0) * 0.5,
+      y: (hudWindow?.innerHeight || 0) * 0.5
+    };
+  }
+
+  function normalizeSupplyPickupOrigin(origin) {
+    if (Array.isArray(origin) && Number.isFinite(origin[0]) && Number.isFinite(origin[1])) {
+      return { x: origin[0], y: origin[1] };
+    }
+
+    if (Number.isFinite(origin?.x) && Number.isFinite(origin?.y)) {
+      return { x: origin.x, y: origin.y };
+    }
+
+    return getFallbackSupplyPickupOrigin();
+  }
+
+  function getElementCenter(element) {
+    const rect = element?.getBoundingClientRect?.();
+
+    if (!rect) {
+      return getFallbackSupplyPickupOrigin();
+    }
+
+    return {
+      x: rect.left + rect.width * 0.5,
+      y: rect.top + rect.height * 0.5
+    };
+  }
+
+  function pulseSupplySlot(itemId) {
+    const slotElement = getSupplySlotElement(itemId);
+
+    if (!slotElement) {
+      return;
+    }
+
+    slotElement.dataset.pickupPulse = "true";
+    setTimeout(() => {
+      if (slotElement.dataset.pickupPulse === "true") {
+        delete slotElement.dataset.pickupPulse;
+      }
+    }, 380);
+  }
+
+  function createSupplyPickupFlyElement(itemId) {
+    const documentRef = getHudDocument();
+    const item = itemDefs[itemId];
+
+    if (!documentRef || !item) {
+      return null;
+    }
+
+    const flyElement = documentRef.createElement("div");
+    flyElement.className = "supply-pickup-fly";
+    flyElement.dataset.itemId = itemId;
+    flyElement.innerHTML = `
+      <div
+        class="supply-pickup-fly__icon"
+        style="--slot-color:${item.color}; --slot-ink:${item.ink}"
+      >
+        ${renderInventorySlotIconHtml(itemId, item)}
+      </div>
+    `;
+    return flyElement;
+  }
+
+  function animateSupplyPickupFly(payload) {
+    const slotElement = getSupplySlotElement(payload.itemId);
+    const layerElement = getSupplyPickupFlyLayer();
+    const flyElement = createSupplyPickupFlyElement(payload.itemId);
+
+    if (!slotElement || !layerElement || !flyElement) {
+      supplyPickupFlyAnimating = false;
+      startNextSupplyPickupFly();
+      return;
+    }
+
+    const start = normalizeSupplyPickupOrigin(payload.origin);
+    const end = getElementCenter(slotElement);
+    const control = {
+      x: (start.x + end.x) * 0.5,
+      y: Math.min(start.y, end.y) - 112 - Math.abs(end.x - start.x) * 0.08
+    };
+    const startedAt = getAnimationNow();
+
+    layerElement.appendChild(flyElement);
+
+    const update = (timestamp) => {
+      const progress = clamp01((timestamp - startedAt) / SUPPLY_PICKUP_FLY_DURATION_MS);
+      const eased = easeOutBack(progress);
+      const curveT = clamp01(eased);
+      const oneMinusT = 1 - curveT;
+      const x = oneMinusT * oneMinusT * start.x +
+        2 * oneMinusT * curveT * control.x +
+        curveT * curveT * end.x;
+      const y = oneMinusT * oneMinusT * start.y +
+        2 * oneMinusT * curveT * control.y +
+        curveT * curveT * end.y;
+      const bounce = 1 + Math.sin(progress * Math.PI) * 0.24;
+      const scale = (1 - progress * 0.28) * bounce;
+      const rotation = Math.sin(progress * Math.PI * 2) * 10;
+
+      flyElement.style.opacity = String(1 - Math.max(0, progress - 0.82) / 0.18);
+      flyElement.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
+
+      if (progress < 1) {
+        requestHudAnimationFrame(update);
+        return;
+      }
+
+      flyElement.remove();
+      pulseSupplySlot(payload.itemId);
+      supplyPickupFlyAnimating = false;
+      startNextSupplyPickupFly();
+    };
+
+    requestHudAnimationFrame(update);
+  }
+
+  function startNextSupplyPickupFly() {
+    if (supplyPickupFlyAnimating || supplyPickupFlyQueue.length === 0) {
+      return;
+    }
+
+    supplyPickupFlyAnimating = true;
+    animateSupplyPickupFly(supplyPickupFlyQueue.shift());
+  }
+
+  function queueSupplyPickupFlyToSlot({ itemId, origin } = {}) {
+    if (!itemDefs[itemId] || !getSupplySlotElement(itemId)) {
+      return false;
+    }
+
+    supplyPickupFlyQueue.push({
+      itemId,
+      origin: normalizeSupplyPickupOrigin(origin)
+    });
+    startNextSupplyPickupFly();
+    return true;
   }
 
   function syncActiveCompanionHud(skills, activeSkillId = null, storyState = null) {
@@ -274,7 +551,11 @@ export function createGameHudController({
       <span class="active-companion-hud__text">
         <span class="active-companion-hud__move">${escapeHtml(skill.shortLabel || activeAbility.label)}</span>
         <span class="active-companion-hud__name">${escapeHtml(activeAbility.companionName)}</span>
-        ${activeGuidance ? `<span class="active-companion-hud__hint">${escapeHtml(activeGuidance)}</span>` : ""}
+        ${activeGuidance ? `
+          <span class="active-companion-hud__hint">
+            <img class="active-companion-hud__hint-image" src="${escapeHtml(ACTIVE_COMPANION_LT_ICON_URL)}" alt="${escapeHtml(activeGuidance)}" loading="eager" decoding="async">
+          </span>
+        ` : ""}
       </span>
     `;
 
@@ -550,7 +831,9 @@ export function createGameHudController({
       return;
     }
 
-    const presentedItemIds = getInventoryPresentationOrder(inventory, inventoryOrder, itemDefs);
+    const presentedItemIds = getInventoryPresentationOrder(inventory, inventoryOrder, itemDefs, {
+      excludedRoles: SUPPLY_HUD_EXCLUDED_SLOT_ROLES
+    });
     const visibleItemIds = presentedItemIds.slice(0, MAX_VISIBLE_INVENTORY_SLOTS);
     const emptySlotCount = Math.max(0, MAX_VISIBLE_INVENTORY_SLOTS - visibleItemIds.length);
 
@@ -564,6 +847,7 @@ export function createGameHudController({
           class="inventory-slot"
           data-filled="true"
           data-empty="false"
+          data-item-id="${escapeHtml(itemId)}"
           data-slot-role="${escapeHtml(slotRole)}"
           data-icon-kind="${INVENTORY_ITEM_IMAGES[itemId] ? "image" : "glyph"}"
         >
@@ -1072,6 +1356,7 @@ export function createGameHudController({
     syncQuestFocus,
     syncInventoryUi,
     syncSkillsUi,
+    queueSupplyPickupFlyToSlot,
     updateTransientNotice
   };
 }

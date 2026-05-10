@@ -7,13 +7,62 @@ import {
   ACT_TWO_REPAIR_PLANT_POSITION,
   ACT_TWO_SQUIRTLE_POSITION
 } from "../../rendering/worldAssets.js";
+import { SQUIRTLE_POKEDEX_ENTRY_ID } from "../../pokedexEntries.js";
 import { createStartScreen } from "../../startScreen.js";
+import {
+  confirmPlayerName,
+  hasConfirmedPlayerName
+} from "../player/playerProfile.js";
 import { createIntroRoomDebugPanel } from "../scenes/introRoom/createIntroRoomDebugPanel.js";
 import { createOverlayVeil } from "../ui/overlayTransition.js";
 import { createGameScenes } from "./gameScenes.js";
 import { createSceneDirector } from "./sceneDirector.js";
 
 const ENABLE_INTRO_ROOM_DEBUG = true;
+
+export function applyActTwoTutorialCompletionResult(result = {}, {
+  playerMemory,
+  session,
+  unlockPokedexUi,
+  pushNotice,
+  unlockPlayerSkill,
+  onPlayerNameConfirmed = () => {}
+}) {
+  playerMemory.humanClaim = result.humanClaim;
+  playerMemory.pokedexReaction = result.pokedexReaction;
+  playerMemory.pokedexChoice = result.pokedexChoice;
+  playerMemory.foundPokedex = Boolean(result.foundPokedex);
+  playerMemory.trainerLookChoice = result.trainerLookChoice;
+  confirmPlayerName(playerMemory, {
+    playerName: result.playerName,
+    nameConfirmation: result.nameConfirmation
+  });
+  playerMemory.worldQuestion = result.worldQuestion;
+
+  if (hasConfirmedPlayerName(playerMemory)) {
+    onPlayerNameConfirmed({
+      playerName: playerMemory.playerName,
+      nameConfirmation: playerMemory.nameConfirmation
+    });
+  }
+
+  if (result.foundPokedex && !result.repairPlantFixed) {
+    unlockPokedexUi();
+    pushNotice("The Pokedex still works.", 3.6);
+  }
+  if (result.repairPlantFixed && session?.actTwoRepairPlant) {
+    session.actTwoRepairPlant.fixed = true;
+    unlockPokedexUi();
+    pushNotice("The plant is online again. The Pokedex is reacting.", 4.2);
+  }
+  if (result.learnedWaterGun) {
+    unlockPlayerSkill("transform");
+    unlockPlayerSkill("waterGun");
+    if (session?.actTwoSquirtle) {
+      session.actTwoSquirtle.recovered = true;
+    }
+  }
+}
 
 export function createSceneFlowRuntime({
   dom,
@@ -31,7 +80,8 @@ export function createSceneFlowRuntime({
   pushNotice,
   unlockPlayerSkill,
   unlockPokedexUi,
-  setPokedexOverlayOpen
+  setPokedexOverlayOpen,
+  onPlayerNameConfirmed = () => {}
 }) {
   let sceneDirector = null;
   let introRoomDebugPanelInstance = null;
@@ -209,39 +259,24 @@ export function createSceneFlowRuntime({
         }
       },
       onPokedexReveal: () => {
+        unlockPokedexUi();
         setPokedexOverlayOpen(true, {
-          force: true,
           markSeen: true,
-          scripted: true
+          scripted: true,
+          entryId: SQUIRTLE_POKEDEX_ENTRY_ID
         });
       },
       onComplete: (result) => {
         const session = getGameSession();
 
-        playerMemory.humanClaim = result.humanClaim;
-        playerMemory.pokedexReaction = result.pokedexReaction;
-        playerMemory.pokedexChoice = result.pokedexChoice;
-        playerMemory.foundPokedex = Boolean(result.foundPokedex);
-        playerMemory.trainerLookChoice = result.trainerLookChoice;
-        playerMemory.playerName = result.playerName || "";
-        playerMemory.nameConfirmation = result.nameConfirmation;
-        playerMemory.worldQuestion = result.worldQuestion;
-        if (result.foundPokedex && !result.repairPlantFixed) {
-          unlockPokedexUi();
-          pushNotice("The Pokedex still works.", 3.6);
-        }
-        if (result.repairPlantFixed && session?.actTwoRepairPlant) {
-          session.actTwoRepairPlant.fixed = true;
-          unlockPokedexUi();
-          pushNotice("The plant is online again. The Pokedex is reacting.", 4.2);
-        }
-        if (result.learnedWaterGun) {
-          unlockPlayerSkill("transform");
-          unlockPlayerSkill("waterGun");
-          if (session?.actTwoSquirtle) {
-            session.actTwoSquirtle.recovered = true;
-          }
-        }
+        applyActTwoTutorialCompletionResult(result, {
+          playerMemory,
+          session,
+          unlockPokedexUi,
+          pushNotice,
+          unlockPlayerSkill,
+          onPlayerNameConfirmed
+        });
         sceneDirector?.transition(GAME_FLOW.GAMEPLAY);
       }
     });

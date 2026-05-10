@@ -15,6 +15,9 @@ const ROBOT_2_MODEL_TEXTURE_PATH = new URL("../../characters/Robot-2/robot-2.png
 const BEE_MODEL_GLTF_PATH = new URL("../../characters/bee/bee.gltf", import.meta.url).href;
 const BEE_MODEL_BIN_PATH = new URL("../../characters/bee/bee.bin", import.meta.url).href;
 const BEE_MODEL_TEXTURE_PATH = new URL("../../characters/bee/bee.png", import.meta.url).href;
+const CHARMANDER_MODEL_GLTF_PATH = new URL("../../characters/faisca/faisca.gltf", import.meta.url).href;
+const CHARMANDER_MODEL_BIN_PATH = new URL("../../characters/faisca/faisca.bin", import.meta.url).href;
+const CHARMANDER_MODEL_TEXTURE_PATH = new URL("../../characters/faisca/faisca.png", import.meta.url).href;
 
 export async function loadCharacterAssets({ gl, setStatus }) {
   const [
@@ -22,6 +25,7 @@ export async function loadCharacterAssets({ gl, setStatus }) {
     robot1Model,
     robot2Model,
     beeModel,
+    charmanderModel,
     gameplayOpeningShipModel,
     playerModel,
     billImage,
@@ -54,6 +58,14 @@ export async function loadCharacterAssets({ gl, setStatus }) {
     }),
     loadTexturedModel({
       gl,
+      gltfPath: CHARMANDER_MODEL_GLTF_PATH,
+      binPath: CHARMANDER_MODEL_BIN_PATH,
+      texturePath: CHARMANDER_MODEL_TEXTURE_PATH,
+      normalizedSize: 1.65,
+      onStatus: setStatus
+    }),
+    loadTexturedModel({
+      gl,
       gltfPath: BROKEN_MODULE_GLTF_PATH,
       binPath: BROKEN_MODULE_BIN_PATH,
       texturePath: BROKEN_MODULE_TEXTURE_PATH,
@@ -80,6 +92,7 @@ export async function loadCharacterAssets({ gl, setStatus }) {
     robot1Model,
     robot2Model,
     beeModel,
+    charmanderModel,
     gameplayOpeningShipModel,
     playerModel,
     billImage,

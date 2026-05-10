@@ -405,4 +405,52 @@ describe("createQuestSystem", () => {
     expect(secondSystem.getQuest("learn-to-move").status).toBe("completed");
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("resumes at the next quest when a save captured a completed transition quest", () => {
+    vi.useFakeTimers();
+    const firstSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: null,
+      transitionDelayMs: 3000
+    });
+
+    firstSystem.emit({ type: QUEST_EVENT.MOVE, targetId: "player" });
+    expect(firstSystem.getActiveQuest()).toMatchObject({
+      id: "learn-to-move",
+      status: QUEST_STATUS.COMPLETED
+    });
+
+    const secondSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: null,
+      initialState: firstSystem.getState(),
+      transitionDelayMs: 3000
+    });
+
+    expect(secondSystem.getActiveQuest().id).toBe("wake-guide");
+    expect(secondSystem.getQuest("learn-to-move").status).toBe(QUEST_STATUS.COMPLETED);
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("loads quest state from an explicit initial state", () => {
+    const firstSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: null
+    });
+
+    firstSystem.emit({ type: QUEST_EVENT.MOVE, targetId: "player" });
+
+    const onChange = vi.fn();
+    const secondSystem = createQuestSystem({
+      quests: SMALL_ISLAND_QUESTS,
+      storage: null,
+      initialState: firstSystem.getState(),
+      onChange
+    });
+
+    expect(secondSystem.getActiveQuest().id).toBe("wake-guide");
+    expect(secondSystem.getQuest("learn-to-move").status).toBe("completed");
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

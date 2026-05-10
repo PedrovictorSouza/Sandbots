@@ -40,6 +40,30 @@ describe("resolveCompanionFollowDistance", () => {
     })).toBe(1.18);
   });
 
+  it("separates followers into fixed line slots", () => {
+    const firstSlot = resolveCompanionFollowDistance({
+      companionId: "squirtle",
+      activeMoveId: "waterGun",
+      defaultDistance: 1.18,
+      formationIndex: 0
+    });
+    const secondSlot = resolveCompanionFollowDistance({
+      companionId: "bulbasaur",
+      activeMoveId: "waterGun",
+      defaultDistance: 1.46,
+      formationIndex: 1
+    });
+    const thirdSlot = resolveCompanionFollowDistance({
+      companionId: "charmander",
+      activeMoveId: "waterGun",
+      defaultDistance: 1.28,
+      formationIndex: 2
+    });
+
+    expect(secondSlot - firstSlot).toBeGreaterThan(1);
+    expect(thirdSlot - secondSlot).toBeCloseTo(secondSlot - firstSlot);
+  });
+
   it("uses the player movement speed for following companions", () => {
     expect(resolveCompanionFollowSpeed()).toBe(ACT_TWO_PLAYER_SPEED);
   });

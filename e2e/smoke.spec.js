@@ -11,8 +11,10 @@ test("boots into a ready state and renders core HUD elements", async ({ page }) 
 
   await expect(page.locator("#status")).not.toHaveAttribute("data-error", "true");
   await expect(page.locator(".hud")).toBeVisible();
-  await expect(page.locator("#hud-instructions")).toBeVisible();
-  await expect(page.locator("#hud-instructions")).not.toHaveText("");
+  await expect(page.locator(".hud-task-title")).toBeVisible();
+  await expect(page.locator(".hud-task-title")).not.toHaveText("");
+  await expect(page.locator(".hud-task-subtitle")).toBeVisible();
+  await expect(page.locator(".hud-task-subtitle")).not.toHaveText("");
   await expect(page.locator(".hud-checklist")).toBeVisible();
   await expect(page.locator(".hud-checklist")).not.toHaveText("");
 });

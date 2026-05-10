@@ -4,7 +4,6 @@ import { createGameplayUiVisibilityController } from "../ui/gameplayUiVisibility
 import { createColliderGizmoOverlay } from "../ui/colliderGizmoOverlay.js";
 import { createGroundCellHighlightController } from "../ui/groundCellHighlightController.js";
 import { createHudSuspenseBoundary } from "../ui/hudSuspenseBoundary.js";
-import { createOnboardingHintController } from "../ui/onboardingHintController.js";
 import { createSkillLearnOverlay } from "../ui/skillLearnOverlay.js";
 import { createWorldSpeechController } from "../ui/worldSpeechController.js";
 import { createBagUiRuntime } from "./bagUiRuntime.js";
@@ -47,8 +46,6 @@ export function createUiRuntime({
     questFocusTitle,
     questFocusBody,
     nearbyHabitatsValue,
-    bagOnboardingTitle,
-    bagOnboardingBody,
     bagDetailsIcon,
     bagDetailsName,
     bagDetailsCount,
@@ -253,10 +250,6 @@ export function createUiRuntime({
     uiLayer,
     initialVisibility: "hidden"
   });
-  const bagOnboarding = createOnboardingHintController({
-    titleElement: bagOnboardingTitle,
-    bodyElement: bagOnboardingBody
-  });
   const bagDetails = createBagDetailsController({
     iconElement: bagDetailsIcon,
     nameElement: bagDetailsName,
@@ -264,7 +257,6 @@ export function createUiRuntime({
     descriptionElement: bagDetailsDescription
   });
   const bagUiRuntime = createBagUiRuntime({
-    bagOnboarding,
     bagDetails,
     gameplayUiVisibility,
     inventory,

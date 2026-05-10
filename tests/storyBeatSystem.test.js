@@ -123,6 +123,58 @@ describe("createStoryBeatSystem", () => {
     expect(system.getDialogueLines(STORY_BEAT_IDS.CHOPPER_ONBOARDING)).toEqual(dialogueLines);
   });
 
+  it("includes the first Chopper name request only when a name is still needed", () => {
+    const { system } = createSystem();
+
+    expect(system.getDialogueLines(STORY_BEAT_IDS.CHOPPER_ONBOARDING, {
+      needsPlayerName: true
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "ask-player-name"
+      })
+    ]));
+
+    expect(system.getDialogueLines(STORY_BEAT_IDS.CHOPPER_ONBOARDING, {
+      needsPlayerName: false
+    })).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "ask-player-name"
+      })
+    ]));
+  });
+
+  it("interpolates the saved player name in dialogue lines", () => {
+    const { system } = createSystem({
+      beats: {
+        greeting: {
+          id: "greeting",
+          fallbackLines: [
+            {
+              speaker: "Chopper",
+              text: "Good morning, {{playerName}}."
+            }
+          ]
+        }
+      },
+      playerProfile: {
+        playerName: "Ada"
+      }
+    });
+
+    expect(system.getDialogueLines("greeting")).toEqual([
+      {
+        speaker: "Chopper",
+        text: "Good morning, Ada."
+      }
+    ]);
+    expect(system.getDialogueLines("greeting", { playerName: "" })).toEqual([
+      {
+        speaker: "Chopper",
+        text: "Good morning, Trainer."
+      }
+    ]);
+  });
+
   it("turns in Bulbasaur's request, unlocks Leafage, and opens Squirtle's request", () => {
     const unlockPlayerSkill = vi.fn();
     const pushNotice = vi.fn();
@@ -207,12 +259,19 @@ describe("createStoryBeatSystem", () => {
     openConversation.mock.results[1].value.complete();
 
     expect(storyState.flags.logChairSat).toBe(true);
+    expect(storyState.flags.bulbasaurWorkbenchGuideAvailable).toBeUndefined();
+    expect(trackFieldTask).not.toHaveBeenCalledWith(FIELD_TASK_IDS.WORKBENCH_CAMPFIRE);
+    expect(pushNotice).toHaveBeenCalledWith("saved.", undefined);
+
+    system.playDialogue(STORY_BEAT_IDS.BULBASAUR_WORKBENCH_GUIDE_INTRO);
+    openConversation.mock.results[2].value.complete();
+
+    expect(storyState.flags.bulbasaurWorkbenchGuideIntroSeen).toBe(true);
     expect(storyState.flags.bulbasaurWorkbenchGuideAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.WORKBENCH_CAMPFIRE);
-    expect(pushNotice).toHaveBeenCalledWith("You sat on the Log Chair.", undefined);
   });
 
-  it("unlocks the first Workbench recipe and marks Campfire creation beats", () => {
+  it("unlocks the first Workbench recipe and marks Train House creation beats", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -240,17 +299,17 @@ describe("createStoryBeatSystem", () => {
     expect(system.complete(STORY_BEAT_IDS.CAMPFIRE_CREATED)).toBe(true);
     expect(storyState.flags.campfireCrafted).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.SPIT_OUT_CAMPFIRE);
-    expect(pushNotice).toHaveBeenCalledWith("You created a Campfire.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You created Charmander's Train House.", undefined);
 
     system.playDialogue(STORY_BEAT_IDS.CAMPFIRE_SPIT_OUT);
     openConversation.mock.results[1].value.complete();
 
     expect(storyState.flags.campfireSpatOut).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.CHARMANDER_TALL_GRASS);
-    expect(pushNotice).toHaveBeenCalledWith("You spat out the Campfire.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You placed Charmander's Train House.", undefined);
   });
 
-  it("registers Charmander and completes the Campfire lighting beat", () => {
+  it("registers Charmander and completes the Train House home beat", () => {
     const pushNotice = vi.fn();
     const { openConversation, pokedexRuntime, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -271,7 +330,7 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.charmanderCampfireLit).toBe(true);
     expect(storyState.flags.pokemonCenterGuideStarted).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.RUINED_POKEMON_CENTER);
-    expect(pushNotice).toHaveBeenCalledWith("Charmander lit the Campfire.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("Charmander moved into the Train House.", undefined);
   });
 
   it("keeps ruined Pokemon Center discovery separate from Challenges unlock", () => {
@@ -338,7 +397,7 @@ describe("createStoryBeatSystem", () => {
     expect(pushNotice).toHaveBeenCalledWith("You received Life Coins.", undefined);
   });
 
-  it("unlocks the Straw Bed recipe from Bulbasaur after the first challenge set", () => {
+  it("unlocks the Solar Station recipe from Bulbasaur after the first challenge set", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -352,7 +411,7 @@ describe("createStoryBeatSystem", () => {
           text: "Do you need anything?"
         }),
         expect.objectContaining({
-          text: expect.stringContaining("Straw Bed recipe")
+          text: expect.stringContaining("Solar Station recipe")
         })
       ]),
       onLineChange: undefined,
@@ -364,10 +423,10 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.bulbasaurStrawBedChallengeComplete).toBe(true);
     expect(storyState.flags.strawBedRecipeUnlocked).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.STRAW_BED_RECIPE);
-    expect(pushNotice).toHaveBeenCalledWith("You learned the Straw Bed recipe.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You learned the Solar Station recipe.", undefined);
   });
 
-  it("marks Straw Bed creation and Bulbasaur request completion beats", () => {
+  it("marks Solar Station creation and Bulbasaur request completion beats", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -376,7 +435,7 @@ describe("createStoryBeatSystem", () => {
     system.complete(STORY_BEAT_IDS.STRAW_BED_CREATED);
 
     expect(storyState.flags.strawBedCrafted).toBe(true);
-    expect(pushNotice).toHaveBeenCalledWith("You created a Straw Bed.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You created a Solar Station.", undefined);
 
     system.playDialogue(STORY_BEAT_IDS.BULBASAUR_STRAW_BED_REQUEST_COMPLETE);
     openConversation.mock.results[0].value.complete();
@@ -385,7 +444,7 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.newPcChallengesAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.NEW_CHALLENGES_IN_PC);
     expect(pushNotice).toHaveBeenCalledWith(
-      "Bulbasaur's Straw Bed request complete.",
+      "Bulbasaur's Solar Station request complete.",
       undefined
     );
   });
@@ -412,7 +471,7 @@ describe("createStoryBeatSystem", () => {
     expect(pushNotice).toHaveBeenCalledWith("New Challenges added.", undefined);
   });
 
-  it("unlocks the Leaf Den Kit purchase after Professor Tangrowth explains houses", () => {
+  it("unlocks the House Kit purchase after Professor Tangrowth explains houses", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -424,12 +483,12 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.tangrowthHouseTalkComplete).toBe(true);
     expect(storyState.flags.leafDenKitPurchaseAvailable).toBe(true);
     expect(pushNotice).toHaveBeenCalledWith(
-      "Leaf Den Kit is available in the PC Shop.",
+      "House Kit is available in the PC Shop.",
       undefined
     );
   });
 
-  it("marks the Leaf Den Kit purchase complete", () => {
+  it("marks the House Kit purchase complete", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -441,10 +500,10 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.leafDenKitPurchased).toBe(true);
     expect(storyState.flags.leafDenBuildAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.BUILD_LEAF_DEN);
-    expect(pushNotice).toHaveBeenCalledWith("You purchased a Leaf Den Kit.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You purchased a House Kit.", undefined);
   });
 
-  it("sets the Leaf Den hub repair completion flag after construction", () => {
+  it("sets the House hub repair completion flag after construction", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -457,7 +516,7 @@ describe("createStoryBeatSystem", () => {
     openConversation.mock.results[0].value.complete();
 
     expect(storyState.flags.leafDenConstructionStarted).toBe(true);
-    expect(pushNotice).toHaveBeenCalledWith("Leaf Den construction started.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("House construction started.", undefined);
 
     system.playDialogue(STORY_BEAT_IDS.LEAF_DEN_COMPLETE);
     openConversation.mock.results[1].value.complete();
@@ -465,10 +524,10 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.leafDenBuilt).toBe(true);
     expect(storyState.flags.leafDenFurnitureRequestAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.LEAF_DEN_FURNITURE);
-    expect(pushNotice).toHaveBeenCalledWith("The Leaf Den is complete.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("The House is complete.", undefined);
   });
 
-  it("completes Timburr's Leaf Den furniture request", () => {
+  it("completes Timburr's House furniture request", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -481,7 +540,7 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.charmanderCelebrationRequestAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.CHARMANDER_CELEBRATION);
     expect(pushNotice).toHaveBeenCalledWith(
-      "Leaf Den furniture request complete.",
+      "House furniture request complete.",
       undefined
     );
   });
@@ -521,7 +580,7 @@ describe("createStoryBeatSystem", () => {
 
     expect(storyState.flags.dittoFlagPlacedOnHouse).toBe(true);
     expect(pushNotice).toHaveBeenCalledWith(
-      "The Leaf Den is now marked as your house.",
+      "The House is now marked as your house.",
       undefined
     );
   });

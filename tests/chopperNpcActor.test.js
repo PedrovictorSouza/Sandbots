@@ -170,4 +170,34 @@ describe("chopperNpcActor", () => {
     expect(position[0]).toBeGreaterThan(10);
     expect(position[2]).toBeLessThan(-6);
   });
+
+  it("hovers in place during dialogue before resuming patrol", () => {
+    const npcActor = createNpcActor([12.4, 0.02, -8.4]);
+    const chopperActor = createChopperNpcActor({ npcActor });
+    const storyState = {
+      flags: {
+        chopperPatrolEnabled: true
+      }
+    };
+
+    updateChopperNpcActor(chopperActor, {
+      deltaTime: 1,
+      storyState,
+      isNpcActive: () => true,
+      isDialogueActive: () => true
+    });
+
+    expect(npcActor.character.getPosition()).toEqual([12.4, 0.02, -8.4]);
+    expect(chopperActor.bodyInstance.offset[1]).toBeGreaterThan(1.2);
+    expect(chopperActor.propellerAngle).toBeGreaterThan(0);
+
+    updateChopperNpcActor(chopperActor, {
+      deltaTime: 1,
+      storyState,
+      isNpcActive: () => true,
+      isDialogueActive: () => false
+    });
+
+    expect(npcActor.character.getPosition()).not.toEqual([12.4, 0.02, -8.4]);
+  });
 });

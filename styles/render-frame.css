@@ -15,6 +15,16 @@
   isolation: isolate;
 }
 
+.game-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background: rgba(44, 142, 255, 0.27);
+  mix-blend-mode: multiply;
+}
+
 .render-frame {
   position: absolute;
   inset: 0;

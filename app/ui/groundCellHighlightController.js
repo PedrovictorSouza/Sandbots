@@ -12,6 +12,12 @@ const GROUND_CELL_TARGET_CUES = Object.freeze({
     outlineFill: "rgba(91, 238, 132, 0.09)",
     outlineStroke: "#7effa5"
   },
+  fire: {
+    haloFill: "rgba(255, 88, 54, 0.16)",
+    haloStroke: "rgba(60, 8, 0, 0.94)",
+    outlineFill: "rgba(255, 88, 54, 0.1)",
+    outlineStroke: "#ff5a36"
+  },
   invalid: {
     haloFill: "rgba(255, 211, 122, 0.18)",
     haloStroke: "rgba(84, 48, 0, 0.94)",
@@ -31,6 +37,10 @@ function normalizeTargetState(targetState) {
 function getGroundCellCueKey(groundCell, targetState) {
   if (groundCell?.highlightAbilityId === "leafage") {
     return "leafage";
+  }
+
+  if (groundCell?.highlightAbilityId === "fire") {
+    return "fire";
   }
 
   return normalizeTargetState(targetState);

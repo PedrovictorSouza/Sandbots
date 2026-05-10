@@ -1,26 +1,28 @@
 import { getInventoryPresentationOrder } from "../ui/inventoryPresentation.js";
 
 export function createBagUiRuntime({
-  bagOnboarding,
   gameplayUiVisibility,
   inventory,
   inventoryOrder,
   itemDefs,
   isBagDetailItemId
 }) {
-  let bagOnboardingActive = false;
+  let bagOverlayActive = false;
   let restoreQuestAfterBagOverlay = false;
   let selectedBagItemId = null;
 
   function beginOverlay() {
-    if (!bagOnboardingActive) {
-      restoreQuestAfterBagOverlay = gameplayUiVisibility.isSectionVisible("quest");
-      gameplayUiVisibility.hideSections(["quest"]);
+    if (bagOverlayActive) {
+      return;
     }
+
+    restoreQuestAfterBagOverlay = gameplayUiVisibility.isSectionVisible("quest");
+    gameplayUiVisibility.hideSections(["quest"]);
+    bagOverlayActive = true;
   }
 
   function endOverlay() {
-    if (bagOnboardingActive) {
+    if (!bagOverlayActive) {
       return;
     }
 
@@ -28,6 +30,7 @@ export function createBagUiRuntime({
       gameplayUiVisibility.showSections(["quest"]);
     }
     restoreQuestAfterBagOverlay = false;
+    bagOverlayActive = false;
   }
 
   function resolveSelectedItemId() {
@@ -60,39 +63,15 @@ export function createBagUiRuntime({
     selectedBagItemId = itemId;
   }
 
-  function showOnboarding() {
-    bagOnboarding.setHint({
-      title: "Your Bag",
-      bodyHtml:
-        "<p>Items you obtain are placed in your bag.</p>" +
-        "<p>You can press <span class=\"bag-onboarding-panel__key\">X</span> to look inside.</p>"
-    });
-    beginOverlay();
-    bagOnboardingActive = true;
-    gameplayUiVisibility.showSections(["bagOnboarding", "inventory"]);
-  }
-
-  function dismissOnboarding() {
-    if (!bagOnboardingActive && !gameplayUiVisibility.isSectionVisible("bagOnboarding")) {
-      return;
-    }
-
-    bagOnboardingActive = false;
-    gameplayUiVisibility.hideSections(["bagOnboarding"]);
-    endOverlay();
-  }
-
   function showDetails() {
+    beginOverlay();
     syncDetailsPanel();
     gameplayUiVisibility.showSections(["inventory"]);
-
-    if (bagOnboardingActive) {
-      dismissOnboarding();
-    }
   }
 
   function hideDetails() {
     gameplayUiVisibility.hideSections(["bagDetails"]);
+    endOverlay();
   }
 
   function inspect() {
@@ -105,13 +84,6 @@ export function createBagUiRuntime({
     if (isBagDetailItemId(itemId)) {
       selectItem(itemId);
     }
-
-    if (storyState.flags.bagOnboardingSeen) {
-      return;
-    }
-
-    storyState.flags.bagOnboardingSeen = true;
-    showOnboarding();
   }
 
   return {
@@ -122,7 +94,6 @@ export function createBagUiRuntime({
     isDetailsOpen: () => false,
     selectItem,
     showDetails,
-    showOnboarding,
     syncDetailsPanel
   };
 }

@@ -18,6 +18,29 @@ describe("createQuestLog", () => {
     expect(checklistHtml).toContain("Left stick");
   });
 
+  it("hides the completed first movement card after the next quest is active", () => {
+    const completedMoveQuest = {
+      ...SMALL_ISLAND_QUESTS.find((entry) => entry.id === "learn-to-move"),
+      status: "completed",
+      objectives: [
+        { type: QUEST_EVENT.MOVE, targetId: "player", required: 1, current: 1 }
+      ]
+    };
+    const activeQuest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "wake-guide");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => activeQuest,
+        getQuestLog: () => [completedMoveQuest, activeQuest]
+      }
+    });
+
+    const logHtml = questLog.renderLogHtml();
+
+    expect(logHtml).not.toContain("Take Your First Steps");
+    expect(logHtml).not.toContain("Left stick");
+    expect(logHtml).toContain("Talk to Chopper");
+  });
+
   it("renders task title and subtitle as separate HUD elements", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "wake-guide");
     const questLog = createQuestLog({
@@ -385,7 +408,7 @@ describe("createQuestLog", () => {
     const logHtml = questLog.renderLogHtml(storyState);
 
     expect(checklistHtml).toContain("Tangrowth");
-    expect(checklistHtml).toContain("press A or E to sit");
+    expect(checklistHtml).toContain("press X to save");
     expect(logHtml).toContain('data-task-id="tangrowth-log-chair"');
   });
 
@@ -408,11 +431,11 @@ describe("createQuestLog", () => {
     const logHtml = questLog.renderLogHtml(storyState);
 
     expect(checklistHtml).toContain("Workbench");
-    expect(checklistHtml).toContain("create a Campfire");
+    expect(checklistHtml).toContain("create Charmander&#39;s Train House");
     expect(logHtml).toContain('data-task-id="workbench-campfire"');
   });
 
-  it("renders the Campfire bag selection task as it progresses", () => {
+  it("renders the Train House placement task after crafting", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -429,19 +452,19 @@ describe("createQuestLog", () => {
 
     const initialChecklistHtml = questLog.renderChecklistHtml(storyState);
 
-    expect(initialChecklistHtml).toContain("Professor Tangrowth");
-    expect(initialChecklistHtml).toContain("Press X to open the bag and select the Campfire.");
+    expect(initialChecklistHtml).toContain("Train House");
+    expect(initialChecklistHtml).toContain("Press A or E anywhere outside to place Charmander&#39;s Train House.");
 
-    storyState.flags.campfireSelectedForTangrowth = true;
+    storyState.flags.campfireSpatOut = true;
 
-    const selectedChecklistHtml = questLog.renderChecklistHtml(storyState);
+    const placedChecklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(selectedChecklistHtml).toContain("press A or E to spit out the Campfire");
+    expect(placedChecklistHtml).toContain("You placed Charmander&#39;s Train House.");
     expect(logHtml).toContain('data-task-id="spit-out-campfire"');
   });
 
-  it("renders Charmander's habitat and Campfire task as it progresses", () => {
+  it("renders Charmander's habitat and Train House task as it progresses", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -470,7 +493,7 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Lead Charmander close to the Campfire.");
+    expect(checklistHtml).toContain("Lead Charmander close to the Train House.");
     expect(logHtml).toContain('data-task-id="charmander-tall-grass"');
   });
 
@@ -530,7 +553,7 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="boulder-shaded-tall-grass"');
   });
 
-  it("renders Bulbasaur's Straw Bed recipe challenge with both counters", () => {
+  it("renders Bulbasaur's Solar Station recipe challenge with both counters", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -547,7 +570,14 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("3/5 trees watered, 7/10 sturdy sticks");
+    const supplyChecklistHtml = questLog.renderChecklistHtml(storyState);
+    expect(supplyChecklistHtml).toContain("Prepare Bulbasaur&#39;s habitat supplies.");
+    expect(supplyChecklistHtml).toContain("Water 5 trees");
+    expect(supplyChecklistHtml).toContain("3/5 trees watered");
+    expect(supplyChecklistHtml).toContain("Gather 10 sturdy sticks");
+    expect(supplyChecklistHtml).toContain("7/10 sturdy sticks gathered");
+    expect(supplyChecklistHtml).toContain('data-subtask-id="water-trees"');
+    expect(supplyChecklistHtml).toContain('data-subtask-id="gather-sturdy-sticks"');
 
     storyState.flags.bulbasaurStrawBedChallengeComplete = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
@@ -557,7 +587,7 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="bulbasaur-straw-bed"');
   });
 
-  it("renders the Straw Bed Recipe task from craft to Bulbasaur turn-in", () => {
+  it("renders the Solar Station Recipe task from craft to Bulbasaur turn-in", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -572,13 +602,13 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("You will need 2 Leaves");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Press X at the Workbench");
 
     storyState.flags.strawBedCrafted = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("select the Straw Bed");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Press X at the Solar Station field");
 
     storyState.flags.strawBedSelectedForBulbasaur = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("within the boundaries");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("within the boundaries of the Solar Station field");
 
     storyState.flags.strawBedPlacedInBulbasaurHabitat = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
@@ -614,7 +644,7 @@ describe("createQuestLog", () => {
     expect(logHtml).toContain('data-task-id="new-challenges-in-pc"');
   });
 
-  it("renders the Leaf Den Kit task from Tangrowth talk to PC purchase", () => {
+  it("renders the House Kit task from Tangrowth talk to PC purchase", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -635,17 +665,17 @@ describe("createQuestLog", () => {
     storyState.flags.tangrowthHouseTalkComplete = true;
     storyState.flags.leafDenKitPurchaseAvailable = true;
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("purchase a Leaf Den Kit");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("purchase a House Kit");
 
     storyState.flags.leafDenKitPurchased = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("You purchased a Leaf Den Kit");
+    expect(checklistHtml).toContain("You purchased a House Kit");
     expect(logHtml).toContain('data-task-id="leaf-den-kit"');
   });
 
-  it("renders Leaf Den repair material requirements through placement and construction", () => {
+  it("renders House repair material requirements through placement and construction", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -660,28 +690,28 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("select the Leaf Den Kit");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("select the House Kit");
 
     storyState.flags.leafDenKitSelected = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Place the Leaf Den Kit");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Place the House Kit");
 
     storyState.flags.leafDenKitPlaced = true;
     const materialChecklistHtml = questLog.renderChecklistHtml(storyState);
     expect(materialChecklistHtml).toContain("Gather 3 Sturdy Sticks and 3 Leaves");
-    expect(materialChecklistHtml).toContain("lead Timburr and Charmander");
+    expect(materialChecklistHtml).toContain("inspect the House Kit");
 
     storyState.flags.leafDenConstructionStarted = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("few real-world hours");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("few seconds");
 
     storyState.flags.leafDenBuilt = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("The Leaf Den is complete");
+    expect(checklistHtml).toContain("The House is complete");
     expect(logHtml).toContain('data-task-id="build-leaf-den"');
   });
 
-  it("renders the helper-character Leaf Den furniture request through Timburr turn-in", () => {
+  it("renders the helper-character House furniture request through Timburr turn-in", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -698,7 +728,7 @@ describe("createQuestLog", () => {
 
     const availableChecklistHtml = questLog.renderChecklistHtml(storyState);
     const availableLogHtml = questLog.renderLogHtml(storyState);
-    expect(availableChecklistHtml).toContain("Enter the Leaf Den");
+    expect(availableChecklistHtml).toContain("Enter the House");
     expect(availableLogHtml).toContain('data-task-id="leaf-den-furniture"');
 
     storyState.flags.leafDenInteriorEntered = true;

@@ -31,6 +31,57 @@ describe("inventoryPresentation", () => {
     ]);
   });
 
+  it("keeps follower state out of supplies while showing leaves", () => {
+    const inventory = {
+      wood: 2,
+      leaves: 3,
+      bulbasaurFollowing: 1,
+      charmander: 1
+    };
+    const inventoryOrder = ["bulbasaurFollowing", "wood", "leaves", "charmander"];
+    const itemDefs = {
+      wood: { slotRole: "material" },
+      leaves: { slotRole: "material" },
+      charmander: { slotRole: "companion" }
+    };
+
+    expect(getInventoryPresentationOrder(inventory, inventoryOrder, itemDefs)).toEqual([
+      "wood",
+      "leaves"
+    ]);
+  });
+
+  it("can hide non-supply roles from the Supplies HUD", () => {
+    const inventory = {
+      waterGunTotem: 1,
+      simpleWoodenDiyRecipes: 1,
+      lifeCoins: 10,
+      wood: 5,
+      leaves: 3
+    };
+    const inventoryOrder = [
+      "waterGunTotem",
+      "simpleWoodenDiyRecipes",
+      "lifeCoins",
+      "wood",
+      "leaves"
+    ];
+    const itemDefs = {
+      waterGunTotem: { slotRole: "key" },
+      simpleWoodenDiyRecipes: { slotRole: "recipe" },
+      lifeCoins: { slotRole: "currency" },
+      wood: { slotRole: "material" },
+      leaves: { slotRole: "material" }
+    };
+
+    expect(getInventoryPresentationOrder(inventory, inventoryOrder, itemDefs, {
+      excludedRoles: ["key", "recipe", "currency"]
+    })).toEqual([
+      "wood",
+      "leaves"
+    ]);
+  });
+
   it("supports custom role labels for repair kits", () => {
     expect(getInventorySlotRoleLabel({
       slotRole: "placeable",

@@ -20,6 +20,11 @@ export const TANGROWTH_ONBOARDING_DIALOGUE = [
     text: "Are you a Ditto?! My, what an impressive transformation!"
   },
   {
+    id: "ask-player-name",
+    speaker: "Tangrowth",
+    text: "Before we run off, what should I call you?"
+  },
+  {
     id: "notice-squirtle-sound",
     speaker: "Tangrowth",
     text: "Huum, what's that sound? Where is it coming from?! Come on, we need to find that Pokemon."
@@ -33,7 +38,7 @@ export const SQUIRTLE_DISCOVERY_DIALOGUE = [
   },
   {
     speaker: "Tangrowth",
-    text: "Well, I'll be gobsmacked! if it isn't a Squirtle! And they're nearly all dried up!"
+    text: "Well, I'll be gobsmacked! if it isn't a dormant Squirtle unit! Its water core is nearly dried up!"
   },
   {
     speaker: "Tangrowth",
@@ -61,11 +66,11 @@ export const SQUIRTLE_DISCOVERY_DIALOGUE = [
   },
   {
     speaker: "",
-    text: "You found a Pokedex! It's even equipped with a camera that can take selfies!"
+    text: "You found a FieldDex! It still has a working entry for the Pokemon you just helped."
   },
   {
     speaker: "Tangrowth",
-    text: "Oho! That's a Pokedex I found ages ago! Keep it with you."
+    text: "Oho! That's an old field device I found ages ago! Keep it with you; it records island discoveries."
   }
 ];
 
@@ -114,6 +119,10 @@ export const CHOPPER_BULBASAUR_ENCOURAGEMENT_DIALOGUE = [
 ];
 
 export const BULBASAUR_HABITAT_DISCOVERY_DIALOGUE = [
+  {
+    speaker: "Chopper",
+    text: "That old repair pod just woke up. The island infrastructure still remembers Bulbasaur."
+  },
   {
     speaker: "Bulbasaur",
     text: "Yippee! Nice to meet you! This plot of tall grass is kinda small, but I like it!"

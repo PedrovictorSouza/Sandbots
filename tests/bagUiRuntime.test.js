@@ -37,9 +37,6 @@ function createRuntime({
   const bagDetails = {
     setItem: vi.fn()
   };
-  const bagOnboarding = {
-    setHint: vi.fn()
-  };
   const gameplayUiVisibility = createGameplayUiVisibility(initialSections);
   const itemDefs = {
     wood: {
@@ -54,7 +51,6 @@ function createRuntime({
     }
   };
   const runtime = createBagUiRuntime({
-    bagOnboarding,
     bagDetails,
     gameplayUiVisibility,
     inventory,
@@ -65,7 +61,6 @@ function createRuntime({
 
   return {
     bagDetails,
-    bagOnboarding,
     gameplayUiVisibility,
     itemDefs,
     runtime,
@@ -74,10 +69,9 @@ function createRuntime({
 }
 
 describe("createBagUiRuntime", () => {
-  it("shows onboarding once and restores quest visibility when the bag is inspected", () => {
+  it("tracks collected bag items without opening onboarding", () => {
     const {
       bagDetails,
-      bagOnboarding,
       gameplayUiVisibility,
       runtime,
       storyState
@@ -85,23 +79,22 @@ describe("createBagUiRuntime", () => {
 
     runtime.handleItemCollected("wood", storyState);
 
-    expect(storyState.flags.bagOnboardingSeen).toBe(true);
-    expect(bagOnboarding.setHint).toHaveBeenCalledWith(expect.objectContaining({
-      title: "Your Bag"
-    }));
-    expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(false);
-    expect(gameplayUiVisibility.isSectionVisible("bagOnboarding")).toBe(true);
-    expect(gameplayUiVisibility.isSectionVisible("inventory")).toBe(true);
+    expect(storyState.flags).toEqual({});
+    expect(runtime.getSelectedItemId()).toBe("wood");
+    expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(true);
+    expect(gameplayUiVisibility.isSectionVisible("inventory")).toBe(false);
 
     runtime.inspect();
 
     expect(bagDetails.setItem).not.toHaveBeenCalled();
-    expect(gameplayUiVisibility.isSectionVisible("bagOnboarding")).toBe(false);
     expect(gameplayUiVisibility.isSectionVisible("bagDetails")).toBe(false);
     expect(gameplayUiVisibility.isSectionVisible("inventory")).toBe(true);
-    expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(true);
+    expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(false);
 
     runtime.inspect();
+    expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(false);
+
+    runtime.hideDetails();
 
     expect(gameplayUiVisibility.isSectionVisible("bagDetails")).toBe(false);
     expect(gameplayUiVisibility.isSectionVisible("quest")).toBe(true);
@@ -141,9 +134,6 @@ describe("createBagUiRuntime", () => {
       }
     };
     const runtime = createBagUiRuntime({
-      bagOnboarding: {
-        setHint: vi.fn()
-      },
       bagDetails,
       gameplayUiVisibility: createGameplayUiVisibility(["quest"]),
       inventory: {
@@ -163,13 +153,7 @@ describe("createBagUiRuntime", () => {
   });
 
   it("updates the tracked bag item when a new eligible item is collected", () => {
-    const { bagDetails, runtime, storyState } = createRuntime({
-      storyState: {
-        flags: {
-          bagOnboardingSeen: true
-        }
-      }
-    });
+    const { bagDetails, runtime, storyState } = createRuntime();
 
     runtime.inspect();
     runtime.handleItemCollected("berry", storyState);

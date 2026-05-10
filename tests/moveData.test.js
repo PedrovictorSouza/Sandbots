@@ -14,6 +14,7 @@ import { getCompanionAbilityByAbilityId } from "../app/gameplay/content/companio
 const CORE_FIELD_MOVE_ABILITY_IDS = [
   "waterGun",
   "leafage",
+  "fire",
   "cut",
   "rockSmash",
   "rototiller",
@@ -53,6 +54,9 @@ describe("small island move data", () => {
     expect(formatActiveMoveGuidanceByAbilityId("leafage")).toBe(
       "Leafage: grow tall grass on restored ground."
     );
+    expect(formatActiveMoveGuidanceByAbilityId("fire")).toBe(
+      "Fire: burn white ground into dry ground."
+    );
     expect(formatActiveMoveGuidanceByAbilityId("waterGun")).toBe(
       "USE LT TO MARK THE GROUND"
     );
@@ -76,6 +80,9 @@ describe("small island move data", () => {
     expect(getSmallIslandMoveById("leafage").firstUseCompleteFlags).toEqual([
       "leafageTallGrassCount",
       "leafageTallGrassHabitatCreated"
+    ]);
+    expect(getSmallIslandMoveById("fire").firstUseCompleteFlags).toEqual([
+      "fireWhiteGroundBurned"
     ]);
 
     expect(formatActiveMoveGuidanceByAbilityId("waterGun", {
@@ -112,6 +119,9 @@ describe("small island move data", () => {
     expect(formatMoveTargetPromptByAbilityId("waterGun", "ground", {
       pendingWaterGunCount: 3
     })).toBe("[Enter] Mark dry ground for Squirtle • 3 queued");
+    expect(formatMoveTargetPromptByAbilityId("fire", "ground")).toBe(
+      "[Enter] Use Fire on white ground"
+    );
     expect(formatMoveTargetPromptByAbilityId("leafage", "unknown")).toBeNull();
   });
 

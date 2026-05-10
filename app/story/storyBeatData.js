@@ -59,6 +59,7 @@ export const STORY_BEAT_IDS = Object.freeze({
   LEPPA_BERRY_DELIVERY: "leppa-berry-delivery",
   CHOPPER_LOG_CHAIR_GIFT: "chopper-log-chair-gift",
   LOG_CHAIR_REST: "log-chair-rest",
+  BULBASAUR_WORKBENCH_GUIDE_INTRO: "bulbasaur-workbench-guide-intro",
   WORKBENCH_DIY_RECIPES: "workbench-diy-recipes",
   CAMPFIRE_CREATED: "campfire-created",
   CAMPFIRE_SPIT_OUT: "campfire-spit-out",
@@ -97,6 +98,16 @@ export const STORY_BEAT_EFFECT = Object.freeze({
 });
 
 const BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET = 10;
+
+function buildChopperOnboardingLines(context = {}, { dialogueLines = [] } = {}) {
+  const lines = dialogueLines.length ? dialogueLines : TANGROWTH_ONBOARDING_DIALOGUE;
+
+  if (context.needsPlayerName !== false) {
+    return lines;
+  }
+
+  return lines.filter((line) => line.id !== "ask-player-name");
+}
 
 export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   [FIELD_TASK_IDS.MAKING_HABITATS]: {
@@ -190,11 +201,11 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const flags = storyState.flags || {};
 
       if (flags.logChairSat) {
-        return "You placed Chopper's log chair and took a short rest.";
+        return "You placed Chopper's log chair and saved your game.";
       }
 
       if (flags.logChairPlaced) {
-        return "Stand close to the log chair and press A or E to sit on it.";
+        return "Stand close to the log chair and press X to save your game.";
       }
 
       if (flags.logChairReceived) {
@@ -212,11 +223,11 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const flags = storyState.flags || {};
 
       if (flags.campfireCrafted) {
-        return "You made a Campfire at the Workbench.";
+        return "You made Charmander's Train House at the Workbench.";
       }
 
       if (flags.workbenchDiyRecipesReceived) {
-        return "Use the Workbench to create a Campfire.";
+        return "Use the Workbench to create Charmander's Train House.";
       }
 
       return "Follow Bulbasaur to the nearby area and interact with the Workbench.";
@@ -225,19 +236,15 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   },
   [FIELD_TASK_IDS.SPIT_OUT_CAMPFIRE]: {
     id: FIELD_TASK_IDS.SPIT_OUT_CAMPFIRE,
-    title: "Professor Tangrowth",
+    title: "Train House",
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.campfireSpatOut) {
-        return "You spat out the Campfire for Professor Tangrowth.";
+        return "You placed Charmander's Train House.";
       }
 
-      if (flags.campfireSelectedForTangrowth) {
-        return "Return to Professor Tangrowth and press A or E to spit out the Campfire.";
-      }
-
-      return "Press X to open the bag and select the Campfire.";
+      return "Press A or E anywhere outside to place Charmander's Train House.";
     },
     completeFlag: "campfireSpatOut"
   },
@@ -248,11 +255,11 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const flags = storyState.flags || {};
 
       if (flags.charmanderCampfireLit) {
-        return "Charmander lit the Campfire.";
+        return "Charmander moved into the Train House.";
       }
 
       if (flags.charmanderFollowing) {
-        return "Lead Charmander close to the Campfire.";
+        return "Lead Charmander close to the Train House.";
       }
 
       if (flags.charmanderRevealed) {
@@ -322,40 +329,64 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const sturdySticks = Math.min(10, Number(flags.sturdySticksGatheredForChallenge || 0));
 
       if (flags.strawBedRecipeUnlocked) {
-        return "You learned the Straw Bed recipe from Bulbasaur.";
+        return "You learned the Solar Station recipe from Bulbasaur.";
       }
 
       if (flags.bulbasaurStrawBedChallengeComplete) {
-        return 'Talk to Bulbasaur and choose "Do you need anything?" to learn the Straw Bed recipe.';
+        return 'Talk to Bulbasaur and choose "Do you need anything?" to learn the Solar Station recipe.';
       }
 
-      return `Water 5 trees and gather 10 sturdy sticks. ${wateredTrees}/5 trees watered, ${sturdySticks}/10 sturdy sticks gathered.`;
+      return "Prepare Bulbasaur's habitat supplies.";
+    },
+    subtasks(storyState = {}) {
+      const flags = storyState.flags || {};
+      const wateredTrees = Math.min(5, Number(flags.wateredTreeCount || 0));
+      const sturdySticks = Math.min(10, Number(flags.sturdySticksGatheredForChallenge || 0));
+
+      if (flags.strawBedRecipeUnlocked || flags.bulbasaurStrawBedChallengeComplete) {
+        return [];
+      }
+
+      return [
+        {
+          id: "water-trees",
+          label: "Water 5 trees",
+          progress: `${wateredTrees}/5 trees watered`,
+          done: wateredTrees >= 5
+        },
+        {
+          id: "gather-sturdy-sticks",
+          label: "Gather 10 sturdy sticks",
+          progress: `${sturdySticks}/10 sturdy sticks gathered`,
+          done: sturdySticks >= 10
+        }
+      ];
     },
     completeFlag: "strawBedRecipeUnlocked"
   },
   [FIELD_TASK_IDS.STRAW_BED_RECIPE]: {
     id: FIELD_TASK_IDS.STRAW_BED_RECIPE,
-    title: "Straw Bed Recipe",
+    title: "Solar Station Recipe",
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.bulbasaurStrawBedRequestComplete) {
-        return "Bulbasaur's Straw Bed request is complete.";
+        return "Bulbasaur's Solar Station request is complete.";
       }
 
       if (flags.strawBedPlacedInBulbasaurHabitat) {
-        return "Talk to Bulbasaur after placing the Straw Bed.";
+        return "Talk to Bulbasaur after placing the Solar Station.";
       }
 
       if (flags.strawBedCrafted) {
         if (flags.strawBedSelectedForBulbasaur) {
-          return "Place the Straw Bed within the boundaries of Bulbasaur's habitat.";
+          return "Place the Solar Station within the boundaries of the Solar Station field.";
         }
 
-        return "Open the bag with X and select the Straw Bed.";
+        return "Press X at the Solar Station field to place the Solar Station.";
       }
 
-      return "Use the Workbench to craft the Straw Bed. You will need 2 Leaves.";
+      return "Press X at the Workbench and craft the Solar Station. You will need 2 Leaves.";
     },
     completeFlag: "bulbasaurStrawBedRequestComplete"
   },
@@ -380,11 +411,11 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const flags = storyState.flags || {};
 
       if (flags.leafDenKitPurchased) {
-        return "You purchased a Leaf Den Kit from the PC Shop.";
+        return "You purchased a House Kit from the PC Shop.";
       }
 
       if (flags.leafDenKitPurchaseAvailable) {
-        return "Go to the Pokemon Center PC and purchase a Leaf Den Kit from the Shop.";
+        return "Go to the Pokemon Center PC and purchase a House Kit from the Shop.";
       }
 
       return "Talk to Professor Tangrowth about building houses.";
@@ -393,39 +424,39 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   },
   [FIELD_TASK_IDS.BUILD_LEAF_DEN]: {
     id: FIELD_TASK_IDS.BUILD_LEAF_DEN,
-    title: "Building the Leaf Den",
+    title: "Build a House",
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.leafDenBuilt) {
-        return "The Leaf Den is complete.";
+        return "The House is complete.";
       }
 
       if (flags.leafDenConstructionStarted) {
-        return "Construction is underway. Inspect the Leaf Den after a few real-world hours, or skip ahead by changing the system time.";
+        return "Construction is underway. Wait a few seconds for the House to take shape.";
       }
 
       if (flags.leafDenKitPlaced) {
-        return "Gather 3 Sturdy Sticks and 3 Leaves, then lead Timburr and Charmander to the Leaf Den Kit and inspect it.";
+        return "Gather 3 Sturdy Sticks and 3 Leaves, then inspect the House Kit.";
       }
 
       if (flags.leafDenKitSelected) {
-        return "Place the Leaf Den Kit in a clear area.";
+        return "Place the House Kit in a clear area.";
       }
 
-      return "Open the bag with X and select the Leaf Den Kit, then place it in a clear area.";
+      return "Open the bag with X and select the House Kit, then place it in a clear area.";
     },
     completeFlag: "leafDenBuilt"
   },
   [FIELD_TASK_IDS.LEAF_DEN_FURNITURE]: {
     id: FIELD_TASK_IDS.LEAF_DEN_FURNITURE,
-    title: "Furnitures inside Leaf Den",
+    title: "Furnitures inside House",
     description(storyState = {}) {
       const flags = storyState.flags || {};
       const placed = Math.min(3, Number(flags.leafDenFurniturePlacedCount || 0));
 
       if (flags.leafDenFurnitureRequestComplete) {
-        return "Timburr approved the furniture inside the Leaf Den.";
+        return "Timburr approved the furniture inside the House.";
       }
 
       if (placed >= 3) {
@@ -433,10 +464,10 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       }
 
       if (flags.leafDenInteriorEntered) {
-        return `Place 3 furniture pieces inside the Leaf Den. ${placed}/3 placed.`;
+        return `Place 3 furniture pieces inside the House. ${placed}/3 placed.`;
       }
 
-      return "Enter the Leaf Den and place 3 furniture pieces inside.";
+      return "Enter the House and place 3 furniture pieces inside.";
     },
     completeFlag: "leafDenFurnitureRequestComplete"
   },
@@ -465,14 +496,14 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const flags = storyState.flags || {};
 
       if (flags.dittoFlagPlacedOnHouse) {
-        return "The Leaf Den is marked as your house.";
+        return "The House is marked as your house.";
       }
 
       if (flags.dittoFlagSelectedForHouse) {
-        return "Head to the Leaf Den and place the Ditto Flag.";
+        return "Head to the House and place the Ditto Flag.";
       }
 
-      return "Open the bag with X and select the Ditto Flag, then head to the Leaf Den.";
+      return "Open the bag with X and select the Ditto Flag, then head to the House.";
     },
     completeFlag: "dittoFlagPlacedOnHouse"
   }
@@ -482,7 +513,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
   [STORY_BEAT_IDS.CHOPPER_ONBOARDING]: {
     id: STORY_BEAT_IDS.CHOPPER_ONBOARDING,
     dialogueId: "chopperOnboarding",
-    fallbackLines: TANGROWTH_ONBOARDING_DIALOGUE
+    buildLines: buildChopperOnboardingLines
   },
   [STORY_BEAT_IDS.SQUIRTLE_DISCOVERY]: {
     id: STORY_BEAT_IDS.SQUIRTLE_DISCOVERY,
@@ -670,7 +701,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Chopper",
-        text: "Here, take this log chair. Place it nearby, then try sitting on it."
+        text: "Here, take this log chair. Place it nearby, then use it to save your game."
       }
     ],
     effects: [
@@ -703,8 +734,28 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You sat on the Log Chair."
+        message: "saved."
+      }
+    ]
+  },
+  [STORY_BEAT_IDS.BULBASAUR_WORKBENCH_GUIDE_INTRO]: {
+    id: STORY_BEAT_IDS.BULBASAUR_WORKBENCH_GUIDE_INTRO,
+    onceFlag: "bulbasaurWorkbenchGuideIntroSeen",
+    fallbackLines: [
+      {
+        speaker: "Bulbasaur",
+        text: "I was thinking about that chair. A habitat needs more than a safe patch of grass."
       },
+      {
+        speaker: "You",
+        text: "It needs things Pokemon can actually use."
+      },
+      {
+        speaker: "Bulbasaur",
+        text: "Yeah! The Workbench can help us make cozy things from the materials we find. Come on, I'll show you!"
+      }
+    ],
+    effects: [
       {
         type: STORY_BEAT_EFFECT.SET_FLAG,
         flag: "bulbasaurWorkbenchGuideAvailable"
@@ -751,7 +802,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You created a Campfire."
+        message: "You created Charmander's Train House."
       },
       {
         type: STORY_BEAT_EFFECT.TRACK_FIELD_TASK,
@@ -764,15 +815,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Pokedesk",
-        text: "You spat out the Campfire."
-      },
-      {
-        speaker: "Professor Tangrowth",
-        text: "Good. Furniture and tools belong out in the world, not just tucked away in your bag."
-      },
-      {
-        speaker: "Professor Tangrowth",
-        text: "Place things where Pokemon can gather, rest, and feel at home."
+        text: "You placed Charmander's Train House."
       }
     ],
     effects: [
@@ -782,7 +825,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You spat out the Campfire."
+        message: "You placed Charmander's Train House."
       },
       {
         type: STORY_BEAT_EFFECT.TRACK_FIELD_TASK,
@@ -794,12 +837,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.CHARMANDER_DISCOVERY,
     fallbackLines: [
       {
+        speaker: "Chopper",
+        text: "The tall grass pinged an old heat signature. Charmander's repair module is back online."
+      },
+      {
         speaker: "Charmander",
         text: "Whoa, fresh tall grass! I was hiding in there where it felt warm and safe."
       },
       {
         speaker: "Charmander",
-        text: "If you need fire, call me over. I can help light that Campfire."
+        text: "If you find my Train House, call me over. That is my home."
       },
       {
         speaker: "Pokedesk",
@@ -813,6 +860,17 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
         flag: "charmanderRevealed"
       },
       {
+        type: STORY_BEAT_EFFECT.UNLOCK_SKILL,
+        skillId: "fire",
+        options: {
+          silent: true
+        }
+      },
+      {
+        type: STORY_BEAT_EFFECT.PUSH_NOTICE,
+        message: "You learned Fire."
+      },
+      {
         type: STORY_BEAT_EFFECT.OPEN_POKEDEX_ENTRY,
         entryId: CHARMANDER_POKEDEX_ENTRY_ID
       }
@@ -823,12 +881,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Charmander",
-        text: "There! A warm fire makes this place feel much more like home."
+        text: "Type ship! There is my crib! Whatsupp homies!"
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "Excellent. Habitats come alive when the right Pokemon and objects work together."
-      }
+        speaker: "Squirtle",
+        text: "He has no homies, there is nobody here."
+      },
+      {
+        speaker: "Charmander",
+        text: "If you silicon nerds need me to PARTY F... HARD! Just call me, cuz."
+      },
     ],
     effects: [
       {
@@ -837,7 +899,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Charmander lit the Campfire."
+        message: "Charmander moved into the Train House."
       },
       {
         type: STORY_BEAT_EFFECT.SET_FLAG,
@@ -854,15 +916,19 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Professor Tangrowth",
-        text: "This is what is left of the old Pokemon Center. It used to be the safest place on the island."
+        text: "Well, this is what's left of our office. For a brief, beautiful moment, we had some dignity."
       },
       {
         speaker: "Professor Tangrowth",
-        text: "The building is ruined, but that PC still has power flickering through it."
+        text: "Then Bill had another fit of rage. The walls took it personally. The insurance, less so."
+      },
+      {
+        speaker: "Professor Tangrowth",
+        text: "But that's life, isn't it? You build a workplace, someone has a revelation, shit is all over the place."
       },
       {
         speaker: "Pokedesk",
-        text: "Check the PC beside the ruins."
+        text: "I guess journaling does not pay the bill's, right?! Go check the computer."
       }
     ],
     effects: [
@@ -922,6 +988,10 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
   [STORY_BEAT_IDS.TIMBURR_DISCOVERY]: {
     id: STORY_BEAT_IDS.TIMBURR_DISCOVERY,
     fallbackLines: [
+      {
+        speaker: "Chopper",
+        text: "That boulder shade woke a dormant carrier unit. Timburr's repair module is responding."
+      },
       {
         speaker: "Timburr",
         text: "Hey! A shady patch by a boulder. That's perfect for training."
@@ -1002,11 +1072,11 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Bulbasaur",
-        text: "I drew up a Straw Bed recipe for you. It should make a habitat feel much cozier."
+        text: "I drew up a Solar Station recipe for you. It should make a habitat feel much cozier."
       },
       {
         speaker: "Pokedesk",
-        text: "Straw Bed recipe was added to your bag."
+        text: "Solar Station recipe was added to your bag."
       }
     ],
     effects: [
@@ -1024,7 +1094,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You learned the Straw Bed recipe."
+        message: "You learned the Solar Station recipe."
       }
     ]
   },
@@ -1037,7 +1107,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You created a Straw Bed."
+        message: "You created a Solar Station."
       }
     ]
   },
@@ -1046,7 +1116,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Bulbasaur",
-        text: "A Straw Bed right in the tall grass! It smells like fresh leaves and feels so soft."
+        text: "A Solar Station right in the tall grass! It catches the light and hums softly."
       },
       {
         speaker: "Bulbasaur",
@@ -1072,7 +1142,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Bulbasaur's Straw Bed request complete."
+        message: "Bulbasaur's Solar Station request complete."
       }
     ]
   },
@@ -1132,7 +1202,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Professor Tangrowth",
-        text: "The Pokemon Center PC Shop should have a Leaf Den Kit. Buy one and we can start from there."
+        text: "The Pokemon Center PC Shop should have a House Kit. Buy one and we can start from there."
       }
     ],
     effects: [
@@ -1146,7 +1216,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Leaf Den Kit is available in the PC Shop."
+        message: "House Kit is available in the PC Shop."
       }
     ]
   },
@@ -1159,7 +1229,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Pokedesk",
-        text: "Leaf Den Kit purchased."
+        text: "House Kit purchased."
       },
       {
         speaker: "Professor Tangrowth",
@@ -1181,7 +1251,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You purchased a Leaf Den Kit."
+        message: "You purchased a House Kit."
       }
     ]
   },
@@ -1198,11 +1268,11 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Timburr",
-        text: "Leave the heavy lifting to me. This Leaf Den will be standing before you know it!"
+        text: "Leave the heavy lifting to me. This House will be standing before you know it!"
       },
       {
         speaker: "Pokedesk",
-        text: "Leaf Den construction has started. It will take a few real-world hours to complete."
+        text: "House construction has started. It will take a few seconds to complete."
       }
     ],
     effects: [
@@ -1212,7 +1282,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Leaf Den construction started."
+        message: "House construction started."
       }
     ]
   },
@@ -1221,11 +1291,11 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Pokedesk",
-        text: "Leaf Den construction is complete."
+        text: "House construction is complete."
       },
       {
         speaker: "Professor Tangrowth",
-        text: "A leafy home like this will make Pokemon feel much more welcome here."
+        text: "A real house like this will make Pokemon feel much more welcome here."
       }
     ],
     effects: [
@@ -1243,7 +1313,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "The Leaf Den is complete."
+        message: "The House is complete."
       }
     ]
   },
@@ -1252,7 +1322,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Timburr",
-        text: "Nice work! Three pieces of furniture make the Leaf Den feel like a real home."
+        text: "Nice work! Three pieces of furniture make the House feel like a real home."
       },
       {
         speaker: "Timburr",
@@ -1260,7 +1330,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Pokedesk",
-        text: "Leaf Den furniture request complete."
+        text: "House furniture request complete."
       }
     ],
     effects: [
@@ -1278,7 +1348,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Leaf Den furniture request complete."
+        message: "House furniture request complete."
       }
     ]
   },
@@ -1287,7 +1357,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Charmander",
-        text: "The Leaf Den is ready, and it feels so cozy now!"
+        text: "The House is ready, and it feels so cozy now!"
       },
       {
         speaker: "Charmander",
@@ -1357,7 +1427,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "The Leaf Den is now marked as your house."
+        message: "The House is now marked as your house."
       }
     ]
   },

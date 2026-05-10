@@ -30,6 +30,7 @@ function createController() {
 describe("createGameHudController", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    document.body.innerHTML = "";
   });
 
   it("shows immediate prompts as the current action instead of repeating quest copy", () => {
@@ -62,7 +63,14 @@ describe("createGameHudController", () => {
     const inventoryGridElement = document.createElement("div");
     const controller = createGameHudController({
       inventoryGridElement,
-      inventoryOrder: ["waterGunTotem", "wood", "campfire", "leppaBerry"],
+      inventoryOrder: [
+        "waterGunTotem",
+        "simpleWoodenDiyRecipes",
+        "lifeCoins",
+        "wood",
+        "campfire",
+        "leppaBerry"
+      ],
       itemDefs: {
         waterGunTotem: {
           shortLabel: "Totem",
@@ -70,6 +78,20 @@ describe("createGameHudController", () => {
           color: "#65c7ff",
           ink: "#081f33",
           slotRole: "key"
+        },
+        simpleWoodenDiyRecipes: {
+          shortLabel: "DIY",
+          glyph: "D",
+          color: "#d2a36a",
+          ink: "#2a1809",
+          slotRole: "recipe"
+        },
+        lifeCoins: {
+          shortLabel: "Coins",
+          glyph: "$",
+          color: "#ffd45c",
+          ink: "#392406",
+          slotRole: "currency"
         },
         wood: {
           shortLabel: "Wood",
@@ -97,6 +119,8 @@ describe("createGameHudController", () => {
 
     controller.syncInventoryUi({
       waterGunTotem: 1,
+      simpleWoodenDiyRecipes: 1,
+      lifeCoins: 10,
       wood: 3,
       campfire: 1,
       leppaBerry: 1
@@ -105,16 +129,67 @@ describe("createGameHudController", () => {
     const slots = [...inventoryGridElement.querySelectorAll(".inventory-slot[data-filled='true']")];
     expect(inventoryGridElement.querySelector(".inventory-slot__label")).toBeNull();
     expect(inventoryGridElement.querySelector(".inventory-slot__role")).toBeNull();
+    expect(slots.some((slot) => slot.dataset.slotRole === "key")).toBe(false);
+    expect(slots.some((slot) => slot.dataset.slotRole === "recipe")).toBe(false);
+    expect(slots.some((slot) => slot.dataset.slotRole === "currency")).toBe(false);
+    expect(inventoryGridElement.textContent).not.toContain("$");
+    expect(inventoryGridElement.textContent).not.toContain("T");
+    expect(inventoryGridElement.textContent).not.toContain("D");
 
     const woodSlot = slots.find((slot) => {
       return slot.dataset.slotRole === "material";
     });
 
     expect(woodSlot?.dataset.iconKind).toBe("image");
+    expect(woodSlot?.dataset.itemId).toBe("wood");
     expect(woodSlot?.querySelector(".inventory-slot__image")?.getAttribute("src")).toContain("Objects/wood.png");
   });
 
-  it("shows the companion robot for the selected field move beside supplies", () => {
+  it("queues pickup fly animations only for visible supplies slots", () => {
+    const inventoryGridElement = document.createElement("div");
+    document.body.appendChild(inventoryGridElement);
+    const controller = createGameHudController({
+      inventoryGridElement,
+      inventoryOrder: ["waterGunTotem", "wood"],
+      itemDefs: {
+        waterGunTotem: {
+          shortLabel: "Totem",
+          glyph: "T",
+          color: "#65c7ff",
+          ink: "#081f33",
+          slotRole: "key"
+        },
+        wood: {
+          shortLabel: "Wood",
+          glyph: "W",
+          color: "#8c5a34",
+          ink: "#fff1e8",
+          slotRole: "material"
+        }
+      }
+    });
+
+    controller.syncInventoryUi({
+      waterGunTotem: 1,
+      wood: 2
+    });
+
+    expect(controller.queueSupplyPickupFlyToSlot({
+      itemId: "waterGunTotem",
+      origin: { x: 12, y: 18 }
+    })).toBe(false);
+    expect(controller.queueSupplyPickupFlyToSlot({
+      itemId: "wood",
+      origin: { x: 12, y: 18 }
+    })).toBe(true);
+
+    const flyElement = document.body.querySelector(".supply-pickup-fly");
+    expect(flyElement?.dataset.itemId).toBe("wood");
+    expect(document.body.querySelector(".supply-pickup-fly-layer")).not.toBeNull();
+    expect(inventoryGridElement.querySelector(".inventory-slot[data-item-id='wood']")).not.toBeNull();
+  });
+
+  it("keeps companion move information out of the persistent supplies HUD", () => {
     const uiLayerElement = document.createElement("div");
     const inventoryPanelElement = document.createElement("div");
     inventoryPanelElement.className = "inventory";
@@ -171,12 +246,15 @@ describe("createGameHudController", () => {
         ?.getAttribute("src")
     ).toContain("Robot-1-thumb.png");
     expect(companionHudElement?.querySelectorAll(".active-companion-hud__portrait-image")).toHaveLength(1);
-    expect(companionHudElement?.querySelectorAll(".active-companion-hud__switch-button")).toHaveLength(2);
-    expect(companionHudElement?.textContent).toContain("D←");
-    expect(companionHudElement?.textContent).toContain("D→");
+    expect(companionHudElement?.querySelector(".active-companion-hud__switch-button")).toBeNull();
+    expect(companionHudElement?.querySelector(".active-companion-hud__switch-icon")).toBeNull();
     expect(companionHudElement?.textContent).toContain("Water");
     expect(companionHudElement?.textContent).toContain("Squirtle");
-    expect(companionHudElement?.textContent).toContain("mark dry ground");
+    expect(
+      companionHudElement
+        ?.querySelector(".active-companion-hud__hint-image")
+        ?.getAttribute("alt")
+    ).toContain("mark dry ground");
 
     controller.syncHudInstructions({
       flags: {
@@ -185,12 +263,17 @@ describe("createGameHudController", () => {
     });
 
     expect(companionHudElement?.textContent).not.toContain("Squirtle will move over and restore it");
-    expect(companionHudElement?.textContent).toContain("USE LT TO MARK THE GROUND");
+    expect(
+      companionHudElement
+        ?.querySelector(".active-companion-hud__hint-image")
+        ?.getAttribute("src")
+    ).toContain("Lt-thumb.png");
 
     controller.syncSkillsUi(unlockedSkills, "leafage", {
       flags: {}
     });
 
+    expect(companionHudElement?.hidden).toBe(false);
     expect(companionHudElement?.dataset.companionId).toBe("bulbasaur");
     expect(
       companionHudElement
@@ -200,7 +283,11 @@ describe("createGameHudController", () => {
     expect(companionHudElement?.querySelectorAll(".active-companion-hud__portrait-image")).toHaveLength(1);
     expect(companionHudElement?.textContent).toContain("Leaf");
     expect(companionHudElement?.textContent).toContain("Bulbasaur");
-    expect(companionHudElement?.textContent).toContain("restored ground");
+    expect(
+      companionHudElement
+        ?.querySelector(".active-companion-hud__hint-image")
+        ?.getAttribute("alt")
+    ).toContain("restored ground");
 
     controller.syncSkillsUi({ waterGun: true, leafage: false }, "leafage");
 

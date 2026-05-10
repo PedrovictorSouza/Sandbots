@@ -124,6 +124,7 @@ export function createQuestSystem({
   quests,
   storage = null,
   storageKey = DEFAULT_STORAGE_KEY,
+  initialState = null,
   transitionDelayMs = 0,
   onChange = () => {}
 } = {}) {
@@ -134,7 +135,7 @@ export function createQuestSystem({
 
   let state = mergePersistedState(
     createInitialState(quests),
-    safeReadStorage(storage, storageKey),
+    initialState || safeReadStorage(storage, storageKey),
     quests
   );
   let pendingTransitionTimer = null;
@@ -343,6 +344,30 @@ export function createQuestSystem({
     state = createInitialState(quests);
     notify("reset");
   }
+
+  function resumeCompletedActiveQuest() {
+    const activeQuest = getActiveQuest();
+    if (
+      !activeQuest ||
+      activeQuest.status !== QUEST_STATUS.COMPLETED ||
+      !activeQuest.nextQuestId
+    ) {
+      return false;
+    }
+
+    const nextQuest = getQuest(activeQuest.nextQuestId);
+    if (!nextQuest || nextQuest.status === QUEST_STATUS.COMPLETED) {
+      state.activeQuestId = null;
+      persist();
+      return true;
+    }
+
+    activateQuest(nextQuest.id);
+    persist();
+    return true;
+  }
+
+  resumeCompletedActiveQuest();
 
   return {
     activateQuest,

@@ -22,14 +22,17 @@ async function loadSkyImageAsset() {
 export async function loadPropAssets() {
   const [
     woodImage,
+    leaveImage,
     skyImage
   ] = await Promise.all([
     loadImageAsset("./Objects/wood.png"),
+    loadImageAsset("./Objects/leave.png"),
     loadSkyImageAsset()
   ]);
 
   return {
     woodImage,
+    leaveImage,
     skyImage
   };
 }

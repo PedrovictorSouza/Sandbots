@@ -2,7 +2,8 @@ import {
   buildGroundFlowerPatches,
   buildGroundGrassPatches,
   buildGroundGridInstances,
-  GROUND_TILE_INSTANCE_SCALE
+  GROUND_TILE_INSTANCE_SCALE,
+  partitionColdGroundInstances
 } from "../../groundGrid.js";
 
 import {
@@ -35,7 +36,22 @@ import {
 } from "../../rendering/worldAssets.js";
 
 const LEPPA_TREE_DEAD_MODEL_FACE_YAW_OFFSET = 0;
+const TREE_2_MODEL_FACE_YAW_OFFSET = 0;
+const TREE_VARIANT = Object.freeze({
+  PALM: "palm",
+  TREE_2: "tree2"
+});
+const TREE_2_CAMP_RADIUS = 38;
+const PALM_LOW_SNOW_REGION = Object.freeze({
+  minX: 18,
+  maxX: 72,
+  minZ: -28,
+  maxZ: 32
+});
 const DRY_GRASS_PLANET_COVERAGE_RATIO = 0.01;
+const COLD_GROUND_PLANET_COVERAGE_RATIO = 0.8;
+const COLD_GROUND_START_REGION_COVERAGE_RATIO = 0.05;
+const COLD_GROUND_START_REGION_RADIUS = 35;
 
 function toSafeZoneFromPosition(position, radius) {
   return {
@@ -136,19 +152,62 @@ function buildBuildingColliders() {
   ];
 }
 
+function isInsidePalmLowSnowRegion(offset) {
+  return (
+    offset[0] >= PALM_LOW_SNOW_REGION.minX &&
+    offset[0] <= PALM_LOW_SNOW_REGION.maxX &&
+    offset[2] >= PALM_LOW_SNOW_REGION.minZ &&
+    offset[2] <= PALM_LOW_SNOW_REGION.maxZ
+  );
+}
+
+function isNearCamp(offset) {
+  return Math.hypot(
+    offset[0] - ACT_TWO_MONSTER_POSITION[0],
+    offset[2] - ACT_TWO_MONSTER_POSITION[2]
+  ) <= TREE_2_CAMP_RADIUS;
+}
+
+function resolveTreeVariant(tree, index) {
+  if (isNearCamp(tree.offset)) {
+    return TREE_VARIANT.TREE_2;
+  }
+
+  if (isInsidePalmLowSnowRegion(tree.offset)) {
+    return TREE_VARIANT.PALM;
+  }
+
+  return index % 2 === 0 ? TREE_VARIANT.TREE_2 : TREE_VARIANT.PALM;
+}
+
+function withTreeVariant(tree, index) {
+  const aliveModelKey = resolveTreeVariant(tree, index);
+  const yawOffset = aliveModelKey === TREE_VARIANT.TREE_2 ?
+    TREE_2_MODEL_FACE_YAW_OFFSET :
+    0;
+
+  return {
+    ...tree,
+    aliveModelKey,
+    yaw: (tree.yaw || 0) + yawOffset
+  };
+}
+
 export function buildWorldLayout(session, assets) {
-  const { groundDeadModel, houseModel, palmModel, tallGrassModel } = assets;
+  const { groundDeadModel, houseModel, palmModel, tallGrassModel, tree2Model } = assets;
   const groundTileFootprint = Math.max(groundDeadModel.size[0], groundDeadModel.size[2]);
   const groundTileScale = GROUND_TILE_INSTANCE_SCALE;
   const groundTileSpan = groundTileFootprint * groundTileScale;
   const terrainSafeZones = buildElevatedTerrainSafeZones();
 
   session.palmModel = palmModel;
+  session.tree2Model = tree2Model;
   session.tallGrassModel = tallGrassModel;
+  session.leafageGardenInstances = session.leafageGardenInstances || [];
   session.palmInstances = buildPalmInstances(
     houseModel,
     palmModel,
-    PALM_INSTANCE_LAYOUT
+    PALM_INSTANCE_LAYOUT.map(withTreeVariant)
   );
   session.leppaTree = {
     id: "leppa-tree",
@@ -173,11 +232,23 @@ export function buildWorldLayout(session, assets) {
     }
   };
 
-  session.groundDeadInstances = buildGroundGridInstances({
+  const groundGridInstances = buildGroundGridInstances({
     worldLimit: WORLD_LIMIT,
     tileFootprint: groundTileFootprint,
     tileHeight: groundDeadModel.size[1]
   });
+  const partitionedGround = partitionColdGroundInstances(groundGridInstances, {
+    coldCoverageRatio: COLD_GROUND_PLANET_COVERAGE_RATIO,
+    coverageZones: [{
+      position: [ACT_TWO_MONSTER_POSITION[0], ACT_TWO_MONSTER_POSITION[2]],
+      radius: COLD_GROUND_START_REGION_RADIUS,
+      coverageRatio: COLD_GROUND_START_REGION_COVERAGE_RATIO
+    }],
+    seed: "small-island-cold-ground"
+  });
+
+  session.groundDeadInstances = partitionedGround.deadGroundInstances;
+  session.iceGroundInstances = partitionedGround.coldGroundInstances;
 
   session.groundGrassPatches = buildGroundGrassPatches({
     groundInstances: session.groundDeadInstances,

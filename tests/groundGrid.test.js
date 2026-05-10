@@ -1,18 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
   ALIVE_PATCH_STATE,
+  bindPurifiedGroundVariantInstances,
   buildGroundGrassPatches,
   buildGroundFlowerPatches,
   buildGroundGridInstances,
+  COLD_GROUND_KIND,
   createGroundCellSpatialIndex,
   DEAD_PATCH_STATE,
   DEAD_GRASS_STATE,
+  DEAD_GROUND_KIND,
   findNearbyGroundCell,
   GROUND_TILE_INSTANCE_SCALE,
   GREEN_GRASS_STATE,
+  isAlternatePurifiedGroundCell,
+  partitionColdGroundInstances,
   purifyGroundCell,
   reviveGroundFlower,
-  reviveGroundGrass
+  reviveGroundGrass,
+  syncPurifiedGroundVariantInstances
 } from "../groundGrid.js";
 
 describe("buildGroundGridInstances", () => {
@@ -98,6 +104,50 @@ describe("buildGroundGridInstances", () => {
     );
   });
 
+  it("partitions cold ground as non-purifiable cells outside local warm regions", () => {
+    const instances = buildGroundGridInstances({
+      worldLimit: 8,
+      tileFootprint: 3.8,
+      tileHeight: 3.8,
+    });
+    const warmZone = {
+      position: [instances[0].offset[0], instances[0].offset[2]],
+      radius: instances[0].tileSpan * 1.1,
+      coverageRatio: 0
+    };
+    const warmZoneCellIds = new Set(instances
+      .filter((instance) => {
+        const dx = instance.offset[0] - warmZone.position[0];
+        const dz = instance.offset[2] - warmZone.position[1];
+        return dx * dx + dz * dz <= warmZone.radius * warmZone.radius;
+      })
+      .map((instance) => instance.id));
+
+    const {
+      deadGroundInstances,
+      coldGroundInstances
+    } = partitionColdGroundInstances(instances, {
+      coldCoverageRatio: 1,
+      coverageZones: [warmZone],
+      seed: "test-cold-ground"
+    });
+
+    expect(deadGroundInstances).toHaveLength(warmZoneCellIds.size);
+    expect(coldGroundInstances).toHaveLength(instances.length - warmZoneCellIds.size);
+    expect(deadGroundInstances.every((groundCell) => {
+      return groundCell.groundKind === DEAD_GROUND_KIND && groundCell.purifiable === true;
+    })).toBe(true);
+    expect(coldGroundInstances.every((groundCell) => {
+      return groundCell.groundKind === COLD_GROUND_KIND && groundCell.purifiable === false;
+    })).toBe(true);
+
+    const coldGroundCell = coldGroundInstances[0];
+    expect(findNearbyGroundCell(
+      [coldGroundCell.offset[0], 0, coldGroundCell.offset[2]],
+      coldGroundInstances
+    )).toBeNull();
+  });
+
   it("moves a corrupted cell into the purified ground layer", () => {
     const corruptedGroundInstances = buildGroundGridInstances({
       worldLimit: 2,
@@ -116,6 +166,36 @@ describe("buildGroundGridInstances", () => {
     expect(corruptedGroundInstances).toHaveLength(8);
     expect(purifiedGroundInstances).toHaveLength(1);
     expect(purifiedGroundInstances[0].id).toBe("ground-0-0");
+  });
+
+  it("routes purified cells into light and dark checkerboard render layers", () => {
+    const corruptedGroundInstances = buildGroundGridInstances({
+      worldLimit: 2,
+      tileFootprint: 3.8,
+      tileHeight: 3.8,
+    });
+    const purifiedGroundInstances = [];
+    const lightInstances = [];
+    const darkInstances = [];
+    bindPurifiedGroundVariantInstances(purifiedGroundInstances, {
+      lightInstances,
+      darkInstances
+    });
+
+    purifyGroundCell(corruptedGroundInstances[0], corruptedGroundInstances, purifiedGroundInstances);
+    purifyGroundCell(corruptedGroundInstances[0], corruptedGroundInstances, purifiedGroundInstances);
+
+    expect(isAlternatePurifiedGroundCell(purifiedGroundInstances[0])).toBe(false);
+    expect(isAlternatePurifiedGroundCell(purifiedGroundInstances[1])).toBe(true);
+    expect(lightInstances.map((groundCell) => groundCell.id)).toEqual(["ground-0-0"]);
+    expect(darkInstances.map((groundCell) => groundCell.id)).toEqual(["ground-0-1"]);
+
+    lightInstances.length = 0;
+    darkInstances.length = 0;
+    syncPurifiedGroundVariantInstances(purifiedGroundInstances);
+
+    expect(lightInstances.map((groundCell) => groundCell.id)).toEqual(["ground-0-0"]);
+    expect(darkInstances.map((groundCell) => groundCell.id)).toEqual(["ground-0-1"]);
   });
 
   it("attaches grass patches to target cells and revives them when the tile is purified", () => {
