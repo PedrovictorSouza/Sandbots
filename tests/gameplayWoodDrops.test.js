@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { LEAVES_ITEM_ID } from "../gameplayContent.js";
 import { createEmptySession } from "../app/session/createEmptySession.js";
 import { initializeGameplayState } from "../app/session/initializeGameplatState.js";
+import {
+  collectWoodDrops,
+  updateResourceNodes
+} from "../world/islandWorld.js";
 
 describe("gameplay field resource drops", () => {
   it("starts the planet with a smaller readable supply of sturdy sticks and leaf piles", () => {
@@ -28,5 +32,32 @@ describe("gameplay field resource drops", () => {
     expect(session.woodDrops.every((drop) => drop.collected === false)).toBe(true);
     expect(leafNodes.length).toBe(5);
     expect(new Set(leafNodes.map((node) => node.id)).size).toBe(leafNodes.length);
+  });
+
+  it("respawns collected wood drops after their ecosystem cooldown", () => {
+    const woodDrops = [
+      {
+        id: "wood-1",
+        position: [0, 0.02, 0],
+        size: [0.78, 0.78],
+        pickupRadius: 0.64,
+        collected: false,
+        respawnDuration: 3
+      }
+    ];
+    const inventory = { wood: 0 };
+
+    expect(collectWoodDrops([0, 0, 0], woodDrops, inventory)).toBe(1);
+    expect(inventory.wood).toBe(1);
+    expect(woodDrops[0].collected).toBe(true);
+    expect(woodDrops[0].cooldown).toBe(3);
+
+    updateResourceNodes(2, woodDrops);
+    expect(woodDrops[0].collected).toBe(true);
+    expect(woodDrops[0].cooldown).toBe(1);
+
+    updateResourceNodes(1, woodDrops);
+    expect(woodDrops[0].collected).toBe(false);
+    expect(woodDrops[0].cooldown).toBe(0);
   });
 });

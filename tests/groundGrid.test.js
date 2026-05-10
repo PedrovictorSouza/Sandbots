@@ -6,6 +6,7 @@ import {
   buildGroundFlowerPatches,
   buildGroundGridInstances,
   COLD_GROUND_KIND,
+  createGroundGridConfigFromInstances,
   createGroundCellSpatialIndex,
   DEAD_PATCH_STATE,
   DEAD_GRASS_STATE,
@@ -51,6 +52,26 @@ describe("buildGroundGridInstances", () => {
     expect(maxZ).toBeGreaterThanOrEqual(72);
     expect(Math.min(...instances.map((instance) => instance.offset[1]))).toBeCloseTo(-1.425);
     expect(Math.max(...instances.map((instance) => instance.offset[1]))).toBeCloseTo(-1.425);
+  });
+
+  it("derives a build grid config from ground tile centers", () => {
+    const instances = buildGroundGridInstances({
+      worldLimit: 2,
+      tileFootprint: 3.8,
+      tileHeight: 3.8,
+    });
+
+    expect(createGroundGridConfigFromInstances(instances)).toEqual({
+      cellSize: 1.425,
+      origin: {
+        x: -2,
+        y: 0,
+        z: -2
+      },
+      width: 3,
+      height: 3,
+      visualOffsetY: 0.03
+    });
   });
 
   it("finds the closest corrupted ground cell near the player", () => {

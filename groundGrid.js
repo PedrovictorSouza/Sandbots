@@ -453,6 +453,50 @@ export function buildGroundGridInstances({
   return instances;
 }
 
+export function createGroundGridConfigFromInstances(groundInstances, {
+  visualOffsetY = 0.03
+} = {}) {
+  if (!Array.isArray(groundInstances) || !groundInstances.length) {
+    return null;
+  }
+
+  const cells = groundInstances
+    .filter((groundCell) => {
+      return Array.isArray(groundCell?.offset) &&
+        Number.isFinite(Number(groundCell.offset[0])) &&
+        Number.isFinite(Number(groundCell.offset[2])) &&
+        Number.isFinite(Number(groundCell.tileSpan)) &&
+        Number(groundCell.tileSpan) > 0;
+    });
+
+  if (!cells.length) {
+    return null;
+  }
+
+  const cellSize = Number(cells.reduce((smallestSpan, groundCell) => {
+    return Math.min(smallestSpan, Number(groundCell.tileSpan));
+  }, Number.POSITIVE_INFINITY).toFixed(6));
+  const xCenters = [...new Set(cells.map((groundCell) => Number(groundCell.offset[0]).toFixed(4)))]
+    .map(Number)
+    .sort((a, b) => a - b);
+  const zCenters = [...new Set(cells.map((groundCell) => Number(groundCell.offset[2]).toFixed(4)))]
+    .map(Number)
+    .sort((a, b) => a - b);
+  const surfaceY = cells.find((groundCell) => Number.isFinite(Number(groundCell.surfaceY)))?.surfaceY || 0;
+
+  return {
+    cellSize,
+    origin: {
+      x: Number((xCenters[0] - cellSize * 0.5).toFixed(6)),
+      y: Number(surfaceY) || 0,
+      z: Number((zCenters[0] - cellSize * 0.5).toFixed(6))
+    },
+    width: xCenters.length,
+    height: zCenters.length,
+    visualOffsetY
+  };
+}
+
 export function buildGroundGrassPatches({
   groundInstances,
   layout = [],

@@ -2,6 +2,7 @@ export const GAMEPAD_BUTTONS = Object.freeze({
   A: 0,
   B: 1,
   X: 2,
+  Y: 3,
   SELECT: 8,
   START: 9,
   LT: 6,
@@ -44,6 +45,10 @@ export const GAME_INPUT_BINDINGS = Object.freeze({
   bag: {
     keyboardCode: "KeyX",
     gamepadButton: GAMEPAD_BUTTONS.X
+  },
+  destroyAction: {
+    keyboardCode: "KeyY",
+    gamepadButton: GAMEPAD_BUTTONS.Y
   },
   followerCall: {
     keyboardCode: "ArrowUp",

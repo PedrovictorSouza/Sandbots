@@ -91,7 +91,7 @@ describe("createWorldSpeechController", () => {
     const prompt = mount.querySelector('[data-world-speech-variant="player-prompt"]');
 
     expect(prompt?.dataset.worldPromptKind).toBe("field-move-switch");
-    expect(prompt?.style.transform).toContain("translate(8px");
+    expect(prompt?.style.transform).toContain("translate(104px");
     expect(prompt?.style.transform).toContain("0.625");
     expect(prompt?.querySelector("[data-field-move-switch-card='true'] strong")?.textContent).toBe("Water");
 

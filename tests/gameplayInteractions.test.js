@@ -21,6 +21,7 @@ import {
   addItems,
   consumeItems
 } from "../story/progression.js";
+import { findNearbyInteractable } from "../world/islandWorld.js";
 
 function createInteractions(overrides = {}) {
   return createGameplayInteractions({
@@ -369,6 +370,137 @@ describe("createGameplayInteractions", () => {
       groundCell,
       groundDeadInstances,
       groundPurifiedInstances
+    );
+  });
+
+  it("targets nearby dry grass when a closer empty dry ground tile is not valid yet", () => {
+    const emptyGroundCell = {
+      id: "ground-empty-nearby",
+      offset: [0.1, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0
+    };
+    const dryGrassGroundCell = {
+      id: "ground-dry-grass-visible",
+      offset: [1, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0
+    };
+    const groundDeadInstances = [emptyGroundCell, dryGrassGroundCell];
+    const groundGrassPatches = [
+      {
+        id: "dry-grass-visible",
+        cellId: dryGrassGroundCell.id,
+        position: [1, 0.02, 0],
+        size: [1.18, 0.96],
+        state: "dead"
+      }
+    ];
+    const purifyGroundCell = vi.fn(() => true);
+    const reviveGroundGrass = vi.fn(() => ({
+      id: "dry-grass-visible",
+      cellId: dryGrassGroundCell.id,
+      state: "alive"
+    }));
+    const resourceNode = {
+      id: "wood-nearby",
+      itemId: "wood",
+      yield: 1,
+      cooldown: 0,
+      respawnDuration: 8
+    };
+    const interactions = createInteractions({
+      findNearbyHarvestTarget: vi.fn(() => ({
+        resourceNode,
+        distance: 0.05
+      })),
+      findNearbyGroundCell: vi.fn(() => ({
+        groundCell: emptyGroundCell,
+        distance: 0.1
+      })),
+      purifyGroundCell,
+      reviveGroundGrass,
+      pushNotice: vi.fn()
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundDeadInstances,
+      groundPurifiedInstances: [],
+      groundGrassPatches,
+      canPurifyGround: true
+    });
+
+    expect(result).toBe(true);
+    expect(purifyGroundCell).toHaveBeenCalledWith(
+      dryGrassGroundCell,
+      groundDeadInstances,
+      []
+    );
+    expect(reviveGroundGrass).toHaveBeenCalledWith(
+      dryGrassGroundCell,
+      groundGrassPatches
+    );
+    expect(resourceNode.cooldown).toBe(0);
+  });
+
+  it("revives dry grass even when its ground tile is already green", () => {
+    const greenGroundCell = {
+      id: "ground-green-with-dry-grass",
+      offset: [0.45, 0, 0],
+      scale: 1,
+      tileSpan: 1.425,
+      yaw: 0
+    };
+    const groundGrassPatches = [
+      {
+        id: "dry-grass-on-green-ground",
+        cellId: greenGroundCell.id,
+        position: [0.45, 0.02, 0],
+        size: [1.18, 0.96],
+        state: "dead"
+      }
+    ];
+    const purifyGroundCell = vi.fn(() => false);
+    const reviveGroundGrass = vi.fn(() => ({
+      id: "dry-grass-on-green-ground",
+      cellId: greenGroundCell.id,
+      state: "alive"
+    }));
+    const interactions = createInteractions({
+      findNearbyGroundCell: vi.fn(() => null),
+      purifyGroundCell,
+      reviveGroundGrass,
+      pushNotice: vi.fn()
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: [],
+      groundDeadInstances: [],
+      groundPurifiedInstances: [greenGroundCell],
+      groundGrassPatches,
+      canPurifyGround: true
+    });
+
+    expect(result).toBe(true);
+    expect(purifyGroundCell).not.toHaveBeenCalled();
+    expect(reviveGroundGrass).toHaveBeenCalledWith(
+      greenGroundCell,
+      groundGrassPatches
     );
   });
 
@@ -1344,7 +1476,8 @@ describe("createGameplayInteractions", () => {
       interactables: [],
       storyState,
       inventory: {},
-      groundGrassPatches
+      groundGrassPatches,
+      allowDestroyInstantiatedObject: true
     });
 
     expect(result).toBe(true);
@@ -1355,6 +1488,191 @@ describe("createGameplayInteractions", () => {
 
   it("destroys a nearby Leafage-instantiated flower", () => {
     const pushNotice = vi.fn();
+    const groundFlowerPatches = [
+      {
+        id: "leafage-flower-ground-1",
+        cellId: "ground-1",
+        habitatGroupId: "leafage-flower-bed-habitat-0",
+        source: "leafage",
+        state: "alive",
+        position: [0, 0.02, 0],
+        size: [1.12, 1.12]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable,
+      pushNotice
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafageFlowerCount: 1
+      }
+    };
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory: {},
+      groundGrassPatches: [],
+      groundFlowerPatches,
+      allowDestroyInstantiatedObject: true
+    });
+
+    expect(result).toBe(true);
+    expect(groundFlowerPatches).toEqual([]);
+    expect(storyState.flags.leafageFlowerCount).toBe(0);
+    expect(pushNotice).toHaveBeenCalledWith("Flower destroyed.");
+  });
+
+  it("destroys a restored flower even without a Leafage source flag", () => {
+    const pushNotice = vi.fn();
+    const groundFlowerPatches = [
+      {
+        id: "flower-ground-1",
+        cellId: "ground-1",
+        habitatGroupId: "water-gun-flower-field-0",
+        state: "alive",
+        position: [0, 0.02, 0],
+        size: [1.12, 1.12]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable,
+      pushNotice
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: { questIndex: 2, flags: { bulbasaurRevealed: true } },
+      inventory: {},
+      groundGrassPatches: [],
+      groundFlowerPatches,
+      allowDestroyInstantiatedObject: true
+    });
+
+    expect(result).toBe(true);
+    expect(groundFlowerPatches).toEqual([]);
+    expect(pushNotice).toHaveBeenCalledWith("Flower destroyed.");
+  });
+
+  it("destroys restored green grass even without a Leafage source flag", () => {
+    const pushNotice = vi.fn();
+    const groundGrassPatches = [
+      {
+        id: "grass-ground-1",
+        cellId: "ground-1",
+        state: "alive",
+        position: [0, 0.02, 0],
+        size: [1.18, 0.96]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable,
+      pushNotice
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: { questIndex: 2, flags: { bulbasaurRevealed: true } },
+      inventory: {},
+      groundGrassPatches,
+      allowDestroyInstantiatedObject: true
+    });
+
+    expect(result).toBe(true);
+    expect(groundGrassPatches).toEqual([]);
+    expect(pushNotice).toHaveBeenCalledWith("Tall Grass destroyed.");
+  });
+
+  it("uses Y destroy mode even when the normal interact target would be something else", () => {
+    const pushNotice = vi.fn();
+    const groundGrassPatches = [
+      {
+        id: "dry-grass-ground-1",
+        cellId: "ground-1",
+        state: "dead",
+        position: [0, 0.02, 0],
+        size: [1.18, 0.96]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "npc",
+          id: "squirtle",
+          label: "Squirtle"
+        },
+        distance: 0.1
+      })),
+      pushNotice
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: { questIndex: 2, flags: { bulbasaurRevealed: true } },
+      inventory: {},
+      groundGrassPatches,
+      allowDestroyInstantiatedObject: true
+    });
+
+    expect(result).toBe(true);
+    expect(groundGrassPatches).toEqual([]);
+    expect(pushNotice).toHaveBeenCalledWith("Dry Grass cut.");
+  });
+
+  it("blocks destroying world dry grass before Bulbasaur is unlocked", () => {
+    const pushNotice = vi.fn();
+    const groundGrassPatches = [
+      {
+        id: "dry-grass-ground-1",
+        cellId: "ground-1",
+        state: "dead",
+        position: [0, 0.02, 0],
+        size: [1.18, 0.96]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable,
+      pushNotice
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: { questIndex: 2, flags: {} },
+      inventory: {},
+      groundGrassPatches,
+      allowDestroyInstantiatedObject: true
+    });
+
+    expect(result).toBe(false);
+    expect(groundGrassPatches).toHaveLength(1);
+    expect(pushNotice).toHaveBeenCalledWith("Nothing to destroy here.");
+  });
+
+  it("prefers the exact Leafage flower id when another patch shares its cell", () => {
+    const pushNotice = vi.fn();
+    const groundGrassPatches = [
+      {
+        id: "leafage-grass-ground-1",
+        cellId: "ground-1",
+        habitatGroupId: "leafage-tall-grass-habitat-0",
+        source: "leafage",
+        state: "alive",
+        position: [0, 0.02, 0],
+        size: [1.18, 0.96]
+      }
+    ];
     const groundFlowerPatches = [
       {
         id: "leafage-flower-ground-1",
@@ -1382,6 +1700,7 @@ describe("createGameplayInteractions", () => {
     const storyState = {
       questIndex: 2,
       flags: {
+        leafageTallGrassCount: 1,
         leafageFlowerCount: 1
       }
     };
@@ -1392,14 +1711,57 @@ describe("createGameplayInteractions", () => {
       interactables: [],
       storyState,
       inventory: {},
-      groundGrassPatches: [],
-      groundFlowerPatches
+      groundGrassPatches,
+      groundFlowerPatches,
+      allowDestroyInstantiatedObject: true
     });
 
     expect(result).toBe(true);
+    expect(groundGrassPatches).toHaveLength(1);
     expect(groundFlowerPatches).toEqual([]);
+    expect(storyState.flags.leafageTallGrassCount).toBe(1);
     expect(storyState.flags.leafageFlowerCount).toBe(0);
     expect(pushNotice).toHaveBeenCalledWith("Flower destroyed.");
+  });
+
+  it("destroys dry grass with the explicit destroy action", () => {
+    const pushNotice = vi.fn();
+    const groundGrassPatches = [
+      {
+        id: "dry-grass-ground-1",
+        cellId: "ground-1",
+        state: "dead",
+        position: [0, 0.02, 0],
+        size: [1.18, 0.96]
+      }
+    ];
+    const interactions = createInteractions({
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "site",
+          id: "dry-grass-ground-1",
+          label: "Dry Grass",
+          action: "destroyInstantiatedObject",
+          cellId: "ground-1"
+        },
+        distance: 0.25
+      })),
+      pushNotice
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState: { questIndex: 2, flags: { bulbasaurRevealed: true } },
+      inventory: {},
+      groundGrassPatches,
+      allowDestroyInstantiatedObject: true
+    });
+
+    expect(result).toBe(true);
+    expect(groundGrassPatches).toEqual([]);
+    expect(pushNotice).toHaveBeenCalledWith("Dry Grass cut.");
   });
 
   it("shows a tall grass habitat notice when a full grass group is restored", () => {

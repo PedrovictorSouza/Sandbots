@@ -445,4 +445,42 @@ describe("createSettingsMenuController", () => {
       value: 0.34
     }));
   });
+
+  it("lets left and right adjust focused volume sliders", () => {
+    const mount = document.createElement("div");
+    document.body.append(mount);
+    const settingsState = createDefaultSettingsState();
+    const onChange = vi.fn();
+    const controller = createSettingsMenuController({
+      mount,
+      schema: SETTINGS_SCHEMA,
+      settingsState,
+      onChange
+    });
+
+    controller.open();
+    controller.setActiveTab("settings", { focus: true });
+    controller.setActiveGroup("volume", { focus: true });
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowRight" }))).toBe(true);
+    expect(settingsState.volume.master).toBe(0.82);
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowDown" }))).toBe(true);
+    expect(document.activeElement).toBe(mount.querySelector('[data-settings-control="volume.music"]'));
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowLeft" }))).toBe(true);
+    expect(settingsState.volume.music).toBe(0.66);
+
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowDown" }));
+    controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowDown" }));
+    expect(document.activeElement).toBe(mount.querySelector('[data-settings-control="volume.sfx"]'));
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowLeft" }))).toBe(true);
+    expect(settingsState.volume.sfx).toBe(0.8);
+    expect(onChange).toHaveBeenCalledWith(settingsState, expect.objectContaining({
+      groupId: "volume",
+      settingId: "sfx",
+      value: 0.8
+    }));
+  });
 });

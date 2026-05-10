@@ -41,6 +41,7 @@ export function createEmptySession() {
     gameplayOpeningShipFlashTexture: null,
     gameplayOpeningShipSmokeTexture: null,
     gameplayOpeningShipTexture: null,
+    buildGridConfig: null,
     interactables: INTERACTABLE_DEFS.map((interactable) => ({ ...interactable })),
     leppaBerryDrops: [],
     leppaBerryTexture: null,

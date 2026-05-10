@@ -21,6 +21,7 @@ import {
   WORLD_WRAP_AXIS_Z
 } from "../../world/worldTopology.js";
 import { getGameplayOpeningShipDynamicBarrier } from "./gameplayOpeningShip.js";
+import { createPlayerConstructionTerrainColliders } from "../gameplay/placementBlockers.js";
 
 export const ACT_TWO_PLAYER_SPEED = 5.1;
 
@@ -54,7 +55,13 @@ export function configurePlayerSpawner(
       ...DYNAMIC_BARRIERS.filter((barrier) => barrier.activeWhen(storyState)),
       getGameplayOpeningShipDynamicBarrier(session.gameplayOpeningShip)
     ].filter(Boolean),
-    () => session.elevatedTerrainColliders
+    () => [
+      ...(session.elevatedTerrainColliders || []),
+      ...createPlayerConstructionTerrainColliders({
+        session,
+        storyState
+      })
+    ]
   );
 
   const keyboardController = createKeyboardController(camera, pressedKeys, {

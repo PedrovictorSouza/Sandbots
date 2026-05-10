@@ -26,6 +26,7 @@ const GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD = 0.45;
 const GAMEPAD_DIALOGUE_ANALOG_NAVIGATION_THRESHOLD = 0.45;
 const GAMEPAD_LEFT_SHOULDER_BUTTON = 4;
 const GAMEPAD_RIGHT_SHOULDER_BUTTON = 5;
+const GAMEPAD_FACE_BUTTON_PRESS_THRESHOLD = 0.55;
 
 function applyDeadzone(value) {
   const magnitude = Math.abs(value);
@@ -35,6 +36,45 @@ function applyDeadzone(value) {
   }
 
   return Math.sign(value) * ((magnitude - GAMEPAD_DEADZONE) / (1 - GAMEPAD_DEADZONE));
+}
+
+function isNintendoStyleGamepad(gamepad) {
+  const id = String(gamepad?.id || "").toLowerCase();
+  return (
+    id.includes("nintendo") ||
+    id.includes("switch") ||
+    id.includes("joy-con") ||
+    id.includes("joycon")
+  );
+}
+
+function resolveLogicalFaceButton(gamepad, button) {
+  if (!isNintendoStyleGamepad(gamepad)) {
+    return button;
+  }
+
+  if (button === GAMEPAD_BUTTONS.X) {
+    return GAMEPAD_BUTTONS.Y;
+  }
+
+  if (button === GAMEPAD_BUTTONS.Y) {
+    return GAMEPAD_BUTTONS.X;
+  }
+
+  return button;
+}
+
+function isLogicalGamepadButtonPressed(gamepad, button) {
+  const resolvedButton = resolveLogicalFaceButton(gamepad, button);
+  const buttonState = gamepad?.buttons?.[resolvedButton];
+  return Boolean(buttonState?.pressed) ||
+    Number(buttonState?.value || 0) > GAMEPAD_FACE_BUTTON_PRESS_THRESHOLD;
+}
+
+function isGamepadButtonPressed(gamepad, button) {
+  const buttonState = gamepad?.buttons?.[button];
+  return Boolean(buttonState?.pressed) ||
+    Number(buttonState?.value || 0) > GAMEPAD_FACE_BUTTON_PRESS_THRESHOLD;
 }
 
 export function createGameInputController({
@@ -79,10 +119,13 @@ export function createGameInputController({
   let gamepadPokedexButtonPressed = false;
   let gamepadSettingsButtonPressed = false;
   let gamepadBagButtonPressed = false;
+  let gamepadDestroyActionButtonPressed = false;
   let gamepadFollowerCallButtonPressed = false;
   let gamepadSettingsPreviousTabButtonPressed = false;
   let gamepadSettingsNextTabButtonPressed = false;
   let gamepadSettingsNavigateDownButtonPressed = false;
+  let gamepadSettingsNavigateLeftAxisPressed = false;
+  let gamepadSettingsNavigateRightAxisPressed = false;
   let gamepadSettingsNavigateUpAxisPressed = false;
   let gamepadSettingsNavigateDownAxisPressed = false;
   let gamepadDialogueNavigateLeftAxisPressed = false;
@@ -95,6 +138,7 @@ export function createGameInputController({
   let cameraZoomCycleRequests = 0;
   let jumpRequests = 0;
   let placementRotationRequests = 0;
+  let destroyActionRequests = 0;
 
   function createPrimaryButtonEvent() {
     return {
@@ -162,6 +206,18 @@ export function createGameInputController({
     };
   }
 
+  function createSettingsHorizontalButtonEvent(direction) {
+    const code = direction < 0 ? "ArrowLeft" : "ArrowRight";
+
+    return {
+      code,
+      key: code,
+      repeat: false,
+      target: null,
+      preventDefault() {}
+    };
+  }
+
   function createSettingsTabButtonEvent(direction) {
     const code = direction < 0 ? "PageUp" : "PageDown";
 
@@ -204,6 +260,10 @@ export function createGameInputController({
 
   function isBagKey(event) {
     return event.code === GAME_INPUT_BINDINGS.bag.keyboardCode;
+  }
+
+  function isDestroyActionKey(event) {
+    return event.code === GAME_INPUT_BINDINGS.destroyAction.keyboardCode;
   }
 
   function isFollowerCallKey(event) {
@@ -321,10 +381,19 @@ export function createGameInputController({
       return;
     }
 
+    if (isDestroyActionKey(event) && !typingTarget && !builderPanelOpen) {
+      if (!event.repeat) {
+        destroyActionRequests += 1;
+      }
+      event.preventDefault();
+      return;
+    }
+
     if (builderPanelOpen) {
       if (!typingTarget && (
         event.code === GAME_INPUT_BINDINGS.primaryAction.keyboardCode ||
         isBagKey(event) ||
+        isDestroyActionKey(event) ||
         isFollowerCallKey(event) ||
         isJumpKey(event) ||
         event.code === "KeyE" ||
@@ -504,10 +573,12 @@ export function createGameInputController({
     let pokedexButtonPressed = false;
     let settingsButtonPressed = false;
     let bagButtonPressed = false;
+    let destroyActionButtonPressed = false;
     let followerCallButtonPressed = false;
     let settingsPreviousTabButtonPressed = false;
     let settingsNextTabButtonPressed = false;
     let settingsNavigateDownButtonPressed = false;
+    let settingsNavigateAxisX = 0;
     let settingsNavigateAxisY = 0;
     let dialogueNavigateAxisX = 0;
     let dialogueNavigateAxisY = 0;
@@ -528,10 +599,13 @@ export function createGameInputController({
       gamepadPokedexButtonPressed = false;
       gamepadSettingsButtonPressed = false;
       gamepadBagButtonPressed = false;
+      gamepadDestroyActionButtonPressed = false;
       gamepadFollowerCallButtonPressed = false;
       gamepadSettingsPreviousTabButtonPressed = false;
       gamepadSettingsNextTabButtonPressed = false;
       gamepadSettingsNavigateDownButtonPressed = false;
+      gamepadSettingsNavigateLeftAxisPressed = false;
+      gamepadSettingsNavigateRightAxisPressed = false;
       gamepadSettingsNavigateUpAxisPressed = false;
       gamepadSettingsNavigateDownAxisPressed = false;
       gamepadDialogueNavigateLeftAxisPressed = false;
@@ -549,7 +623,7 @@ export function createGameInputController({
       }
 
       actionButtonPressed = actionButtonPressed ||
-        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.primaryAction.gamepadButton]?.pressed);
+        isGamepadButtonPressed(gamepad, GAME_INPUT_BINDINGS.primaryAction.gamepadButton);
       runButtonPressed = runButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.run.gamepadButton]?.pressed);
       jumpButtonPressed = jumpButtonPressed ||
@@ -568,7 +642,9 @@ export function createGameInputController({
           Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.settings.gamepadButton]?.pressed);
       }
       bagButtonPressed = bagButtonPressed ||
-        Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.bag.gamepadButton]?.pressed);
+        isLogicalGamepadButtonPressed(gamepad, GAME_INPUT_BINDINGS.bag.gamepadButton);
+      destroyActionButtonPressed = destroyActionButtonPressed ||
+        isLogicalGamepadButtonPressed(gamepad, GAME_INPUT_BINDINGS.destroyAction.gamepadButton);
       followerCallButtonPressed = followerCallButtonPressed ||
         Boolean(gamepad.buttons?.[GAME_INPUT_BINDINGS.followerCall.gamepadButton]?.pressed);
       settingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed ||
@@ -592,6 +668,9 @@ export function createGameInputController({
       const lookY = applyDeadzone(Number(gamepad.axes?.[3] || 0));
 
       if (settingsOpen) {
+        if (Math.abs(moveX) > Math.abs(settingsNavigateAxisX)) {
+          settingsNavigateAxisX = moveX;
+        }
         if (Math.abs(moveY) > Math.abs(settingsNavigateAxisY)) {
           settingsNavigateAxisY = moveY;
         }
@@ -652,6 +731,7 @@ export function createGameInputController({
       gamepadPokedexButtonPressed = pokedexButtonPressed;
       gamepadSettingsButtonPressed = settingsButtonPressed;
       gamepadBagButtonPressed = bagButtonPressed;
+      gamepadDestroyActionButtonPressed = destroyActionButtonPressed;
       gamepadFollowerCallButtonPressed = followerCallButtonPressed;
       gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
       gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
@@ -669,6 +749,10 @@ export function createGameInputController({
     }
 
     if (settingsOpen) {
+      const settingsNavigateLeftAxisPressed =
+        settingsNavigateAxisX <= -GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD;
+      const settingsNavigateRightAxisPressed =
+        settingsNavigateAxisX >= GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD;
       const settingsNavigateUpAxisPressed =
         settingsNavigateAxisY <= -GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD;
       const settingsNavigateDownAxisPressed =
@@ -689,6 +773,32 @@ export function createGameInputController({
 
       if (settingsNextTabButtonPressed && !gamepadSettingsNextTabButtonPressed) {
         handleSettingsKeydown(createSettingsTabButtonEvent(1));
+      }
+
+      if (
+        (
+          previousMoveButtonPressed &&
+          !gamepadPreviousMoveButtonPressed
+        ) ||
+        (
+          settingsNavigateLeftAxisPressed &&
+          !gamepadSettingsNavigateLeftAxisPressed
+        )
+      ) {
+        handleSettingsKeydown(createSettingsHorizontalButtonEvent(-1));
+      }
+
+      if (
+        (
+          nextMoveButtonPressed &&
+          !gamepadNextMoveButtonPressed
+        ) ||
+        (
+          settingsNavigateRightAxisPressed &&
+          !gamepadSettingsNavigateRightAxisPressed
+        )
+      ) {
+        handleSettingsKeydown(createSettingsHorizontalButtonEvent(1));
       }
 
       if (
@@ -725,10 +835,13 @@ export function createGameInputController({
       gamepadPokedexButtonPressed = pokedexButtonPressed;
       gamepadSettingsButtonPressed = settingsButtonPressed;
       gamepadBagButtonPressed = bagButtonPressed;
+      gamepadDestroyActionButtonPressed = destroyActionButtonPressed;
       gamepadFollowerCallButtonPressed = followerCallButtonPressed;
       gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
       gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
       gamepadSettingsNavigateDownButtonPressed = settingsNavigateDownButtonPressed;
+      gamepadSettingsNavigateLeftAxisPressed = settingsNavigateLeftAxisPressed;
+      gamepadSettingsNavigateRightAxisPressed = settingsNavigateRightAxisPressed;
       gamepadSettingsNavigateUpAxisPressed = settingsNavigateUpAxisPressed;
       gamepadSettingsNavigateDownAxisPressed = settingsNavigateDownAxisPressed;
       gamepadDialogueNavigateLeftAxisPressed = false;
@@ -824,6 +937,7 @@ export function createGameInputController({
       gamepadPokedexButtonPressed = pokedexButtonPressed;
       gamepadSettingsButtonPressed = settingsButtonPressed;
       gamepadBagButtonPressed = bagButtonPressed;
+      gamepadDestroyActionButtonPressed = destroyActionButtonPressed;
       gamepadFollowerCallButtonPressed = followerCallButtonPressed;
       gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
       gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
@@ -970,6 +1084,18 @@ export function createGameInputController({
     gamepadBagButtonPressed = bagButtonPressed;
 
     if (
+      destroyActionButtonPressed &&
+      !gamepadDestroyActionButtonPressed &&
+      !isPokedexOpen() &&
+      !sceneDirector.blocksGameplayInput() &&
+      !isBuilderPanelOpen()
+    ) {
+      destroyActionRequests += 1;
+    }
+
+    gamepadDestroyActionButtonPressed = destroyActionButtonPressed;
+
+    if (
       followerCallButtonPressed &&
       !gamepadFollowerCallButtonPressed &&
       !isPokedexOpen() &&
@@ -1024,6 +1150,15 @@ export function createGameInputController({
     return requests;
   }
 
+  function consumeDestroyActionRequest() {
+    if (destroyActionRequests <= 0) {
+      return false;
+    }
+
+    destroyActionRequests -= 1;
+    return true;
+  }
+
   function consumeCameraLookDelta() {
     const consumed = {
       yaw: cameraLookDelta.yaw,
@@ -1066,6 +1201,7 @@ export function createGameInputController({
     consumeCameraZoomCycleRequest,
     consumeJumpRequest,
     consumePlacementRotationRequest,
+    consumeDestroyActionRequest,
     getAnalogMovement,
     isRunActive,
     isPrimaryActionActive

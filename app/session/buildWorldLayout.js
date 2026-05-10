@@ -2,6 +2,7 @@ import {
   buildGroundFlowerPatches,
   buildGroundGrassPatches,
   buildGroundGridInstances,
+  createGroundGridConfigFromInstances,
   GROUND_TILE_INSTANCE_SCALE,
   partitionColdGroundInstances
 } from "../../groundGrid.js";
@@ -237,6 +238,7 @@ export function buildWorldLayout(session, assets) {
     tileFootprint: groundTileFootprint,
     tileHeight: groundDeadModel.size[1]
   });
+  session.buildGridConfig = createGroundGridConfigFromInstances(groundGridInstances);
   const partitionedGround = partitionColdGroundInstances(groundGridInstances, {
     coldCoverageRatio: COLD_GROUND_PLANET_COVERAGE_RATIO,
     coverageZones: [{

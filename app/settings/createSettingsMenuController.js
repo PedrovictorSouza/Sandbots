@@ -272,6 +272,7 @@ export function createSettingsMenuController({
   const tabButtons = new Map();
   const groupPanels = new Map();
   const groupButtons = new Map();
+  const activeSettingIds = new Map();
 
   function syncOpenState() {
     if (root) {
@@ -469,6 +470,127 @@ export function createSettingsMenuController({
     focusElement(tabButtons.get(tabId));
   }
 
+  function getSchemaGroup(groupId) {
+    return schema.find((group) => group.id === groupId) || null;
+  }
+
+  function getSchemaSetting(groupId, settingId) {
+    return getSchemaGroup(groupId)?.settings?.find((setting) => setting.id === settingId) || null;
+  }
+
+  function getGroupControls(groupId = activeGroupId) {
+    const panel = groupPanels.get(groupId);
+    if (!panel) {
+      return [];
+    }
+
+    return [...panel.querySelectorAll("[data-settings-control]")];
+  }
+
+  function parseControlId(controlId = "") {
+    const [groupId, settingId] = String(controlId).split(".");
+    return { groupId, settingId };
+  }
+
+  function focusSettingControl(groupId = activeGroupId, settingId = null) {
+    const controls = getGroupControls(groupId);
+    if (!controls.length) {
+      return false;
+    }
+
+    const targetSettingId = settingId || activeSettingIds.get(groupId);
+    const control = controls.find((candidate) => {
+      return parseControlId(candidate.dataset.settingsControl).settingId === targetSettingId;
+    }) || controls[0];
+    const parsed = parseControlId(control.dataset.settingsControl);
+    activeSettingIds.set(parsed.groupId, parsed.settingId);
+    focusElement(control);
+    return true;
+  }
+
+  function getFocusedSettingControl() {
+    const activeElement = documentRef.activeElement;
+    if (!activeElement || !root?.contains(activeElement)) {
+      return null;
+    }
+
+    if (activeElement.matches?.("[data-settings-control]")) {
+      return activeElement;
+    }
+
+    return null;
+  }
+
+  function moveFocusedSetting(direction) {
+    const focusedControl = getFocusedSettingControl();
+    if (!focusedControl) {
+      return false;
+    }
+
+    const { groupId } = parseControlId(focusedControl.dataset.settingsControl);
+    const controls = getGroupControls(groupId);
+    const currentIndex = Math.max(0, controls.indexOf(focusedControl));
+    const nextControl = controls[(currentIndex + direction + controls.length) % controls.length];
+    if (!nextControl) {
+      return false;
+    }
+
+    const parsed = parseControlId(nextControl.dataset.settingsControl);
+    activeSettingIds.set(parsed.groupId, parsed.settingId);
+    focusElement(nextControl);
+    return true;
+  }
+
+  function getRangeControlForAdjustment() {
+    const focusedControl = getFocusedSettingControl();
+    if (focusedControl?.type === "range") {
+      return focusedControl;
+    }
+
+    focusSettingControl(activeGroupId);
+    const activeControl = getFocusedSettingControl();
+    return activeControl?.type === "range" ? activeControl : null;
+  }
+
+  function countStepDecimals(step) {
+    const stepText = String(step);
+    const dotIndex = stepText.indexOf(".");
+    return dotIndex === -1 ? 0 : stepText.length - dotIndex - 1;
+  }
+
+  function adjustFocusedRange(direction) {
+    const control = getRangeControlForAdjustment();
+    if (!control) {
+      return false;
+    }
+
+    const { groupId, settingId } = parseControlId(control.dataset.settingsControl);
+    const setting = getSchemaSetting(groupId, settingId);
+    if (!setting || setting.type !== "range") {
+      return false;
+    }
+
+    const min = Number(setting.min ?? control.min ?? 0);
+    const max = Number(setting.max ?? control.max ?? 1);
+    const step = Math.max(0.001, Number(setting.step ?? control.step ?? 0.01));
+    const currentSourceValue =
+      control.value !== "" ?
+        control.value :
+        (settingsState[groupId]?.[settingId] ?? setting.defaultValue ?? 0);
+    const currentValue = Number(currentSourceValue);
+    const rawValue = Math.max(min, Math.min(max, currentValue + (step * direction)));
+    const precision = countStepDecimals(step);
+    const nextValue = Number(rawValue.toFixed(precision));
+    const valueElement = control.closest?.(".settings-menu__setting")?.querySelector?.(".settings-menu__setting-value");
+
+    control.value = String(nextValue);
+    commitSettingValue(groupId, settingId, nextValue);
+    if (valueElement) {
+      valueElement.textContent = formatSettingValue(nextValue);
+    }
+    return true;
+  }
+
   function setActiveTab(tabId, { focus = false } = {}) {
     if (!MENU_TABS.includes(tabId)) {
       return false;
@@ -551,6 +673,11 @@ export function createSettingsMenuController({
     const activeElement = documentRef.activeElement;
     if (!activeElement || !root?.contains(activeElement) || typeof activeElement.click !== "function") {
       return false;
+    }
+
+    const focusedGroupId = activeElement.dataset?.settingsGroupButton;
+    if (focusedGroupId && focusedGroupId === activeGroupId && focusSettingControl(focusedGroupId)) {
+      return true;
     }
 
     activeElement.click();
@@ -895,8 +1022,17 @@ export function createSettingsMenuController({
       return true;
     }
 
+    if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
+      adjustFocusedRange(event.code === "ArrowLeft" ? -1 : 1);
+      event.preventDefault?.();
+      return true;
+    }
+
     if (event.code === "ArrowUp" || event.code === "ArrowDown") {
-      moveActiveItem(event.code === "ArrowUp" ? -1 : 1);
+      const direction = event.code === "ArrowUp" ? -1 : 1;
+      if (!moveFocusedSetting(direction)) {
+        moveActiveItem(direction);
+      }
       event.preventDefault?.();
       return true;
     }

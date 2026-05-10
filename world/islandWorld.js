@@ -18,6 +18,7 @@ import { createSpatialHashIndex } from "./spatialHash.js";
 
 const WOOD_DROP_HEIGHT = 0.78;
 const WOOD_PICKUP_RADIUS = 0.64;
+const WOOD_DROP_RESPAWN_DURATION = 28;
 const LEAF_DROP_HEIGHT = 0.66;
 const LEAF_PICKUP_RADIUS = 0.64;
 const LEPPA_DROP_HEIGHT = 0.72;
@@ -477,6 +478,8 @@ export function collectWoodDrops(playerPosition, woodDrops, inventory) {
     }
 
     woodDrop.collected = true;
+    woodDrop.respawnDuration = Number(woodDrop.respawnDuration || WOOD_DROP_RESPAWN_DURATION);
+    woodDrop.cooldown = woodDrop.respawnDuration;
     inventory.wood += 1;
     collectedThisFrame += 1;
   }
@@ -963,22 +966,48 @@ function isActiveRustlingPatch(groundGrassPatch, storyState) {
   });
 }
 
-function getInstantiatedObjectLabel(groundGrassPatch) {
-  if (groundGrassPatch?.state !== "alive") {
-    return "Dry Grass";
-  }
-
-  if (
+function isFlowerLandscapePatch(groundGrassPatch) {
+  return (
+    groundGrassPatch?.id?.startsWith?.("flower-") ||
     groundGrassPatch?.id?.startsWith?.("leafage-flower-") ||
-    groundGrassPatch?.habitatGroupId === "leafage-flower-bed-habitat-0"
+    String(groundGrassPatch?.habitatGroupId || "").includes("flower")
+  );
+}
+
+function isPlayerInstantiatedLandscapePatch(groundGrassPatch) {
+  return (
+    groundGrassPatch?.source === "leafage" ||
+    groundGrassPatch?.id?.startsWith?.("leafage-")
+  );
+}
+
+function canDestroyWorldNature(storyState) {
+  return Boolean(
+    storyState?.flags?.bulbasaurRevealed ||
+    storyState?.flags?.bulbasaurFollowing
+  );
+}
+
+function getInstantiatedObjectLabel(groundGrassPatch) {
+  if (
+    groundGrassPatch?.state === "alive" &&
+    isFlowerLandscapePatch(groundGrassPatch)
   ) {
     return "Flower";
+  }
+
+  if (groundGrassPatch?.state !== "alive") {
+    return "Dry Grass";
   }
 
   return groundGrassPatch?.leafageObjectId === "garden1" ? "Garden-1" : "Tall Grass";
 }
 
-function isDestroyableLandscapePatch(groundGrassPatch, storyState) {
+function isDestroyableLandscapePatch(
+  groundGrassPatch,
+  storyState,
+  { includeRestoredGrass = false } = {}
+) {
   if (
     !groundGrassPatch ||
     !Array.isArray(groundGrassPatch.position) ||
@@ -987,23 +1016,37 @@ function isDestroyableLandscapePatch(groundGrassPatch, storyState) {
     return false;
   }
 
-  return groundGrassPatch.state !== "alive" || groundGrassPatch.source === "leafage";
+  if (isPlayerInstantiatedLandscapePatch(groundGrassPatch)) {
+    return true;
+  }
+
+  if (!canDestroyWorldNature(storyState)) {
+    return false;
+  }
+
+  return (
+    includeRestoredGrass ||
+    groundGrassPatch.state !== "alive" ||
+    isFlowerLandscapePatch(groundGrassPatch)
+  );
 }
 
-function findNearbyInstantiatedObject(
+export function findNearbyDestroyableInstantiatedObject(
   playerPosition,
   groundGrassPatches,
   storyState,
-  groundFlowerPatches = []
+  groundFlowerPatches = [],
+  { includeRestoredGrass = true } = {}
 ) {
   let nearest = null;
+  let nearestPatch = null;
   let nearestDistance = Infinity;
 
   for (const groundGrassPatch of [
     ...(groundGrassPatches || []),
     ...(groundFlowerPatches || [])
   ]) {
-    if (!isDestroyableLandscapePatch(groundGrassPatch, storyState)) {
+    if (!isDestroyableLandscapePatch(groundGrassPatch, storyState, { includeRestoredGrass })) {
       continue;
     }
 
@@ -1017,7 +1060,12 @@ function findNearbyInstantiatedObject(
     ) * 0.5;
     const interactDistance = INSTANTIATED_OBJECT_INTERACT_DISTANCE + sizeReach;
 
-    if (distance <= interactDistance && distance < nearestDistance) {
+    const shouldPreferFlowerTie =
+      Math.abs(distance - nearestDistance) <= 0.001 &&
+      isFlowerLandscapePatch(groundGrassPatch) &&
+      !isFlowerLandscapePatch(nearestPatch);
+
+    if (distance <= interactDistance && (distance < nearestDistance || shouldPreferFlowerTie)) {
       nearest = {
         kind: "site",
         id: groundGrassPatch.id,
@@ -1025,6 +1073,7 @@ function findNearbyInstantiatedObject(
         action: "destroyInstantiatedObject",
         cellId: groundGrassPatch.cellId
       };
+      nearestPatch = groundGrassPatch;
       nearestDistance = distance;
     }
   }
@@ -1052,13 +1101,21 @@ export function isResourceNodeActive(resourceNode, storyState) {
 }
 
 export function updateResourceNodes(deltaTime, resourceNodes) {
-  for (const resourceNode of resourceNodes) {
-    if (resourceNode.cooldown <= 0) {
+  for (const resourceNode of resourceNodes || []) {
+    const currentCooldown = Number(resourceNode.cooldown || 0);
+
+    if (currentCooldown <= 0) {
       resourceNode.cooldown = 0;
+      if (resourceNode.collected && Number(resourceNode.respawnDuration || 0) > 0) {
+        resourceNode.collected = false;
+      }
       continue;
     }
 
-    resourceNode.cooldown = Math.max(0, resourceNode.cooldown - deltaTime);
+    resourceNode.cooldown = Math.max(0, currentCooldown - deltaTime);
+    if (resourceNode.cooldown <= 0 && resourceNode.collected) {
+      resourceNode.collected = false;
+    }
   }
 }
 
@@ -1420,11 +1477,12 @@ export function findNearbyInteractable(
     nearestDistance = nearbyLeafDen.distance;
   }
 
-  const nearbyInstantiatedObject = findNearbyInstantiatedObject(
+  const nearbyInstantiatedObject = findNearbyDestroyableInstantiatedObject(
     playerPosition,
     groundGrassPatches,
     storyState,
-    groundFlowerPatches
+    groundFlowerPatches,
+    { includeRestoredGrass: false }
   );
   if (nearbyInstantiatedObject && nearbyInstantiatedObject.distance < nearestDistance) {
     nearest = nearbyInstantiatedObject.target;
@@ -1641,7 +1699,7 @@ export function buildNearbyPrompt({
     const actionLabel = quest?.actionLabel === "Destroy" ?
       quest.actionLabel :
       (interactTarget.target.actionLabel || "Cut");
-    return `${interactPromptPrefix} ${interactTarget.target.label} • ${actionLabel}`;
+    return `[Y] ${interactTarget.target.label} • ${actionLabel}`;
   }
 
   if (interactTarget?.target?.kind === "logChairSeat") {

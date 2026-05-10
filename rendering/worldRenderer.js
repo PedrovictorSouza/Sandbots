@@ -36,6 +36,9 @@ export function createWorldRenderer({
   const GROUND_HIGHLIGHT_MARKED_SCALE = 0.98;
   const GROUND_HIGHLIGHT_ACTION_PULSE_SCALE = 1.12;
   const GROUND_HIGHLIGHT_ACTION_PULSE_SCALE_RANGE = 0.46;
+  const SPRITE_DRAW_DISTANCE_FROM_CAMERA_TARGET = 72;
+  const RESOURCE_MARKER_DRAW_DISTANCE_FROM_CAMERA_TARGET = 34;
+  const WORLD_MARKER_DRAW_DISTANCE_FROM_CAMERA_TARGET = 46;
   const worldCurvatureOrigin = new Float32Array(3);
   const worldRenderTopology = createWrappedWorldTopology({
     id: "small-island-render-wrap",
@@ -390,7 +393,28 @@ export function createWorldRenderer({
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, spriteQuadIndices);
   }
 
+  function getSpriteCullingTarget() {
+    return camera.getPose?.()?.target || spritePassCameraTarget;
+  }
+
+  function shouldDrawWorldSprite(position, drawDistance = SPRITE_DRAW_DISTANCE_FROM_CAMERA_TARGET) {
+    const cameraTarget = getSpriteCullingTarget();
+
+    if (!(drawDistance > 0) || !Array.isArray(cameraTarget) || !Array.isArray(position)) {
+      return true;
+    }
+
+    return worldRenderTopology.getPlanarDistanceSquared(
+      position,
+      cameraTarget
+    ) <= drawDistance * drawDistance;
+  }
+
   function drawSpriteQuad(texture, position, size, uvRect, { alpha = 1, rotation = 0 } = {}) {
+    if (!shouldDrawWorldSprite(position)) {
+      return false;
+    }
+
     const renderPosition = worldRenderTopology.getRenderPosition(
       position,
       spritePassCameraTarget,
@@ -405,6 +429,7 @@ export function createWorldRenderer({
     gl.uniform1f(spriteUniforms.spriteRotation, rotation || 0);
     gl.uniform1f(spriteUniforms.spriteAlpha, alpha ?? 1);
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+    return true;
   }
 
   function drawSpriteBillboards(viewProjection, billboards) {
@@ -539,6 +564,10 @@ export function createWorldRenderer({
         }
 
         const position = npcActor.character.getPosition();
+        if (!shouldDrawWorldSprite(position, WORLD_MARKER_DRAW_DISTANCE_FROM_CAMERA_TARGET)) {
+          continue;
+        }
+
         markers.push({
           id: npcActor.id,
           texture,
@@ -555,6 +584,10 @@ export function createWorldRenderer({
 
         const texture = markerTextures[interactable.markerKey];
         if (!texture) {
+          continue;
+        }
+
+        if (!shouldDrawWorldSprite(interactable.position, WORLD_MARKER_DRAW_DISTANCE_FROM_CAMERA_TARGET)) {
           continue;
         }
 
@@ -578,6 +611,10 @@ export function createWorldRenderer({
 
         const texture = markerTextures[resourceNode.markerKey];
         if (!texture) {
+          continue;
+        }
+
+        if (!shouldDrawWorldSprite(resourceNode.position, RESOURCE_MARKER_DRAW_DISTANCE_FROM_CAMERA_TARGET)) {
           continue;
         }
 

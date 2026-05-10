@@ -11,6 +11,7 @@ import {
   collectLeafResourceNodes,
   collectLeppaBerryDrops,
   dropLeppaBerryFromTree,
+  findNearbyDestroyableInstantiatedObject,
   findNearbyInteractable,
   findNearbyLeafDen,
   findNearbyLogChair,
@@ -1041,7 +1042,7 @@ describe("findNearbyInteractable", () => {
     expect(collectLeafResourceNodes(
       [1.1, 0, 1.05],
       resourceNodes,
-      { flags: {} },
+      { flags: { bulbasaurRevealed: true } },
       inventory
     )).toBe(2);
     expect(inventory[LEAVES_ITEM_ID]).toBe(2);
@@ -1119,7 +1120,7 @@ describe("findNearbyInteractable", () => {
           activeWhen: () => true
         }
       ],
-      { flags: {} }
+      { flags: { bulbasaurRevealed: true } }
     )).toEqual({
       target: {
         kind: "site",
@@ -1487,7 +1488,7 @@ describe("findNearbyInteractable", () => {
       [1.15, 0, 0.2],
       [],
       [],
-      { flags: {} },
+      { flags: { bulbasaurRevealed: true } },
       [
         {
           id: "leafage-grass-ground-1",
@@ -1517,7 +1518,25 @@ describe("findNearbyInteractable", () => {
         title: "Any quest",
         actionLabel: "Destroy"
       }
-    })).toBe("[E / X] Garden-1 • Destroy");
+    })).toBe("[Y] Garden-1 • Destroy");
+  });
+
+  it("does not detect world dry grass as destroyable before Bulbasaur is unlocked", () => {
+    const result = findNearbyDestroyableInstantiatedObject(
+      [1.15, 0, 0.2],
+      [
+        {
+          id: "dry-grass-ground-1",
+          cellId: "ground-1",
+          state: "dead",
+          position: [1, 0.02, 0],
+          size: [1.18, 0.96]
+        }
+      ],
+      { flags: {} }
+    );
+
+    expect(result).toBeNull();
   });
 
   it("detects a nearby Leafage-instantiated flower as destroyable", () => {
@@ -1525,7 +1544,7 @@ describe("findNearbyInteractable", () => {
       [1.15, 0, 0.2],
       [],
       [],
-      { flags: {} },
+      { flags: { bulbasaurRevealed: true } },
       [],
       null,
       null,
@@ -1556,6 +1575,120 @@ describe("findNearbyInteractable", () => {
       },
       distance: expect.any(Number)
     });
+  });
+
+  it("detects a nearby restored flower as destroyable with Y", () => {
+    const result = findNearbyInteractable(
+      [1.15, 0, 0.2],
+      [],
+      [],
+      { flags: { bulbasaurRevealed: true } },
+      [],
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      [
+        {
+          id: "flower-ground-1",
+          cellId: "ground-1",
+          habitatGroupId: "water-gun-flower-field-0",
+          state: "alive",
+          position: [1, 0.02, 0],
+          size: [1.12, 1.12]
+        }
+      ]
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "site",
+        id: "flower-ground-1",
+        label: "Flower",
+        action: "destroyInstantiatedObject",
+        cellId: "ground-1"
+      },
+      distance: expect.any(Number)
+    });
+    expect(buildNearbyPrompt({
+      interactTarget: result,
+      quest: {
+        title: "Any quest",
+        actionLabel: "Destroy"
+      }
+    })).toBe("[Y] Flower • Destroy");
+  });
+
+  it("detects nearby restored green grass as destroyable with Y", () => {
+    const result = findNearbyDestroyableInstantiatedObject(
+      [1.15, 0, 0.2],
+      [
+        {
+          id: "grass-ground-1",
+          cellId: "ground-1",
+          state: "alive",
+          position: [1, 0.02, 0],
+          size: [1.18, 0.96]
+        }
+      ],
+      { flags: { bulbasaurRevealed: true } }
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "site",
+        id: "grass-ground-1",
+        label: "Tall Grass",
+        action: "destroyInstantiatedObject",
+        cellId: "ground-1"
+      },
+      distance: expect.any(Number)
+    });
+    expect(buildNearbyPrompt({
+      interactTarget: result,
+      quest: {
+        title: "Any quest",
+        actionLabel: "Destroy"
+      }
+    })).toBe("[Y] Tall Grass • Destroy");
+  });
+
+  it("detects nearby dry grass as destroyable with Y", () => {
+    const result = findNearbyInteractable(
+      [1.15, 0, 0.2],
+      [],
+      [],
+      { flags: { bulbasaurRevealed: true } },
+      [
+        {
+          id: "dry-grass-ground-1",
+          cellId: "ground-1",
+          state: "dead",
+          position: [1, 0.02, 0],
+          size: [1.18, 0.96]
+        }
+      ]
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "site",
+        id: "dry-grass-ground-1",
+        label: "Dry Grass",
+        action: "destroyInstantiatedObject",
+        cellId: "ground-1"
+      },
+      distance: expect.any(Number)
+    });
+    expect(buildNearbyPrompt({
+      interactTarget: result,
+      quest: {
+        title: "Any quest",
+        actionLabel: "Destroy"
+      }
+    })).toBe("[Y] Dry Grass • Destroy");
   });
 
   it("describes the Leafage grow action in the nearby prompt", () => {

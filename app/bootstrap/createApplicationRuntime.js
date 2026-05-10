@@ -106,6 +106,7 @@ import {
   hasConfirmedPlayerName
 } from "../player/playerProfile.js";
 import { createEngineRuntime } from "../runtime/createEngineRuntime.js";
+import { createAudioMixRuntime, resolveAudioMix } from "../runtime/audioMixRuntime.js";
 import { createDialogueCameraController } from "../runtime/dialogueCameraController.js";
 import { createGameAppController } from "../runtime/gameAppController.js";
 import { shouldGamepadSourceHarvestTarget } from "../runtime/gamepadHarvestPolicy.js";
@@ -147,6 +148,7 @@ import {
   createGridSystem,
   migrateLegacyPlaceablesToGridRecords
 } from "../gameplay/gridBuildingSystem.js";
+import { createWorkbenchRecipeMap } from "../gameplay/buildableCatalog.js";
 
 const RESOURCE_HARVEST_PROMPT = "Enter action";
 const INTERACT_PROMPT = "E talk";
@@ -165,6 +167,9 @@ const DEFAULT_GRID_PLACEMENT_SAVE_CONFIG = Object.freeze({
   visualOffsetY: 0.03
 });
 const DEFAULT_GRID_PLACEMENT_DATABASE = createDefaultPlacementDatabase();
+const WORKBENCH_RECIPES = createWorkbenchRecipeMap({
+  placeholderRecipes: PLACEHOLDER_RECIPES
+});
 const FLOWER_FIELD_COMPLETION_SPARK_BUDGET = 420;
 const FLOWER_FIELD_COMPLETION_MIN_SPARKS_PER_PATCH = 4;
 const FLOWER_FIELD_COMPLETION_MAX_SPARKS_PER_PATCH = 8;
@@ -272,6 +277,7 @@ const SQUIRTLE_DRY_GRASS_FOCUS_LINE_INDEX = 3;
 const SQUIRTLE_DRY_GRASS_CAMERA_FOCUS_HEIGHT = 1.12;
 const LEAF_DEN_KIT_LIFE_COIN_COST = 10;
 const WORKBENCH_OBJECT_ROTATE_DISTANCE = 3.2;
+const WORKBENCH_OBJECT_ROTATE_TRIGGER_TILE_MARGIN = 1.425;
 const SOLAR_STATION_ROTATION_FOOTPRINT = [2.2, 2.2];
 const TRAIN_HOUSE_ROTATION_FOOTPRINT = [1.7, 1.45];
 const HOUSE_KIT_ROTATION_FOOTPRINT = [1.95, 1.45];
@@ -496,8 +502,10 @@ export function cloneSavedGridPlacement(gridPlacement) {
   };
 }
 
-export function createLegacyGridPlacementSaveData(placeables) {
-  const gridConfig = cloneGridPlacementConfig(DEFAULT_GRID_PLACEMENT_SAVE_CONFIG);
+export function createLegacyGridPlacementSaveData(placeables, {
+  gridConfig: sourceGridConfig = DEFAULT_GRID_PLACEMENT_SAVE_CONFIG
+} = {}) {
+  const gridConfig = cloneGridPlacementConfig(sourceGridConfig);
   const gridSystem = createGridSystem(gridConfig);
   const placedObjects = migrateLegacyPlaceablesToGridRecords({
     placeables,
@@ -597,7 +605,9 @@ function cloneSessionGridPlacement(session) {
     return savedGridPlacement;
   }
 
-  const legacyGridPlacement = createLegacyGridPlacementSaveData(cloneSessionPlaceables(session));
+  const legacyGridPlacement = createLegacyGridPlacementSaveData(cloneSessionPlaceables(session), {
+    gridConfig: session?.buildGridConfig || DEFAULT_GRID_PLACEMENT_SAVE_CONFIG
+  });
   return legacyGridPlacement.placedObjects.length ? legacyGridPlacement : null;
 }
 
@@ -1492,9 +1502,16 @@ export function createAutosaveIndicator({ documentRef, mount, windowRef }) {
 export function createBotTradeSfxPlayer({
   windowRef,
   src = BOT_TRADE_SFX_URL,
-  volume = BOT_TRADE_SFX_VOLUME
+  volume = BOT_TRADE_SFX_VOLUME,
+  volumeScale = () => 1
 } = {}) {
   let audio = null;
+
+  function getEffectiveVolume() {
+    const scale = typeof volumeScale === "function" ? volumeScale() : volumeScale;
+    const numericScale = Number(scale);
+    return Math.max(0, Math.min(1, volume * (Number.isFinite(numericScale) ? numericScale : 1)));
+  }
 
   function getAudio() {
     if (audio || typeof windowRef?.Audio !== "function") {
@@ -1503,7 +1520,7 @@ export function createBotTradeSfxPlayer({
 
     audio = new windowRef.Audio(src);
     audio.preload = "auto";
-    audio.volume = volume;
+    audio.volume = getEffectiveVolume();
     return audio;
   }
 
@@ -1513,7 +1530,7 @@ export function createBotTradeSfxPlayer({
       return false;
     }
 
-    sfx.volume = volume;
+    sfx.volume = getEffectiveVolume();
     try {
       sfx.currentTime = 0;
     } catch {
@@ -1614,11 +1631,13 @@ export function createApplicationRuntime({
   const inventory = createInitialInventory();
   const storyState = createStoryState();
   const settingsState = loadSettingsState(windowRef.localStorage, SETTINGS_SCHEMA);
+  const initialAudioMix = resolveAudioMix(settingsState);
   const musicRuntime = createMusicRuntime({
     tracks: {
       [MUSIC_TRACK_IDS.MAIN_THEME]: MAIN_THEME_MUSIC_URL,
       [MUSIC_TRACK_IDS.MAIN_THEME_B]: MAIN_THEME_B_MUSIC_URL
     },
+    initialVolume: initialAudioMix.music,
     audioFactory: (src) => {
       if (typeof windowRef.Audio !== "function") {
         return null;
@@ -1628,6 +1647,7 @@ export function createApplicationRuntime({
     }
   });
   const planetAmbientRuntime = createPlanetAmbientRuntime({
+    initialVolume: initialAudioMix.ambience,
     audioFactory: (src) => {
       if (typeof windowRef.Audio !== "function") {
         return null;
@@ -1636,6 +1656,11 @@ export function createApplicationRuntime({
       return new windowRef.Audio(src);
     }
   });
+  const audioMixRuntime = createAudioMixRuntime({
+    settingsState,
+    musicRuntime,
+    planetAmbientRuntime
+  });
   planetAmbientRuntime.start({
     intensity: PLANET_AMBIENT_INTENSITY.OPENING
   });
@@ -1643,7 +1668,10 @@ export function createApplicationRuntime({
     intensity: PLANET_AMBIENT_INTENSITY.OPENING
   });
   musicRuntime.startOnFirstGesture(windowRef);
-  const botTradeSfxPlayer = createBotTradeSfxPlayer({ windowRef });
+  const botTradeSfxPlayer = createBotTradeSfxPlayer({
+    windowRef,
+    volumeScale: () => audioMixRuntime.getSfxVolumeScale()
+  });
   const playerMemory = createPlayerProfileState();
   const playerSkills = {
     transform: false,
@@ -1811,12 +1839,16 @@ export function createApplicationRuntime({
   }
 
   function startStrawBedPlacementPreview(placementTarget) {
+    const gridConfig = gameSession?.buildGridConfig ?
+      cloneGridPlacementConfig(gameSession.buildGridConfig) :
+      null;
     gameSession.strawBedPlacementPreview = {
       active: true,
       position: [...placementTarget.center],
       snappedPosition: [...placementTarget.center],
       bounds: clonePlacementBounds(placementTarget.bounds),
-      gridStep: Number(placementTarget.gridStep) || 1.425,
+      gridConfig,
+      gridStep: Number(gridConfig?.cellSize || placementTarget.gridStep) || 1.425,
       habitatGroupId: placementTarget.habitatGroupId || null,
       yaw: 0,
       valid: true,
@@ -1864,12 +1896,17 @@ export function createApplicationRuntime({
 
   function startLeafDenKitPlacementPreview(playerPosition) {
     const placement = buildLeafDenKitPlacement(playerPosition);
+    const gridConfig = gameSession?.buildGridConfig ?
+      cloneGridPlacementConfig(gameSession.buildGridConfig) :
+      null;
     gameSession.leafDenKitPlacementPreview = {
       active: true,
       position: [...placement.position],
       snappedPosition: [...placement.position],
       size: [...placement.size],
       uvRect: [...placement.uvRect],
+      gridConfig,
+      gridStep: Number(gridConfig?.cellSize) || 1.425,
       yaw: 0,
       valid: true,
       readyForConfirm: false
@@ -3115,6 +3152,14 @@ export function createApplicationRuntime({
     return Math.hypot(dx, dz);
   }
 
+  function getWorkbenchRotationTriggerDistance() {
+    const cellSize = Number(gameSession?.buildGridConfig?.cellSize);
+    const tileMargin = Number.isFinite(cellSize) && cellSize > 0 ?
+      cellSize :
+      WORKBENCH_OBJECT_ROTATE_TRIGGER_TILE_MARGIN;
+    return WORKBENCH_OBJECT_ROTATE_DISTANCE + tileMargin;
+  }
+
   function isPlayerNearRotatableWorkbenchPlacement(playerPosition) {
     if (!Array.isArray(playerPosition)) {
       return false;
@@ -3166,7 +3211,7 @@ export function createApplicationRuntime({
         candidate.placement,
         candidate.fallbackSize,
         candidate.sizeOverride
-      ) <= WORKBENCH_OBJECT_ROTATE_DISTANCE;
+      ) <= getWorkbenchRotationTriggerDistance();
     });
   }
 
@@ -3940,6 +3985,7 @@ export function createApplicationRuntime({
     itemDefs: ITEM_DEFS,
     storyState,
     onChange: () => {
+      audioMixRuntime.updateFromSettings(settingsState);
       saveSettingsState(windowRef.localStorage, settingsState);
     },
     onClose: clearGameFlowInput,
@@ -4136,6 +4182,7 @@ export function createApplicationRuntime({
   } = createGameplayInteractions({
     npcProfiles: NPC_PROFILES,
     placeholderRecipes: PLACEHOLDER_RECIPES,
+    workbenchRecipes: WORKBENCH_RECIPES,
     startDialogue({ targetId, dialogueId, onComplete }) {
       const restoreCameraOnComplete = () => {
         onComplete?.();
@@ -5208,6 +5255,9 @@ export function createApplicationRuntime({
           interactRequested = false;
           return true;
         },
+        consumeDestroyActionRequest() {
+          return gameInput.consumeDestroyActionRequest();
+        },
         consumeFollowerCallRequest() {
           if (!followerCallRequested) {
             return false;
@@ -5359,6 +5409,7 @@ export function createApplicationRuntime({
         syncLeppaTreeState,
         updatePalmShake,
         updateResourceNodes,
+        audioMixRuntime,
         musicRuntime
       },
       hud: {

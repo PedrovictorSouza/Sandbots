@@ -22,9 +22,11 @@ import {
   collectLeppaBerryDrops,
   dropLeppaBerryFromTree,
   getLeppaTreeSurroundingGroundCells,
+  findNearbyDestroyableInstantiatedObject,
   findNearbyLeafDen,
   reviveLeppaTreeFromWateredTiles
 } from "./islandWorld.js";
+import { createWorkbenchRecipeMap } from "../app/gameplay/buildableCatalog.js";
 
 const BULBASAUR_RUSTLING_GRASS_RESTORE_COUNT = 4;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
@@ -38,18 +40,6 @@ const LEAFAGE_OBJECT_ID_FLOWER = "flower";
 const BOULDER_SHADED_TALL_GRASS_GROUP_ID = "boulder-shaded-tall-grass-habitat-0";
 const LEAFAGE_GROUND_CELL_INTERACT_RADIUS_FACTOR = 0.82;
 const LEPPA_TREE_WATER_HINT_DISTANCE = 2.85;
-const HOUSE_WORKBENCH_RECIPE = Object.freeze({
-  id: "leafDenKit",
-  title: "House",
-  stationId: "workbench",
-  ingredients: Object.freeze({
-    wood: 20
-  }),
-  output: Object.freeze({
-    [LEAF_DEN_KIT_ITEM_ID]: 1
-  }),
-  note: "A construction kit for a proper Pokemon home."
-});
 export const CHARMANDER_FIRE_USES_PER_CARBON = 10;
 export const CHARMANDER_FIRE_CARBON_USES_FLAG = "charmanderFireCarbonUses";
 export const MAX_ACTIVE_POKEMON_FOLLOWERS = 5;
@@ -142,7 +132,8 @@ function recordCharmanderFireCarbonUse({ storyState, inventory, syncInventoryUi 
 
 export function createGameplayInteractions({
   npcProfiles,
-  placeholderRecipes,
+  placeholderRecipes = {},
+  workbenchRecipes = createWorkbenchRecipeMap({ placeholderRecipes }),
   startDialogue = null,
   unlockPlayerAbility = () => {},
   unlockPokedexReward = () => {},
@@ -334,6 +325,96 @@ export function createGameplayInteractions({
     return hasGrassPatchForGroundCell(groundCell, groundGrassPatches) ||
       canWaterGunRestoreEmptyGround(storyState) ||
       isLeppaTreeWateringGroundCell(groundCell, leppaTree, storyState);
+  }
+
+  function findNearbyWaterGunPatchGroundCell({
+    playerPosition,
+    groundDeadInstances = [],
+    groundPurifiedInstances = [],
+    groundGrassPatches = [],
+    storyState,
+    leppaTree = null
+  }) {
+    if (!Array.isArray(playerPosition)) {
+      return null;
+    }
+
+    const groundCellById = new Map(
+      [
+        ...(groundDeadInstances || []),
+        ...(groundPurifiedInstances || [])
+      ]
+        .filter((groundCell) => typeof groundCell?.id === "string")
+        .map((groundCell) => [groundCell.id, groundCell])
+    );
+    let nearest = null;
+    let nearestDistance = Infinity;
+
+    for (const patch of groundGrassPatches || []) {
+      const groundCell = groundCellById.get(patch?.cellId);
+      if (
+        !groundCell ||
+        groundCell.active === false ||
+        groundCell.purifiable === false ||
+        !canWaterGunTargetGroundCell(groundCell, groundGrassPatches, storyState, leppaTree)
+      ) {
+        continue;
+      }
+
+      const targetPosition = Array.isArray(patch?.position) ? patch.position : groundCell.offset;
+      if (!Array.isArray(targetPosition)) {
+        continue;
+      }
+
+      const dx = playerPosition[0] - targetPosition[0];
+      const dz = playerPosition[2] - targetPosition[2];
+      const distance = Math.hypot(dx, dz);
+      const tileReach = (groundCell.tileSpan || 0) * LEAFAGE_GROUND_CELL_INTERACT_RADIUS_FACTOR;
+      const patchReach = Math.max(Number(patch?.size?.[0]) || 0, Number(patch?.size?.[1]) || 0) * 0.28;
+      const interactDistance = tileReach + patchReach;
+
+      if (distance <= interactDistance && distance < nearestDistance) {
+        nearest = {
+          groundCell,
+          distance
+        };
+        nearestDistance = distance;
+      }
+    }
+
+    return nearest;
+  }
+
+  function findNearbyWaterGunGroundCell({
+    playerPosition,
+    groundDeadInstances = [],
+    groundPurifiedInstances = [],
+    groundGrassPatches = [],
+    storyState,
+    leppaTree = null
+  }) {
+    const nearbyGroundCell = findNearbyGroundCell(playerPosition, groundDeadInstances);
+
+    if (
+      nearbyGroundCell?.groundCell &&
+      canWaterGunTargetGroundCell(
+        nearbyGroundCell.groundCell,
+        groundGrassPatches,
+        storyState,
+        leppaTree
+      )
+    ) {
+      return nearbyGroundCell;
+    }
+
+    return findNearbyWaterGunPatchGroundCell({
+      playerPosition,
+      groundDeadInstances,
+      groundPurifiedInstances,
+      groundGrassPatches,
+      storyState,
+      leppaTree
+    });
   }
 
   function findNearbyFireGroundCell(playerPosition, iceGroundInstances = []) {
@@ -683,28 +764,61 @@ export function createGameplayInteractions({
     };
   }
 
-  function findDestroyableInstantiatedPatchIndex(target, patches = []) {
+  function isDestroyableInstantiatedPatch(patch) {
+    return Boolean(patch);
+  }
+
+  function isFlowerInstantiatedPatch(patch) {
+    return (
+      patch?.id?.startsWith?.("flower-") ||
+      patch?.id?.startsWith?.("leafage-flower-") ||
+      String(patch?.habitatGroupId || "").includes("flower")
+    );
+  }
+
+  function findDestroyableInstantiatedPatchIndex(target, patches = [], { matchCellId = true } = {}) {
+    const isDestroyablePatch = (patch) => {
+      return isDestroyableInstantiatedPatch(patch);
+    };
+
+    const exactIdIndex = patches.findIndex((patch) => {
+      return isDestroyablePatch(patch) && patch.id === target.id;
+    });
+
+    if (exactIdIndex >= 0) {
+      return exactIdIndex;
+    }
+
     return patches.findIndex((patch) => {
-      return (
-        (
-          patch?.source === "leafage" ||
-          patch?.state !== "alive"
-        ) &&
-        (
-          patch.id === target.id ||
-          (target.cellId && patch.cellId === target.cellId)
-        )
-      );
+      return matchCellId && isDestroyablePatch(patch) && target.cellId && patch.cellId === target.cellId;
     });
   }
 
   function destroyInstantiatedObjectPatch(target, groundGrassPatches, groundFlowerPatches, storyState) {
-    let patchCollection = groundGrassPatches;
-    let patchIndex = findDestroyableInstantiatedPatchIndex(target, patchCollection);
+    const collections = [groundGrassPatches, groundFlowerPatches];
+    let patchCollection = null;
+    let patchIndex = -1;
+
+    for (const collection of collections) {
+      const exactIndex = findDestroyableInstantiatedPatchIndex(target, collection, {
+        matchCellId: false
+      });
+      if (exactIndex >= 0) {
+        patchCollection = collection;
+        patchIndex = exactIndex;
+        break;
+      }
+    }
 
     if (patchIndex < 0) {
-      patchCollection = groundFlowerPatches;
-      patchIndex = findDestroyableInstantiatedPatchIndex(target, patchCollection);
+      for (const collection of collections) {
+        const cellIndex = findDestroyableInstantiatedPatchIndex(target, collection);
+        if (cellIndex >= 0) {
+          patchCollection = collection;
+          patchIndex = cellIndex;
+          break;
+        }
+      }
     }
 
     if (patchIndex < 0) {
@@ -730,7 +844,7 @@ export function createGameplayInteractions({
     pushNotice(
       patch.state !== "alive" ?
         "Dry Grass cut." :
-        patch.habitatGroupId === LEAFAGE_FLOWER_GROUP_ID ?
+        isFlowerInstantiatedPatch(patch) ?
         "Flower destroyed." :
         patch.leafageObjectId === LEAFAGE_OBJECT_ID_GARDEN_1 ?
         "Garden-1 destroyed." :
@@ -837,7 +951,7 @@ export function createGameplayInteractions({
   }
 
   function craftCampfireAtWorkbench({ storyState, inventory } = {}) {
-    const campfireRecipe = placeholderRecipes.campfire;
+    const campfireRecipe = workbenchRecipes.campfire;
 
     if (!storyState?.flags || !inventory || !campfireRecipe) {
       return false;
@@ -868,7 +982,7 @@ export function createGameplayInteractions({
   }
 
   function craftStrawBedAtWorkbench({ storyState, inventory } = {}) {
-    const strawBedRecipe = placeholderRecipes.strawBed;
+    const strawBedRecipe = workbenchRecipes.strawBed;
 
     if (!storyState?.flags || !inventory || !strawBedRecipe) {
       return false;
@@ -899,7 +1013,13 @@ export function createGameplayInteractions({
   }
 
   function craftLeafDenKitAtWorkbench({ storyState, inventory } = {}) {
+    const houseRecipe = workbenchRecipes[LEAF_DEN_KIT_ITEM_ID];
+
     if (!storyState?.flags || !inventory) {
+      return false;
+    }
+
+    if (!houseRecipe) {
       return false;
     }
 
@@ -908,13 +1028,13 @@ export function createGameplayInteractions({
       return false;
     }
 
-    if (!hasItems(inventory, HOUSE_WORKBENCH_RECIPE.ingredients)) {
-      pushNotice(`Missing: ${formatRequirementSummary(HOUSE_WORKBENCH_RECIPE.ingredients, inventory)}`);
+    if (!hasItems(inventory, houseRecipe.ingredients)) {
+      pushNotice(`Missing: ${formatRequirementSummary(houseRecipe.ingredients, inventory)}`);
       return false;
     }
 
-    consumeItems(inventory, HOUSE_WORKBENCH_RECIPE.ingredients);
-    addItems(inventory, HOUSE_WORKBENCH_RECIPE.output);
+    consumeItems(inventory, houseRecipe.ingredients);
+    addItems(inventory, houseRecipe.output);
     storyState.flags.leafDenKitPurchased = true;
     storyState.flags.leafDenBuildAvailable = true;
     storyState.flags.leafDenKitSelected = true;
@@ -937,31 +1057,33 @@ export function createGameplayInteractions({
     const flags = storyState?.flags || {};
     const recipeOptions = [];
 
-    if (placeholderRecipes.campfire) {
+    if (workbenchRecipes.campfire) {
       const campfireUnlocked = Boolean(flags.workbenchDiyRecipesReceived);
       recipeOptions.push({
-        recipe: placeholderRecipes.campfire,
+        recipe: workbenchRecipes.campfire,
         disabled: Boolean(flags.campfireCrafted || !campfireUnlocked),
         status: flags.campfireCrafted ?
           "Created" :
           campfireUnlocked ?
             null :
-            getLockedRecipeStatus(placeholderRecipes.campfire, inventory)
+            getLockedRecipeStatus(workbenchRecipes.campfire, inventory)
       });
     }
 
-    if (placeholderRecipes.strawBed) {
+    if (workbenchRecipes.strawBed) {
       const strawBedUnlocked = Boolean(flags.strawBedRecipeUnlocked);
       recipeOptions.push({
-        recipe: placeholderRecipes.strawBed,
+        recipe: workbenchRecipes.strawBed,
         disabled: Boolean(flags.strawBedCrafted || !strawBedUnlocked),
         status: flags.strawBedCrafted ?
           "Created" :
           strawBedUnlocked ?
             null :
-            getLockedRecipeStatus(placeholderRecipes.strawBed, inventory)
+            getLockedRecipeStatus(workbenchRecipes.strawBed, inventory)
       });
     }
+
+    const houseRecipe = workbenchRecipes[LEAF_DEN_KIT_ITEM_ID];
 
     const houseCreated = Boolean(
       flags.leafDenKitPurchased ||
@@ -975,15 +1097,17 @@ export function createGameplayInteractions({
       flags.leafDenBuildAvailable
     );
 
-    recipeOptions.push({
-      recipe: HOUSE_WORKBENCH_RECIPE,
-      disabled: Boolean(!houseUnlocked),
-      status: houseCreated ?
-        `Needs ${formatRequirementSummary(HOUSE_WORKBENCH_RECIPE.ingredients, inventory)}` :
-        houseUnlocked ?
-          null :
-          "Locked"
-    });
+    if (houseRecipe) {
+      recipeOptions.push({
+        recipe: houseRecipe,
+        disabled: Boolean(!houseUnlocked),
+        status: houseCreated ?
+          `Needs ${formatRequirementSummary(houseRecipe.ingredients, inventory)}` :
+          houseUnlocked ?
+            null :
+            "Locked"
+      });
+    }
 
     return recipeOptions;
   }
@@ -1497,21 +1621,23 @@ export function createGameplayInteractions({
       return nearestTarget;
     }
 
-    const nearbyGroundCell = findNearbyGroundCell(playerPosition, groundDeadInstances);
+    const nearbyGroundCell = findNearbyWaterGunGroundCell({
+      playerPosition,
+      groundDeadInstances,
+      groundPurifiedInstances,
+      groundGrassPatches,
+      storyState,
+      leppaTree
+    });
     if (!nearbyGroundCell) {
       return nearestTarget;
     }
 
-    if (!canWaterGunTargetGroundCell(
-      nearbyGroundCell.groundCell,
-      groundGrassPatches,
-      storyState,
-      leppaTree
-    )) {
-      return nearestTarget;
-    }
-
-    if (!nearestTarget || nearbyGroundCell.distance < nearestTarget.distance) {
+    if (
+      !nearestTarget ||
+      nearestTarget.resourceNode ||
+      nearbyGroundCell.distance < nearestTarget.distance
+    ) {
       return nearbyGroundCell;
     }
 
@@ -1533,6 +1659,7 @@ export function createGameplayInteractions({
     timburrEncounter = null,
     charmanderEncounter = null,
     bulbasaurEncounter = null,
+    allowDestroyInstantiatedObject = false,
     onNpcInteractionStart = () => {}
   }) {
     const getInteractionTargetPosition = (target) => {
@@ -1595,6 +1722,27 @@ export function createGameplayInteractions({
       onNpcInteractionStart(interactionStartEvent);
     };
 
+    if (allowDestroyInstantiatedObject) {
+      const nearbyDestroyableObject = findNearbyDestroyableInstantiatedObject(
+        playerPosition,
+        groundGrassPatches,
+        storyState,
+        groundFlowerPatches
+      );
+
+      if (!nearbyDestroyableObject?.target) {
+        pushNotice("Nothing to destroy here.");
+        return false;
+      }
+
+      return destroyInstantiatedObjectPatch(
+        nearbyDestroyableObject.target,
+        groundGrassPatches,
+        groundFlowerPatches,
+        storyState
+      );
+    }
+
     if (canPlaceCraftedCampfire(storyState, inventory)) {
       missedInteractAttempts = 0;
       onCampfireSpitOutRequested({
@@ -1614,7 +1762,8 @@ export function createGameplayInteractions({
       timburrEncounter,
       charmanderEncounter,
       leppaTree,
-      bulbasaurEncounter
+      bulbasaurEncounter,
+      groundFlowerPatches
     );
     if (!nearbyTarget?.target) {
       if (isLeppaTreeWaterHintAvailable(playerPosition, leppaTree, storyState)) {
@@ -1765,6 +1914,11 @@ export function createGameplayInteractions({
     }
 
     if (target.action === "destroyInstantiatedObject") {
+      if (!allowDestroyInstantiatedObject) {
+        pushNotice("Press Y to destroy this object.");
+        return false;
+      }
+
       return destroyInstantiatedObjectPatch(
         target,
         groundGrassPatches,
@@ -2149,7 +2303,8 @@ export function createGameplayInteractions({
         return false;
       }
 
-      const purified = purifyGroundCell(
+      const alreadyPurified = groundPurifiedInstances.includes(nearbyHarvestTarget.groundCell);
+      const purified = alreadyPurified || purifyGroundCell(
         nearbyHarvestTarget.groundCell,
         groundDeadInstances,
         groundPurifiedInstances

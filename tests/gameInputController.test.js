@@ -65,10 +65,13 @@ function createKeyboardEvent(code) {
   };
 }
 
-function createGamepad() {
+function createGamepad(overrides = {}) {
   return {
+    id: "",
+    mapping: "standard",
     buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })),
-    axes: [0, 0, 0, 0]
+    axes: [0, 0, 0, 0],
+    ...overrides
   };
 }
 
@@ -682,6 +685,108 @@ describe("createGameInputController", () => {
     controller.updateGamepads(1 / 60);
 
     expect(requestHarvest).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests primary harvest from Xbox left trigger when only analog value is reported", () => {
+    const gamepad = createGamepad({
+      id: "Xbox Wireless Controller"
+    });
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const { controller, requestHarvest } = createController({ windowRef });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.LT] = { pressed: false, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+
+    expect(requestHarvest).toHaveBeenCalledTimes(1);
+    expect(requestHarvest).toHaveBeenCalledWith({ source: "gamepadPrimary" });
+    expect(controller.isPrimaryActionActive()).toBe(true);
+  });
+
+  it("requests destroy action from keyboard Y", () => {
+    const { controller } = createController();
+    const event = createKeyboardEvent("KeyY");
+
+    controller.handleKeydown(event);
+
+    expect(controller.consumeDestroyActionRequest()).toBe(true);
+    expect(controller.consumeDestroyActionRequest()).toBe(false);
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests destroy action from gamepad Y once per press", () => {
+    const gamepad = createGamepad();
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const { controller } = createController({ windowRef });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.Y] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+    controller.updateGamepads(1 / 60);
+
+    expect(controller.consumeDestroyActionRequest()).toBe(true);
+    expect(controller.consumeDestroyActionRequest()).toBe(false);
+  });
+
+  it("requests destroy action from Xbox Series Y when the browser reports only button value", () => {
+    const gamepad = createGamepad({
+      id: "Xbox Wireless Controller"
+    });
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const { controller } = createController({ windowRef });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.Y] = { pressed: false, value: 1 };
+    controller.updateGamepads(1 / 60);
+
+    expect(controller.consumeDestroyActionRequest()).toBe(true);
+    expect(controller.consumeDestroyActionRequest()).toBe(false);
+  });
+
+  it("maps Nintendo-style physical Y to destroy action", () => {
+    const gamepad = createGamepad({
+      id: "Nintendo Switch Pro Controller"
+    });
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const { controller, inspectBag } = createController({ windowRef });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.X] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+
+    expect(controller.consumeDestroyActionRequest()).toBe(true);
+    expect(inspectBag).not.toHaveBeenCalled();
+  });
+
+  it("maps Nintendo-style physical X to bag action", () => {
+    const gamepad = createGamepad({
+      id: "Nintendo Switch Pro Controller"
+    });
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const { controller, inspectBag } = createController({ windowRef });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.Y] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+
+    expect(inspectBag).toHaveBeenCalledTimes(1);
+    expect(controller.consumeDestroyActionRequest()).toBe(false);
   });
 
   it("uses the right trigger for camera zoom instead of field moves", () => {
