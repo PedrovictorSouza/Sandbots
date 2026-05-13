@@ -271,6 +271,10 @@ const ROBOT_REPAIR_BOX_OPEN_BACKSTEP = 0.28;
 const BULBASAUR_REVEAL_BOX_DURATION = 1.15;
 const BULBASAUR_REVEAL_VISIBLE_PROGRESS = 0.56;
 const BULBASAUR_REVEAL_FLASH_PEAK_OPACITY = 0.86;
+const BULBASAUR_REPAIR_BOX_RUSTLE_ROLL = 0.11;
+const BULBASAUR_REPAIR_BOX_RUSTLE_PITCH = 0.08;
+const BULBASAUR_REPAIR_BOX_RUSTLE_YAW = 0.12;
+const BULBASAUR_REPAIR_BOX_RUSTLE_LIFT = 0.08;
 const REPAIR_BOX_PROMPT_DISTANCE = 2.8;
 const REPAIR_BOX_ACTIVE_TINT = Object.freeze([0.38, 1.72, 0.42]);
 const REPAIR_BOX_ACTIVE_TINT_STRENGTH = 0.68;
@@ -3001,6 +3005,32 @@ export function startGameLoop({
     instance.active = Boolean(active);
   }
 
+  function applyBulbasaurRepairBoxRustle(encounter) {
+    const instance = encounter?.repairModuleInstance;
+    const rustle = encounter?.repairBoxRustle;
+
+    if (!instance || !rustle?.active) {
+      return;
+    }
+
+    const duration = Math.max(0.001, Number(rustle.duration || 1));
+    const elapsed = Math.max(0, Number(rustle.elapsed || 0));
+    const progress = clamp01(elapsed / duration);
+    const envelope = Math.sin(progress * Math.PI);
+    const bounce = Math.abs(Math.sin(elapsed * 32));
+    const twist = Math.sin(elapsed * 46);
+    const counterTwist = Math.sin(elapsed * 39 + Math.PI * 0.35);
+
+    instance.offset = [
+      instance.offset[0] + twist * envelope * 0.055,
+      instance.offset[1] + bounce * envelope * BULBASAUR_REPAIR_BOX_RUSTLE_LIFT,
+      instance.offset[2] + counterTwist * envelope * 0.045
+    ];
+    instance.roll += twist * envelope * BULBASAUR_REPAIR_BOX_RUSTLE_ROLL;
+    instance.pitch += counterTwist * envelope * BULBASAUR_REPAIR_BOX_RUSTLE_PITCH;
+    instance.yaw += Math.sin(elapsed * 52) * envelope * BULBASAUR_REPAIR_BOX_RUSTLE_YAW;
+  }
+
   function syncDismantledEncounterModule(encounter) {
     if (!encounter?.repairModuleInstance) {
       return;
@@ -3019,6 +3049,7 @@ export function startGameLoop({
       !hideBoxAfterReveal && (openingProgress > 0 || !encounter.visible),
       { openingProgress }
     );
+    applyBulbasaurRepairBoxRustle(encounter);
   }
 
   function syncBulbasaurModelInstance() {
@@ -3328,6 +3359,7 @@ export function startGameLoop({
 
     if (
       !rustlingGrassCellId ||
+      !flags.chopperBulbasaurRepairBoxIntroComplete ||
       flags.bulbasaurRevealed ||
       !session.bulbasaurEncounter?.repairModuleInstance?.active
     ) {
@@ -6127,6 +6159,21 @@ export function startGameLoop({
     }
   }
 
+  function updateBulbasaurRepairBoxRustle(deltaTime) {
+    const rustle = session.bulbasaurEncounter?.repairBoxRustle;
+
+    if (!rustle?.active) {
+      return;
+    }
+
+    const duration = Math.max(0.001, Number(rustle.duration || 1));
+    rustle.elapsed = Math.min(duration, Number(rustle.elapsed || 0) + deltaTime);
+
+    if (rustle.elapsed >= duration) {
+      rustle.active = false;
+    }
+  }
+
   function updateBulbasaurEncounter(deltaTime) {
     const encounter = session.bulbasaurEncounter;
 
@@ -7506,6 +7553,7 @@ export function startGameLoop({
       guidePosition: RUINED_POKEMON_CENTER_GUIDE_POSITION,
       investigationTarget: chopperBulbasaurRepairBoxInvestigationTarget
     });
+    updateBulbasaurRepairBoxRustle(deltaTime);
     updateBulbasaurEncounter(deltaTime);
     updateCharmanderEncounter(deltaTime, { activeMoveId });
     updateCharmanderFireAction(deltaTime);

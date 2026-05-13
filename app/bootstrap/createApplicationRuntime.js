@@ -260,6 +260,31 @@ const QUEST_COMPLETION_POP_MESSAGES = Object.freeze({
   "grow-a-home-patch": "YOU GREW A HOME PATCH!",
   "chopper-first-habitat-report": "YOU REPORTED BACK!"
 });
+const CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_LINES = Object.freeze([
+  {
+    speaker: "Chopper",
+    text: "Nice Job, rookie. It's good to see some green around here after so many years."
+  },
+  {
+    speaker: "Chopper",
+    text: "But i don't believe that just the two of you are going to be able to clean up this mess. I don't believe the company only sent one worker here."
+  },
+  {
+    speaker: "Chopper",
+    text: "Okay, the situation here is complicated, but this is just ridiculous. All this time and only you came?"
+  }
+]);
+const CHOPPER_BULBASAUR_REPAIR_BOX_PRE_INTERACTION_LINES = Object.freeze([
+  {
+    speaker: "Chopper",
+    text: "Theses boxes fell from the sky with you, i wonder what is inside..."
+  }
+]);
+const CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_STARTED_FLAG = "chopperBulbasaurRepairBoxIntroStarted";
+const CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_COMPLETE_FLAG = "chopperBulbasaurRepairBoxIntroComplete";
+const BULBASAUR_REPAIR_BOX_INTRO_FOCUS_HEIGHT = 1.12;
+const BULBASAUR_REPAIR_BOX_INTRO_FOCUS_DELAY_MS = 480;
+const BULBASAUR_REPAIR_BOX_INTRO_RUSTLE_DURATION_MS = 1550;
 const CHOPPER_SECOND_TALK_APPROACH_DURATION = 1.05;
 const CHOPPER_SECOND_TALK_STOP_DISTANCE = 1.45;
 const SQUIRTLE_DIALOGUE_MIN_PLAYER_DISTANCE = 1.55;
@@ -2100,15 +2125,147 @@ export function createApplicationRuntime({
     };
   }
 
-  function autoStartBulbasaurLeafageRewardFromTask(activeQuest = null) {
+  function getBulbasaurRepairBoxFocusPosition() {
+    const encounter = gameSession?.bulbasaurEncounter;
+    const repairBoxPosition =
+      encounter?.repairBoxPosition ||
+      encounter?.repairModuleInstance?.baseOffset ||
+      encounter?.repairPosition ||
+      null;
+
+    return Array.isArray(repairBoxPosition) ? [...repairBoxPosition] : null;
+  }
+
+  function focusChopperForBulbasaurRepairBoxIntro() {
+    const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+    const chopperPosition = getChopperNpcPosition();
+
+    if (!playerPosition || !chopperPosition) {
+      return;
+    }
+
+    gameSession?.chopperNpcActor?.npcActor?.character?.faceToward?.(playerPosition);
+    if (gameSession?.chopperNpcActor?.npcActor) {
+      gameSession.chopperNpcActor.npcActor.faceYaw = getYawToward(chopperPosition, playerPosition);
+    }
+    dialogueCamera?.focusNpcConversation({
+      targetId: "tangrowth",
+      playerPosition,
+      npcActors: gameSession?.npcActors || [],
+      interactables: gameSession?.interactables || []
+    });
+  }
+
+  function startBulbasaurRepairBoxRustle() {
+    const encounter = gameSession?.bulbasaurEncounter;
+
+    if (!encounter) {
+      return;
+    }
+
+    encounter.repairBoxRustle = {
+      active: true,
+      elapsed: 0,
+      duration: BULBASAUR_REPAIR_BOX_INTRO_RUSTLE_DURATION_MS / 1000
+    };
+    if (encounter.repairModuleInstance) {
+      encounter.repairModuleInstance.active = true;
+    }
+  }
+
+  function completeBulbasaurRepairBoxIntro() {
+    delete storyState.flags[CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_STARTED_FLAG];
+    storyState.flags[CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_COMPLETE_FLAG] = true;
+    scriptedInteractionActive = false;
+    dialogueCamera?.restoreGameplayCamera();
+    syncQuestPanels();
+    requestAutosave(AUTOSAVE_EVENT.STORY_STEP_ADVANCED, {
+      storyBeatId: "chopper-bulbasaur-repair-box-intro"
+    }, { silent: true });
+  }
+
+  function openBulbasaurRepairBoxPreInteractionDialogue() {
+    focusChopperForBulbasaurRepairBoxIntro();
+    const opened = uiRuntime.gameplayDialogue.openConversation({
+      lines: CHOPPER_BULBASAUR_REPAIR_BOX_PRE_INTERACTION_LINES,
+      onComplete: completeBulbasaurRepairBoxIntro
+    });
+
+    if (!opened) {
+      completeBulbasaurRepairBoxIntro();
+    }
+  }
+
+  function autoStartBulbasaurRepairBoxIntroFromCompletedQuests(completedQuestIds = []) {
     if (
-      activeQuest?.id !== "inspect-rustling-grass" ||
-      storyState.flags.bulbasaurDryGrassRequestTurnedIn
+      !completedQuestIds.includes("water-dry-grass") ||
+      storyState.flags.bulbasaurRevealed ||
+      storyState.flags[CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_STARTED_FLAG] ||
+      storyState.flags[CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_COMPLETE_FLAG]
     ) {
       return false;
     }
 
-    storyBeats?.playDialogue?.(STORY_BEAT_IDS.BULBASAUR_LEAFAGE_REWARD);
+    const repairBoxPosition = getBulbasaurRepairBoxFocusPosition();
+
+    if (!repairBoxPosition) {
+      return false;
+    }
+
+    storyState.flags[CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_STARTED_FLAG] = true;
+    scriptedInteractionActive = true;
+    clearGameFlowInput();
+
+    const openIntroConversation = () => {
+      focusChopperForBulbasaurRepairBoxIntro();
+      return uiRuntime.gameplayDialogue.openConversation({
+        lines: CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_LINES,
+        onComplete() {
+          clearGameFlowInput();
+          windowRef.setTimeout(() => {
+            dialogueCamera?.focusWorldPoint({
+              position: repairBoxPosition,
+              height: BULBASAUR_REPAIR_BOX_INTRO_FOCUS_HEIGHT
+            });
+            windowRef.setTimeout(
+              () => {
+                startBulbasaurRepairBoxRustle();
+                windowRef.setTimeout(
+                  () => {
+                    dialogueCamera?.restoreGameplayCamera();
+                    windowRef.setTimeout(
+                      openBulbasaurRepairBoxPreInteractionDialogue,
+                      BULBASAUR_REPAIR_BOX_INTRO_FOCUS_DELAY_MS
+                    );
+                  },
+                  BULBASAUR_REPAIR_BOX_INTRO_RUSTLE_DURATION_MS
+                );
+              },
+              BULBASAUR_REPAIR_BOX_INTRO_FOCUS_DELAY_MS
+            );
+          }, BULBASAUR_REPAIR_BOX_INTRO_FOCUS_DELAY_MS);
+        }
+      });
+    };
+
+    const chopperActor = gameSession?.chopperNpcActor;
+    const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+    const chopperPosition = getChopperNpcPosition() || playerPosition;
+    const flightStarted = playerPosition && chopperPosition ?
+      startChopperNpcFlight(chopperActor, {
+        targetPosition: buildChopperApproachTarget(playerPosition, chopperPosition),
+        duration: CHOPPER_SECOND_TALK_APPROACH_DURATION,
+        onComplete: openIntroConversation
+      }) :
+      false;
+    const opened = flightStarted || openIntroConversation();
+
+    if (!opened) {
+      scriptedInteractionActive = false;
+      delete storyState.flags[CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_STARTED_FLAG];
+      return false;
+    }
+
     return true;
   }
 
@@ -3460,7 +3617,7 @@ export function createApplicationRuntime({
           buildQuestTransitionNotice(payload.completedQuestIds, activeQuest),
           5.2
         );
-        autoStartBulbasaurLeafageRewardFromTask(activeQuest);
+        autoStartBulbasaurRepairBoxIntroFromCompletedQuests(payload.completedQuestIds);
         requestAutosave(AUTOSAVE_EVENT.TASK_COMPLETED, {
           completedQuestIds: payload.completedQuestIds,
           activeQuestId: activeQuest?.id || null
