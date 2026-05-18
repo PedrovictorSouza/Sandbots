@@ -21,7 +21,7 @@ describe("story quest data", () => {
         bridgeKit: 1
       },
       targetId: "bridge",
-      reward: "Bufo unlocked"
+      reward: "South route signal"
     });
   });
 
@@ -38,7 +38,7 @@ describe("story quest data", () => {
     expect(repairBridgeIndex).toBeLessThan(meetBufoIndex);
     expect(getQuestById("meetBufo")).toMatchObject({
       eyebrow: "Marsh Route",
-      title: "Meet Bufo",
+      title: "Meet the Route Survey Bot",
       body: expect.stringContaining("Cross the repaired route")
     });
   });

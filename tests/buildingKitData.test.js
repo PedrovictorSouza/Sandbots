@@ -67,7 +67,7 @@ describe("building kit data", () => {
     ]);
     expect(getCreatureById("charmander")).toMatchObject({
       id: "charmander",
-      label: "Charmander",
+      label: "Thermal Bot",
       currentHomeId: null,
       idealHabitat: "warm",
       specialties: [
@@ -76,7 +76,7 @@ describe("building kit data", () => {
     });
     expect(getCreatureById("timburr")).toMatchObject({
       id: "timburr",
-      label: "Timburr",
+      label: "Builder Bot",
       currentHomeId: null,
       idealHabitat: "workshop",
       specialties: [

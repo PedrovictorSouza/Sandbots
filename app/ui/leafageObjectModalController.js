@@ -1,3 +1,5 @@
+import { SANDBOTS_ITEM_NAMES } from "../story/sandbotsLexicon.js";
+
 function applyElementStyles(element, styles) {
   Object.assign(element.style, styles);
 }
@@ -51,7 +53,7 @@ export function createLeafageObjectModalController({
 
     root = createElement(documentRef, "section", "leafage-object-modal");
     root.hidden = true;
-    root.setAttribute("aria-label", "Leafage object selector");
+    root.setAttribute("aria-label", `${SANDBOTS_ITEM_NAMES.growTool} object selector`);
     root.setAttribute("role", "dialog");
     applyElementStyles(root, {
       position: "absolute",
@@ -147,7 +149,7 @@ export function createLeafageObjectModalController({
       marginBottom: "14px"
     });
 
-    const title = createElement(documentRef, "strong", "leafage-object-modal__title", "Leafage");
+    const title = createElement(documentRef, "strong", "leafage-object-modal__title", SANDBOTS_ITEM_NAMES.growTool);
     applyElementStyles(title, {
       display: "block",
       color: "#ffffff",

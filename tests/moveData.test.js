@@ -35,6 +35,8 @@ describe("small island move data", () => {
         label: ability.label,
         category: MOVE_CATEGORY.REGULAR,
         status: ability.status,
+        requiredBot: ability.companionName,
+        requiredBotId: ability.companionId,
         requiredPokemon: ability.companionName,
         requiredPokemonId: ability.companionId
       });
@@ -46,23 +48,24 @@ describe("small island move data", () => {
     expect(getSmallIslandMoveById("surf")).toMatchObject({
       category: MOVE_CATEGORY.TRANSFORMATION,
       status: MOVE_STATUS.PLANNED,
+      requiredBot: null,
       requiredPokemon: null
     });
   });
 
   it("formats active move guidance from the shared move definition", () => {
     expect(formatActiveMoveGuidanceByAbilityId("leafage")).toBe(
-      "Leafage: grow tall grass on restored ground."
+      "Bio-Grow: grow tall grass on restored ground."
     );
     expect(formatActiveMoveGuidanceByAbilityId("fire")).toBe(
-      "Fire: burn white ground into dry ground."
+      "Thermal Torch: burn white ground into dry ground."
     );
     expect(formatActiveMoveGuidanceByAbilityId("waterGun")).toBe(
-      "USE LT TO MARK THE GROUND"
+      "Hydro Jet: mark dry ground for Hydro Bot."
     );
     expect(formatActiveMoveGuidanceByAbilityId("waterGun", {
       pendingWaterGunCount: 2
-    })).toBe("Water Gun: Squirtle has 2 tiles queued.");
+    })).toBe("Hydro Jet: Hydro Bot has 2 tiles queued.");
     expect(formatActiveMoveGuidanceByAbilityId("unknown")).toBeNull();
   });
 
@@ -87,40 +90,40 @@ describe("small island move data", () => {
 
     expect(formatActiveMoveGuidanceByAbilityId("waterGun", {
       storyFlags: {}
-    })).toBe("Water Gun: mark dry ground; Squirtle will move over and restore it.");
+    })).toBe("Hydro Jet: mark dry ground; Hydro Bot will move over and restore it.");
     expect(formatActiveMoveGuidanceByAbilityId("waterGun", {
       storyFlags: {
         firstGrassRestored: true
       }
-    })).toBe("USE LT TO MARK THE GROUND");
+    })).toBe("Hydro Jet: mark dry ground for Hydro Bot.");
 
     expect(formatActiveMoveGuidanceByAbilityId("leafage", {
       storyFlags: {}
-    })).toBe("Leafage: use it on restored ground to grow tall grass.");
+    })).toBe("Bio-Grow: use it on restored ground to grow tall grass.");
     expect(formatActiveMoveGuidanceByAbilityId("leafage", {
       storyFlags: {
         leafageTallGrassCount: 1
       }
-    })).toBe("Leafage: grow tall grass on restored ground.");
+    })).toBe("Bio-Grow: grow tall grass on restored ground.");
     expect(formatActiveMoveGuidanceByAbilityId("leafage", {
       storyFlags: {
         leafageTallGrassHabitatCreated: true
       }
-    })).toBe("Leafage: grow tall grass on restored ground.");
+    })).toBe("Bio-Grow: grow tall grass on restored ground.");
   });
 
   it("formats target prompts for current field moves", () => {
     expect(formatMoveTargetPromptByAbilityId("leafage", "ground")).toBe(
-      "[Enter] Use Leafage to grow tall grass"
+      "[Enter] Use Bio-Grow to grow tall grass"
     );
     expect(formatMoveTargetPromptByAbilityId("waterGun", "ground")).toBe(
-      "[Enter] Mark dry ground for Squirtle"
+      "[Enter] Mark dry ground for Hydro Bot"
     );
     expect(formatMoveTargetPromptByAbilityId("waterGun", "ground", {
       pendingWaterGunCount: 3
-    })).toBe("[Enter] Mark dry ground for Squirtle • 3 queued");
+    })).toBe("[Enter] Mark dry ground for Hydro Bot • 3 queued");
     expect(formatMoveTargetPromptByAbilityId("fire", "ground")).toBe(
-      "[Enter] Use Fire on white ground"
+      "[Enter] Use Thermal Torch on white ground"
     );
     expect(formatMoveTargetPromptByAbilityId("leafage", "unknown")).toBeNull();
   });
@@ -128,15 +131,15 @@ describe("small island move data", () => {
   it("documents game design constraints for current playable moves", () => {
     expect(getSmallIslandMoveById("water-gun").design).toEqual({
       benefit: "Restores dry ground, dry plants, and future crop targets.",
-      limit: "Requires a marked valid target and Squirtle travel time.",
-      feedback: "Target prompt, Squirtle movement, restored tile state, and restoration notice.",
+      limit: "Requires a marked valid target and Hydro Bot travel time.",
+      feedback: "Target prompt, Hydro Bot movement, restored tile state, and restoration notice.",
       firstSafeUse: "A nearby dry grass or dry ground patch in the opening field."
     });
     expect(getSmallIslandMoveById("leafage").design).toEqual({
-      benefit: "Creates tall grass patches for habitats and Pokemon gathering.",
+      benefit: "Creates tall grass patches for colony zones and bot gathering.",
       limit: "Only works on restored ground, never on still-dry terrain.",
-      feedback: "Tile outline, Bulbasaur action, tall grass spawn, and habitat rustle.",
-      firstSafeUse: "A restored ground patch created with Water Gun."
+      feedback: "Tile outline, Grow Bot action, tall grass spawn, and habitat rustle.",
+      firstSafeUse: "A restored ground patch created with Hydro Jet."
     });
     expect(getPlayableMoveDesignGaps()).toEqual([]);
     expect(getPlayableMoveDesignGaps([

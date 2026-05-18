@@ -5,7 +5,7 @@ import {
   ACT_TWO_PLAYER_CAMERA_TARGET_HEIGHT,
   ACT_TWO_PLAYER_CAMERA_ZOOM
 } from "../../actTwoSceneConfig.js";
-import { createPokemonCamera } from "../../camera.js";
+import { createSandbotsCamera } from "../camera/gameCamera.js";
 import {
   FULL_UV_RECT,
   NPC_MARKER_OFFSET,
@@ -81,7 +81,7 @@ export function createEngineRuntime({
     skyQuadBuffer,
     skyQuadIndices
   } = createWorldRenderingResources(gl);
-  const camera = createPokemonCamera({
+  const camera = createSandbotsCamera({
     worldCanvas,
     spriteCanvas,
     mount: renderFrameElement || mount,

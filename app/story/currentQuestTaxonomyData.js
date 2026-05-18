@@ -36,7 +36,7 @@ const CURRENT_QUEST_TAXONOMY_BY_ID = deepFreeze({
   },
   "gather-first-supplies": {
     kind: REQUEST_KIND.TUTORIAL,
-    archetype: REQUEST_ARCHETYPE.COLLECTION,
+    archetype: REQUEST_ARCHETYPE.ABILITY_UNLOCK,
     macroBiomeId: MACRO_BIOME_IDS.ASH_WILDS,
     characterArcId: CHARACTER_ARC_IDS.CHOPPER,
     placeholderState: "final",

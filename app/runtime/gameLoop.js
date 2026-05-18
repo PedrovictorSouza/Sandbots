@@ -1,4 +1,7 @@
-import { createFrameSnapshotController } from "./frameSnapshotController.js";
+import {
+  createFrameSnapshotController,
+  setFrameWorldPrompt
+} from "./frameSnapshotController.js";
 import { createCameraZoomPresetController } from "./cameraZoomPresetController.js";
 import { updatePlayerDustParticles } from "../session/playerDustParticles.js";
 import {
@@ -16,7 +19,7 @@ import { getColliderGizmoBillboards } from "../session/colliderGizmos.js";
 import { updateIntroRoomFrame } from "../scenes/introRoom/introRoomSequence.js";
 import { updateChopperNpcActor } from "../session/chopperNpcActor.js";
 import { createGameplayCameraDirector } from "./gameplayCameraDirector.js";
-import { createGameplayOpeningImpactEffect } from "./gameplayOpeningImpactEffect.js";
+import { SOUND_EVENT_IDS } from "./soundEventRuntime.js";
 import {
   appendGameplayOpeningShipBillboards,
   consumeGameplayOpeningShipEvents,
@@ -28,7 +31,9 @@ import {
   LEAVES_ITEM_ID,
   LEPPA_BERRY_ITEM_ID,
   LOG_CHAIR_ITEM_ID,
+  POKEMON_TALK_INTERACT_DISTANCE,
   RUINED_POKEMON_CENTER_GUIDE_POSITION,
+  WORLD_LIMIT,
   WORKBENCH_INTERACT_DISTANCE,
   WORKBENCH_POSITION
 } from "../../gameplayContent.js";
@@ -37,6 +42,7 @@ import {
   buildLogChairPlacement,
   findNearbyDestroyableInstantiatedObject,
   getLeppaTreeSurroundingGroundCells,
+  treeFootprint,
   validateBuildingKitPlacement
 } from "../../world/islandWorld.js";
 import {
@@ -55,6 +61,29 @@ import {
   createPlayerConstructionTerrainColliders,
   isPositionBlockedByTerrainColliders
 } from "../gameplay/placementBlockers.js";
+import {
+  COLONY_FEEDBACK_IDS,
+  getColonyFeedbackPrompt
+} from "../gameplay/colonyFeedbackContracts.js";
+import {
+  resolveInputPrompt,
+  resolvePlacementPreviewPrompt,
+  resolvePlacementReadyPrompt,
+  resolveWorkbenchRotationPrompt,
+  UI_PROMPT_ACTION
+} from "../ui/inputPromptResolver.js";
+import {
+  createCinematicControlState,
+  resetCinematicControlState,
+  setCinematicSkipHoldActive,
+  updateCinematicControlState
+} from "../scene/cinematicControlPolicy.js";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES,
+  SANDBOTS_WORLD_TERMS
+} from "../story/sandbotsLexicon.js";
+import { resolvePsxDistanceFogSettings } from "../rendering/psxDistanceFogConfig.js";
 
 const WATER_DROP_SFX_URL = new URL("../soundFx/water-drop..mp3", import.meta.url).href;
 const PLAYER_DRIVING_SFX_URL = new URL("../soundFx/driving.mp3", import.meta.url).href;
@@ -65,13 +94,16 @@ const INSTANCE_OBJECT_SFX_URL = new URL("../soundFx/instance-object.mp3", import
 const TRAIN_HOUSE_MUSIC_URL = new URL("../soundFx/train-house-music.mp3", import.meta.url).href;
 const FIRE_FLAME_SFX_URL = new URL("../soundFx/fireflame.mp3", import.meta.url).href;
 const TREE_BIRTH_SFX_URL = new URL("../soundFx/tree-birth.mp3", import.meta.url).href;
-const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 1500;
+const GROW_BOT_REVEAL_PLACEHOLDER_SFX_URL = TREE_BIRTH_SFX_URL;
+const GAMEPLAY_OPENING_HUD_REVEAL_DELAY_MS = 600;
 const LOG_CHAIR_PLACEMENT_PREVIEW_ALPHA = 0.42;
+const WORKBENCH_PLACEMENT_PREVIEW_ALPHA = 0.5;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
-const SOLAR_STATION_PLACEMENT_PREVIEW_SPEED = 4.1;
 const SOLAR_STATION_PLACEMENT_PREVIEW_FOOTPRINT = [2.2, 2.2];
-const LEAF_DEN_KIT_PLACEMENT_PREVIEW_SPEED = 4.1;
+const SOLAR_STATION_PLACEMENT_GRID_FOOTPRINT = Object.freeze({ width: 4, height: 4 });
+const SOLAR_STATION_PLACEMENT_FOLLOW_DISTANCE = 2.85;
 const LEAF_DEN_KIT_PLACEMENT_PREVIEW_FOOTPRINT = [1.95, 1.45];
+const LEAF_DEN_KIT_PLACEMENT_GRID_FOOTPRINT = Object.freeze({ width: 3, height: 3 });
 const LEAF_DEN_BUILT_ROTATION_FOOTPRINT = [
   LEAF_DEN_KIT_PLACEMENT_PREVIEW_FOOTPRINT[0] * 2,
   LEAF_DEN_KIT_PLACEMENT_PREVIEW_FOOTPRINT[1] * 2
@@ -93,7 +125,13 @@ const LEAF_DEN_CONSTRUCTION_BAR_WIDTH = 2.5;
 const LEAF_DEN_CONSTRUCTION_BAR_HEIGHT = 0.2;
 const LEAF_DEN_CONSTRUCTION_BAR_Y = 2.55;
 const LEAF_DEN_BUSY_NOTICE = "im busy, boss...";
+const TREE_PLACEMENT_BLOCKER_FOOTPRINT_SCALE = 0.68;
+const DEAD_TREE_PLACEMENT_BLOCKER_FOOTPRINT_SCALE = 1.15;
+const TREE_PLACEMENT_BLOCKER_MIN_SIZE = 0.9;
+const DEAD_TREE_PLACEMENT_BLOCKER_MIN_SIZE = 1.35;
+const LEPPA_TREE_PLACEMENT_BLOCKER_SIZE = [2.35, 2.35];
 const SOLAR_STATION_FIELD_MARKED_TILE_LIMIT = 81;
+const SOLAR_STATION_POWER_RADIUS_MARKED_TILE_LIMIT = 1200;
 const BULBASAUR_WORKBENCH_GUIDE_START = [8.55, 0.02, -5.7];
 const BULBASAUR_WORKBENCH_GUIDE_SPEED = 2.4;
 const BULBASAUR_WORKBENCH_GUIDE_WAYPOINT_DISTANCE = 0.08;
@@ -161,6 +199,7 @@ const INSTANCE_OBJECT_SFX_VOLUME = 0.726;
 const FIELD_MOVE_INVALID_SFX_VOLUME = 0.34;
 const FIRE_FLAME_SFX_VOLUME = 0.78;
 const TREE_BIRTH_SFX_VOLUME = 0.74;
+const GROW_BOT_REVEAL_PLACEHOLDER_SFX_VOLUME = 0.82;
 const WOOD_COLLECT_POP_DURATION = 0.34;
 const WOOD_COLLECT_POP_LIFT = 0.24;
 const WOOD_COLLECT_POP_SCALE = 1.65;
@@ -200,12 +239,12 @@ const CHARMANDER_FIRE_BURST_PARTICLE_COUNT = 16;
 const CHARMANDER_FIRE_BURST_DURATION = 0.84;
 const CHARMANDER_FIRE_BURST_RADIUS = 0.74 * CHARMANDER_FIRE_VISUAL_SCALE;
 const WATER_GUN_FIRST_USE_PROMPT_FLAG = "waterGunFirstUsePromptDismissed";
-const WATER_GUN_FIRST_USE_PROMPT_TEXT = "Press LT to use Squirtle";
-const LEAFAGE_SWITCH_PROMPT_TEXT = "Press LT on dry ground, then ← / → to select Bulbasaur";
+const WATER_GUN_FIRST_USE_PROMPT_TEXT = `Press LT to use ${SANDBOTS_BOT_NAMES.hydro}`;
+const LEAFAGE_SWITCH_PROMPT_TEXT = `Press LT on dry ground, then <- / -> to select ${SANDBOTS_BOT_NAMES.grow}`;
 const SNOWSTORM_FOG_MAX_OPACITY = 0.54;
 const SNOWSTORM_FOG_OPACITY_EASE = 6.2;
 const LEAFAGE_USE_PROMPT_TEXT = "Use LT on green ground";
-const LEAFAGE_INVALID_TARGET_PROMPT_TEXT = "CHOOSE SQUIRTLE TO DRY FIRST";
+const LEAFAGE_INVALID_TARGET_PROMPT_TEXT = `CHOOSE ${SANDBOTS_BOT_NAMES.hydro.toUpperCase()} TO HYDRATE FIRST`;
 const LEAFAGE_INVALID_TARGET_PROMPT_DURATION_MS = 1600;
 const FIRE_INVALID_TARGET_PROMPT_TEXT = "USE FIRE ON WHITE GROUND";
 const FIRE_INVALID_TARGET_PROMPT_DURATION_MS = 1600;
@@ -250,12 +289,12 @@ const BULBASAUR_INTERACTION_GIZMO_DOT_SIZE = 0.16;
 const COMPANION_LOST_HINT_INITIAL_DELAY_MS = 5200;
 const COMPANION_LOST_HINT_REPEAT_MS = 13000;
 const COMPANION_LOST_HINT_DURATION_MS = 3400;
-const SQUIRTLE_WATER_GUN_HINT_TEXT = "Press LT to use Water Gun.";
-const BULBASAUR_SWITCH_TO_SQUIRTLE_HINT_TEXT = "Press Left to change to Squirtle.";
+const SQUIRTLE_WATER_GUN_HINT_TEXT = `Press LT to use ${SANDBOTS_ITEM_NAMES.hydroTool}.`;
+const BULBASAUR_SWITCH_TO_SQUIRTLE_HINT_TEXT = `Press Left to change to ${SANDBOTS_BOT_NAMES.hydro}.`;
 const SQUIRTLE_REASSEMBLY_PART_SCALE = 0.5;
-const SQUIRTLE_MODEL_FACE_YAW_OFFSET = Math.PI;
-const BULBASAUR_MODEL_FACE_YAW_OFFSET = Math.PI;
-const CHARMANDER_MODEL_FACE_YAW_OFFSET = Math.PI;
+const SQUIRTLE_MODEL_FACE_YAW_OFFSET = 0;
+const BULBASAUR_MODEL_FACE_YAW_OFFSET = 0;
+const CHARMANDER_MODEL_FACE_YAW_OFFSET = 0;
 const ROBOT_MODEL_SCALE = 0.5;
 const BULBASAUR_ROBOT_MODEL_SCALE = ROBOT_MODEL_SCALE * 1.3;
 const CHARMANDER_MODEL_SCALE = 0.75;
@@ -268,9 +307,16 @@ const ROBOT_REPAIR_BOX_OPEN_PITCH = Math.PI * 0.58;
 const ROBOT_REPAIR_BOX_OPEN_ROLL = Math.PI * 0.08;
 const ROBOT_REPAIR_BOX_OPEN_LIFT = 0.18;
 const ROBOT_REPAIR_BOX_OPEN_BACKSTEP = 0.28;
-const BULBASAUR_REVEAL_BOX_DURATION = 1.15;
-const BULBASAUR_REVEAL_VISIBLE_PROGRESS = 0.56;
-const BULBASAUR_REVEAL_FLASH_PEAK_OPACITY = 0.86;
+const BULBASAUR_REVEAL_BOX_DURATION = 4.35;
+const BULBASAUR_REVEAL_VISIBLE_PROGRESS = 0.72;
+const BULBASAUR_REVEAL_BOX_OPEN_START_PROGRESS = 0.62;
+const BULBASAUR_REVEAL_BOX_SHAKE_END_PROGRESS = 0.56;
+const BULBASAUR_REVEAL_BOX_SPIN_ACCELERATION = Math.PI * 8.2;
+const BULBASAUR_REVEAL_BOX_RAY_COUNT = 10;
+const BULBASAUR_REVEAL_BOX_RAY_BASE_SIZE = 0.18;
+const BULBASAUR_REVEAL_FLASH_PEAK_OPACITY = 1;
+const BULBASAUR_REVEAL_BOT_FALL_HEIGHT = 1.82;
+const BULBASAUR_REVEAL_BOT_FALL_END_PROGRESS = 0.96;
 const BULBASAUR_REPAIR_BOX_RUSTLE_ROLL = 0.11;
 const BULBASAUR_REPAIR_BOX_RUSTLE_PITCH = 0.08;
 const BULBASAUR_REPAIR_BOX_RUSTLE_YAW = 0.12;
@@ -294,6 +340,10 @@ const GRASS_PLAYER_BEND_OFFSET = 0.14;
 const GRASS_PLAYER_BEND_SWAY = 0.18;
 const GRASS_OBJECT_COLLISION_ALPHA = 0.5;
 const GRASS_OBJECT_COLLISION_BASE_RADIUS = 0.58;
+const NATURE_PATCH_GRASS_MODEL_LOD_DISTANCE = 28;
+const NATURE_PATCH_MODEL_PREPARE_DISTANCE = 48;
+const NATURE_PATCH_BILLBOARD_PREPARE_DISTANCE = 78;
+const PLAYER_CONSTRUCTION_MODEL_PREPARE_DISTANCE = 58;
 const FLOWER_ARRANGEMENT_OFFSETS = Object.freeze([
   [-0.34, -0.24, 0.82],
   [-0.16, 0.08, 0.66],
@@ -421,14 +471,34 @@ function getFlowerArrangementBillboards({
   texture,
   playerPosition,
   revivalScale,
-  now
+  now,
+  target = []
 }) {
+  const billboards = Array.isArray(target) ? target : [];
+
   if (!groundFlowerPatch?.position || !texture) {
-    return [];
+    return billboards;
   }
 
   const [patchX, patchY, patchZ] = groundFlowerPatch.position;
-  const seedHash = getStableHash(`${groundFlowerPatch.cellId || ""}:${groundFlowerPatch.id || ""}`);
+  const seedHash = Number.isFinite(groundFlowerPatch.flowerArrangementSeedHash) ?
+    groundFlowerPatch.flowerArrangementSeedHash :
+    getStableHash(`${groundFlowerPatch.cellId || ""}:${groundFlowerPatch.id || ""}`);
+  groundFlowerPatch.flowerArrangementSeedHash = seedHash;
+  if (
+    !Array.isArray(groundFlowerPatch.flowerArrangementJitters) ||
+    groundFlowerPatch.flowerArrangementJitters.length !== FLOWER_ARRANGEMENT_OFFSETS.length
+  ) {
+    groundFlowerPatch.flowerArrangementJitters = FLOWER_ARRANGEMENT_OFFSETS.map((_, index) => {
+      const jitterHash = getStableHash(`${seedHash}:${index}`);
+      return {
+        jitterX: (((jitterHash % 11) - 5) / 5) * 0.045,
+        jitterZ: ((((jitterHash >> 4) % 11) - 5) / 5) * 0.045,
+        phase: (seedHash % 97) * 0.09 + index * 1.47
+      };
+    });
+  }
+
   const playerDeltaX = Array.isArray(playerPosition) ? patchX - playerPosition[0] : 0;
   const playerDeltaZ = Array.isArray(playerPosition) ? patchZ - playerPosition[2] : 0;
   const playerDistance = Array.isArray(playerPosition) ?
@@ -441,28 +511,30 @@ function getFlowerArrangementBillboards({
     1 - playerDistance / FLOWER_PLAYER_REACT_RADIUS
   );
   const playerReactStrength = playerReact * playerReact;
+  const baseSizeX = Number(groundFlowerPatch.size?.[0]) || 1;
+  const baseSizeY = Number(groundFlowerPatch.size?.[1]) || baseSizeX;
 
-  return FLOWER_ARRANGEMENT_OFFSETS.map(([offsetX, offsetZ, scale], index) => {
-    const jitterHash = getStableHash(`${seedHash}:${index}`);
-    const jitterX = (((jitterHash % 11) - 5) / 5) * 0.045;
-    const jitterZ = ((((jitterHash >> 4) % 11) - 5) / 5) * 0.045;
-    const phase = (seedHash % 97) * 0.09 + index * 1.47;
-    const wobble = Math.sin(now * 0.0042 + phase) * FLOWER_AMBIENT_WOBBLE;
+  for (let index = 0; index < FLOWER_ARRANGEMENT_OFFSETS.length; index += 1) {
+    const [offsetX, offsetZ, scale] = FLOWER_ARRANGEMENT_OFFSETS[index];
+    const jitter = groundFlowerPatch.flowerArrangementJitters[index];
+    const wobble = Math.sin(now * 0.0042 + jitter.phase) * FLOWER_AMBIENT_WOBBLE;
     const scatter = FLOWER_PLAYER_REACT_OFFSET * playerReactStrength * (0.68 + scale * 0.28);
     const lift = Math.sin(playerReactStrength * Math.PI) * 0.08;
     const arrangementScale = scale * revivalScale * (1 + FLOWER_PLAYER_REACT_SCALE * playerReactStrength);
 
-    return {
+    billboards.push({
       texture,
       position: [
-        patchX + offsetX + jitterX + playerDirectionX * scatter,
+        patchX + offsetX + jitter.jitterX + playerDirectionX * scatter,
         patchY + lift + index * 0.002,
-        patchZ + offsetZ + jitterZ + playerDirectionZ * scatter
+        patchZ + offsetZ + jitter.jitterZ + playerDirectionZ * scatter
       ],
-      size: groundFlowerPatch.size.map((value) => value * arrangementScale),
+      size: [baseSizeX * arrangementScale, baseSizeY * arrangementScale],
       rotation: wobble + playerReactStrength * 0.26 * (index % 2 === 0 ? 1 : -1)
-    };
-  });
+    });
+  }
+
+  return billboards;
 }
 
 function getGrassPlayerBend(groundGrassPatch, playerPosition) {
@@ -506,6 +578,39 @@ function getGrassPlayerBend(groundGrassPatch, playerPosition) {
 
 function clamp01(value) {
   return Math.min(1, Math.max(0, value));
+}
+
+function isVector3Like(value) {
+  return value && value.length >= 3;
+}
+
+function getWrappedPlanarDelta(value, reference) {
+  const numericValue = Number(value) || 0;
+  const numericReference = Number(reference) || 0;
+  let delta = numericValue - numericReference;
+
+  if (!(WORLD_LIMIT > 0)) {
+    return delta;
+  }
+
+  const period = WORLD_LIMIT * 2;
+  if (delta > WORLD_LIMIT) {
+    delta -= period;
+  } else if (delta < -WORLD_LIMIT) {
+    delta += period;
+  }
+
+  return delta;
+}
+
+function isWorldPositionWithinRenderDistance(position, referencePosition, distance) {
+  if (!(distance > 0) || !isVector3Like(position) || !isVector3Like(referencePosition)) {
+    return true;
+  }
+
+  const dx = getWrappedPlanarDelta(position[0], referencePosition[0]);
+  const dz = getWrappedPlanarDelta(position[2], referencePosition[2]);
+  return dx * dx + dz * dz <= distance * distance;
 }
 
 function easeOutCubic(value) {
@@ -698,6 +803,67 @@ function hasFinitePlacementBounds(bounds) {
   );
 }
 
+function getActivePendingPlacementIntent(session, storyState = {}, inventory = {}) {
+  const intent = session?.pendingPlacementIntent || null;
+  if (!intent?.itemId || Number(inventory?.[intent.itemId] || 0) <= 0) {
+    return null;
+  }
+
+  if (intent.itemId === "strawBed" && storyState?.flags?.strawBedPlacedInBulbasaurHabitat) {
+    return null;
+  }
+
+  if (
+    intent.itemId === "leafDenKit" &&
+    intent.blockedReason === "needs-solar-station" &&
+    storyState?.flags?.strawBedPlacedInBulbasaurHabitat &&
+    session?.strawBed?.position
+  ) {
+    return {
+      ...intent,
+      blockedReason: null
+    };
+  }
+
+  return intent;
+}
+
+function getPendingPlacementPrompt(intent, harvestTarget = null, inputModalityState = null) {
+  if (!intent) {
+    return "";
+  }
+
+  if (intent.itemId === "leafDenKit") {
+    return intent.blockedReason === "needs-solar-station" ?
+      getColonyFeedbackPrompt(COLONY_FEEDBACK_IDS.HOUSE_KIT_READY_NEEDS_SOLAR_STATION) :
+      resolvePlacementReadyPrompt("House Kit ready", inputModalityState);
+  }
+
+  if (intent.itemId === "strawBed") {
+    return harvestTarget?.strawBedPlacement?.canPlace ?
+      resolvePlacementReadyPrompt("Solar Station ready", inputModalityState) :
+      getColonyFeedbackPrompt(COLONY_FEEDBACK_IDS.SOLAR_STATION_READY_MOVE_TO_OPEN_TERRAIN);
+  }
+
+  return resolvePlacementReadyPrompt(`${intent.label || "Object"} ready`, inputModalityState);
+}
+
+function getPendingPlacementWorldPromptText(intent, harvestTarget = null, inputModalityState = null) {
+  if (!intent) {
+    return "";
+  }
+
+  if (intent.itemId === "leafDenKit" && intent.blockedReason === "needs-solar-station") {
+    return getColonyFeedbackPrompt(COLONY_FEEDBACK_IDS.WORLD_PROMPT_NEEDS_SOLAR_STATION);
+  }
+
+  if (intent.itemId === "strawBed" && !harvestTarget?.strawBedPlacement?.canPlace) {
+    return getColonyFeedbackPrompt(COLONY_FEEDBACK_IDS.WORLD_PROMPT_MOVE_TO_OPEN_TERRAIN);
+  }
+
+  return resolveInputPrompt(UI_PROMPT_ACTION.PLACE, inputModalityState);
+}
+
 function buildSolarStationFieldMarkedGroundCells(placementTarget) {
   const bounds = placementTarget?.bounds;
 
@@ -740,6 +906,294 @@ function buildSolarStationFieldMarkedGroundCells(placementTarget) {
   return cells;
 }
 
+function normalizeGridFootprint(footprint = { width: 1, height: 1 }) {
+  return {
+    width: Math.max(1, Math.round(Number(footprint?.width) || 1)),
+    height: Math.max(1, Math.round(Number(footprint?.height) || 1))
+  };
+}
+
+function getRotatedGridFootprint(footprint = { width: 1, height: 1 }, yaw = 0) {
+  const normalizedFootprint = normalizeGridFootprint(footprint);
+  const quarterTurn = Math.abs(Math.round(Number(yaw || 0) / (Math.PI * 0.5))) % 4;
+
+  if (quarterTurn % 2 === 1) {
+    return {
+      width: normalizedFootprint.height,
+      height: normalizedFootprint.width
+    };
+  }
+
+  return normalizedFootprint;
+}
+
+function buildPlacementPreviewFootprintCells(preview, {
+  idPrefix,
+  footprint,
+  targetState
+} = {}) {
+  if (!preview?.snappedPosition) {
+    return [];
+  }
+
+  const gridStep = Math.max(
+    0.25,
+    Number(preview.gridStep) ||
+      Number(preview.gridConfig?.cellSize) ||
+      1.425
+  );
+  const rotatedFootprint = getRotatedGridFootprint(footprint, preview.yaw);
+  const originX = preview.snappedPosition[0] - ((rotatedFootprint.width - 1) * gridStep * 0.5);
+  const originZ = preview.snappedPosition[2] - ((rotatedFootprint.height - 1) * gridStep * 0.5);
+  const surfaceY = preview.snappedPosition[1] || 0.02;
+  const cells = [];
+
+  for (let row = 0; row < rotatedFootprint.height; row += 1) {
+    for (let column = 0; column < rotatedFootprint.width; column += 1) {
+      cells.push({
+        id: `${idPrefix}-${column}-${row}`,
+        offset: [
+          Number((originX + column * gridStep).toFixed(3)),
+          surfaceY,
+          Number((originZ + row * gridStep).toFixed(3))
+        ],
+        surfaceY,
+        tileSpan: gridStep,
+        highlightTargetState: targetState
+      });
+    }
+  }
+
+  return cells;
+}
+
+function getPlacementPreviewFootprintWorldSize(preview, footprint) {
+  const gridStep = Math.max(
+    0.25,
+    Number(preview?.gridStep) ||
+      Number(preview?.gridConfig?.cellSize) ||
+      1.425
+  );
+  const rotatedFootprint = getRotatedGridFootprint(footprint, preview?.yaw);
+
+  return [
+    rotatedFootprint.width * gridStep,
+    rotatedFootprint.height * gridStep
+  ];
+}
+
+function buildSolarStationPowerRadiusGroundCells({
+  center,
+  radius,
+  gridConfig = null,
+  gridStep = 1.425,
+  idPrefix = "solar-station-power-radius"
+} = {}) {
+  if (!Array.isArray(center) || !(radius > 0)) {
+    return [];
+  }
+
+  const centerX = Number(center[0]);
+  const centerZ = Number(center[2]);
+  if (!Number.isFinite(centerX) || !Number.isFinite(centerZ)) {
+    return [];
+  }
+
+  const cellSize = Math.max(
+    0.25,
+    Number(gridConfig?.cellSize) ||
+      Number(gridStep) ||
+      1.425
+  );
+  const cells = [];
+
+  const pushCell = (x, z, columnIndex, rowIndex) => {
+    if (cells.length >= SOLAR_STATION_POWER_RADIUS_MARKED_TILE_LIMIT) {
+      return;
+    }
+
+    const dx = x - centerX;
+    const dz = z - centerZ;
+    if (dx * dx + dz * dz > radius * radius) {
+      return;
+    }
+
+    cells.push({
+      id: `${idPrefix}-${columnIndex}-${rowIndex}`,
+      offset: [
+        Number(x.toFixed(3)),
+        Array.isArray(center) ? Number(center[1] || 0.02) : 0.02,
+        Number(z.toFixed(3))
+      ],
+      surfaceY: Array.isArray(center) ? Number(center[1] || 0.02) : 0.02,
+      tileSpan: cellSize,
+      highlightTargetState: "powerRadius",
+      highlightPulse: false
+    });
+  };
+
+  if (
+    Number.isFinite(Number(gridConfig?.origin?.x)) &&
+    Number.isFinite(Number(gridConfig?.origin?.z)) &&
+    Number.isInteger(gridConfig?.width) &&
+    Number.isInteger(gridConfig?.height)
+  ) {
+    const originX = Number(gridConfig.origin.x);
+    const originZ = Number(gridConfig.origin.z);
+    const minCellX = clampNumber(
+      Math.floor((centerX - radius - originX) / cellSize),
+      0,
+      gridConfig.width - 1
+    );
+    const maxCellX = clampNumber(
+      Math.floor((centerX + radius - originX) / cellSize),
+      0,
+      gridConfig.width - 1
+    );
+    const minCellZ = clampNumber(
+      Math.floor((centerZ - radius - originZ) / cellSize),
+      0,
+      gridConfig.height - 1
+    );
+    const maxCellZ = clampNumber(
+      Math.floor((centerZ + radius - originZ) / cellSize),
+      0,
+      gridConfig.height - 1
+    );
+
+    for (let row = minCellZ; row <= maxCellZ; row += 1) {
+      for (let column = minCellX; column <= maxCellX; column += 1) {
+        pushCell(
+          originX + column * cellSize + cellSize * 0.5,
+          originZ + row * cellSize + cellSize * 0.5,
+          column,
+          row
+        );
+      }
+    }
+
+    return cells;
+  }
+
+  let rowIndex = 0;
+  for (
+    let z = centerZ - radius;
+    z <= centerZ + radius && cells.length < SOLAR_STATION_POWER_RADIUS_MARKED_TILE_LIMIT;
+    z += cellSize
+  ) {
+    let columnIndex = 0;
+    for (
+      let x = centerX - radius;
+      x <= centerX + radius && cells.length < SOLAR_STATION_POWER_RADIUS_MARKED_TILE_LIMIT;
+      x += cellSize
+    ) {
+      pushCell(x, z, columnIndex, rowIndex);
+      columnIndex += 1;
+    }
+    rowIndex += 1;
+  }
+
+  return cells;
+}
+
+function getSolarStationPreviewPowerRadius(session, preview) {
+  const modelScale = Number(
+    session?.strawBedModelInstance?.solarStationFinalScale ||
+    session?.strawBedModelInstance?.scale
+  );
+
+  if (Number.isFinite(modelScale) && modelScale > 0) {
+    return modelScale * LEAF_DEN_KIT_SOLAR_STATION_RADIUS_MULTIPLIER;
+  }
+
+  const fallbackSize = getPlacementPreviewFootprintWorldSize(
+    preview,
+    SOLAR_STATION_PLACEMENT_GRID_FOOTPRINT
+  );
+  return Math.max(fallbackSize[0], fallbackSize[1]) * LEAF_DEN_KIT_SOLAR_STATION_RADIUS_MULTIPLIER;
+}
+
+function buildSolarStationPreviewPowerRadiusGroundCells(session, preview) {
+  if (!preview?.snappedPosition) {
+    return [];
+  }
+
+  return buildSolarStationPowerRadiusGroundCells({
+    center: preview.snappedPosition,
+    radius: getSolarStationPreviewPowerRadius(session, preview),
+    gridConfig: preview.gridConfig,
+    gridStep: preview.gridStep,
+    idPrefix: "solar-station-preview-power-radius"
+  });
+}
+
+function buildPlacedSolarStationPowerRadiusGroundCells(session, storyState) {
+  const powerPosition = getSolarStationPowerPosition(session, storyState);
+  if (!powerPosition) {
+    return [];
+  }
+
+  return buildSolarStationPowerRadiusGroundCells({
+    center: powerPosition,
+    radius: getSolarStationPowerRadius(session),
+    gridConfig: session?.buildGridConfig,
+    gridStep: session?.buildGridConfig?.cellSize,
+    idPrefix: "solar-station-placed-power-radius"
+  });
+}
+
+function getTreePlacementBlockerSize(treeModel, instance) {
+  const rawFootprint = treeModel && instance ?
+    treeFootprint(treeModel, instance) :
+    0;
+  const isDeadTree = instance?.alive === false;
+  const footprintScale = isDeadTree ?
+    DEAD_TREE_PLACEMENT_BLOCKER_FOOTPRINT_SCALE :
+    TREE_PLACEMENT_BLOCKER_FOOTPRINT_SCALE;
+  const minSize = isDeadTree ?
+    DEAD_TREE_PLACEMENT_BLOCKER_MIN_SIZE :
+    TREE_PLACEMENT_BLOCKER_MIN_SIZE;
+  const footprint = Number.isFinite(rawFootprint) && rawFootprint > 0 ?
+    rawFootprint :
+    minSize;
+  const size = Math.max(
+    minSize,
+    footprint * footprintScale
+  );
+
+  return [size, size];
+}
+
+function getWorldObjectPlacementBlockers(session) {
+  const blockers = [];
+
+  if (session?.palmModel && Array.isArray(session.palmInstances)) {
+    for (const instance of session.palmInstances) {
+      if (instance?.active === false || !Array.isArray(instance?.offset)) {
+        continue;
+      }
+
+      blockers.push({
+        id: instance.id ? `tree:${instance.id}` : "tree",
+        kind: "tree",
+        position: instance.offset,
+        size: getTreePlacementBlockerSize(session.palmModel, instance)
+      });
+    }
+  }
+
+  if (Array.isArray(session?.leppaTree?.position)) {
+    blockers.push({
+      id: session.leppaTree.id ? `tree:${session.leppaTree.id}` : "tree:leppa-tree",
+      kind: "tree",
+      position: session.leppaTree.position,
+      size: LEPPA_TREE_PLACEMENT_BLOCKER_SIZE
+    });
+  }
+
+  return blockers;
+}
+
 function getSolarStationPlacementBlockers(session, storyState) {
   const blockers = [];
   const flags = storyState?.flags || {};
@@ -754,6 +1208,7 @@ function getSolarStationPlacementBlockers(session, storyState) {
       houseBuilt: LEAF_DEN_BUILT_ROTATION_FOOTPRINT
     }
   }));
+  blockers.push(...getWorldObjectPlacementBlockers(session));
 
   if (session.logChair?.position && flags.logChairPlaced) {
     blockers.push({
@@ -1084,8 +1539,10 @@ export function startGameLoop({
   let movementQuestDistance = 0;
   let gameplayOpeningHudHidden = false;
   let gameplayOpeningHudRevealAt = null;
+  let gameplayOpeningCameraFrame = null;
   let snowstormFogOverlayElement = null;
   let snowstormFogOpacity = 0;
+  const gameplayOpeningSkipControl = createCinematicControlState();
   const frameSnapshotController = createFrameSnapshotController({
     camera,
     mount,
@@ -1100,18 +1557,20 @@ export function startGameLoop({
     camera,
     presets: cameraZoomPresets
   });
+
+  function getCurrentInputModalityState() {
+    return controls.getInputModalityState?.() || null;
+  }
   const gameplayCameraDirector = createGameplayCameraDirector({
     camera,
     cameraOrbit
   });
-  const gameplayOpeningImpactEffect = createGameplayOpeningImpactEffect({
-    mount,
-    canvasWidth: worldCanvas?.width,
-    canvasHeight: worldCanvas?.height
-  });
   const fpsPanelController = createFpsPanelController(fpsPanel);
   const getSfxVolumeScale = () => gameplay?.audioMixRuntime?.getSfxVolumeScale?.() ?? 1;
   const getMusicVolumeScale = () => gameplay?.audioMixRuntime?.getMusicVolumeScale?.() ?? 1;
+  const playSoundEvent = (eventId, options) => {
+    gameplay?.playSoundEvent?.(eventId, options);
+  };
   const waterGunSfxController = createRepeatingSfxController({
     src: WATER_DROP_SFX_URL,
     volumeScale: getSfxVolumeScale
@@ -1167,6 +1626,12 @@ export function startGameLoop({
     volume: TREE_BIRTH_SFX_VOLUME,
     volumeScale: getSfxVolumeScale
   });
+  const growBotRevealSfxController = createRepeatingSfxController({
+    src: GROW_BOT_REVEAL_PLACEHOLDER_SFX_URL,
+    interval: Number.POSITIVE_INFINITY,
+    volume: GROW_BOT_REVEAL_PLACEHOLDER_SFX_VOLUME,
+    volumeScale: getSfxVolumeScale
+  });
   const woodCollectPopEffects = [];
   let repairBoxElapsed = 0;
   let waterGunSfxBurstUntilSeconds = 0;
@@ -1213,6 +1678,13 @@ export function startGameLoop({
     });
   }
 
+  function playGrowBotRevealSfx() {
+    growBotRevealSfxController.update({
+      active: true,
+      nowSeconds: getRuntimeNowSeconds()
+    });
+  }
+
   function getPlayerConstructionTerrainColliders() {
     return createPlayerConstructionTerrainColliders({
       session,
@@ -1243,7 +1715,112 @@ export function startGameLoop({
   }
 
   function cancelBlockedCompanionAction(actionName) {
+    playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
     hud?.pushNotice?.(`${actionName} path is blocked.`);
+  }
+
+  function createDebugAreaCollider({
+    id,
+    position,
+    radius,
+    surfaceY = 0.08,
+    blocksPlayer = false
+  } = {}) {
+    if (!id || !Array.isArray(position) || !(radius > 0)) {
+      return null;
+    }
+
+    return {
+      id,
+      position: [position[0], surfaceY, position[2]],
+      size: [radius * 2, 0.12, radius * 2],
+      surfaceY: surfaceY + 0.08,
+      blocksPlayer
+    };
+  }
+
+  function getActorDebugPosition(actor) {
+    const position =
+      actor?.character?.getPosition?.() ||
+      actor?.position ||
+      actor?.offset ||
+      null;
+    return Array.isArray(position) ? position : null;
+  }
+
+  function getInteractionDebugColliders() {
+    const colliders = [];
+    const pushCollider = (config) => {
+      const collider = createDebugAreaCollider(config);
+      if (collider) {
+        colliders.push(collider);
+      }
+    };
+
+    for (const npcActor of session.npcActors || []) {
+      if (rendering.isNpcActive?.(npcActor, controls.storyState) === false) {
+        continue;
+      }
+
+      pushCollider({
+        id: `${npcActor.id || "npc"}:talk-trigger`,
+        position: getActorDebugPosition(npcActor),
+        radius: Number(npcActor.interactDistance) || POKEMON_TALK_INTERACT_DISTANCE,
+        surfaceY: 0.1
+      });
+    }
+
+    for (const interactable of session.interactables || []) {
+      if (rendering.isInteractableActive?.(interactable, controls.storyState) === false) {
+        continue;
+      }
+
+      pushCollider({
+        id: `${interactable.id || "object"}:interact-trigger`,
+        position: interactable.position,
+        radius: Number(interactable.interactDistance) || WORKBENCH_INTERACT_DISTANCE,
+        surfaceY: 0.09
+      });
+    }
+
+    for (const resourceNode of session.resourceNodes || []) {
+      if (rendering.isResourceNodeActive?.(resourceNode, controls.storyState) === false) {
+        continue;
+      }
+
+      pushCollider({
+        id: `${resourceNode.id || "resource"}:pickup-trigger`,
+        position: resourceNode.position,
+        radius: Number(resourceNode.pickupRadius || resourceNode.interactDistance) || 1.6,
+        surfaceY: 0.07
+      });
+    }
+
+    const growBotPosition =
+      session.bulbasaurEncounter?.visible && Array.isArray(session.bulbasaurEncounter.position) ?
+        session.bulbasaurEncounter.position :
+        null;
+    pushCollider({
+      id: "grow-bot:talk-trigger",
+      position: growBotPosition,
+      radius: BULBASAUR_TALK_INTERACT_DISTANCE,
+      surfaceY: 0.12
+    });
+
+    for (const drop of [
+      ...(session.woodDrops || []),
+      ...(session.fieldDrops || []),
+      ...(session.leppaBerryDrops || [])
+    ]) {
+      pushCollider({
+        id: `${drop.id || drop.itemId || "drop"}:pickup-trigger`,
+        position: drop.position,
+        radius: Number(drop.pickupRadius) || 1.1,
+        surfaceY: 0.06
+      });
+    }
+
+    return colliders;
   }
 
   function getSnappedSolarStationPreviewPosition(preview) {
@@ -1310,7 +1887,57 @@ export function startGameLoop({
     ];
   }
 
-  function updateSolarStationPlacementPreview(deltaTime) {
+  function syncPlacementPreviewPositionToPlayer(preview, defaultForwardDistance = 0) {
+    const playerPosition = session.playerCharacter?.getPosition?.();
+    if (!preview?.active || !Array.isArray(playerPosition)) {
+      return;
+    }
+    const playerX = Number(playerPosition[0]);
+    const playerZ = Number(playerPosition[2]);
+    if (!Number.isFinite(playerX) || !Number.isFinite(playerZ)) {
+      return;
+    }
+
+    if (!Array.isArray(preview.followPlayerOffset)) {
+      const position = Array.isArray(preview.position) ?
+        preview.position :
+        playerPosition;
+      const positionX = Number(position[0]);
+      const positionZ = Number(position[2]);
+      const offset = [
+        (Number.isFinite(positionX) ? positionX : playerX) - playerX,
+        0,
+        (Number.isFinite(positionZ) ? positionZ : playerZ) - playerZ
+      ];
+      const offsetLength = Math.hypot(offset[0], offset[2]);
+
+      if (offsetLength < 0.35 && defaultForwardDistance > 0) {
+        const movementAxes = camera.getMovementAxes();
+        const forwardX = Number(movementAxes?.up?.[0]) || 0;
+        const forwardZ = Number(movementAxes?.up?.[2]) || 0;
+        const forwardLength = Math.hypot(forwardX, forwardZ) || 1;
+        offset[0] = (forwardX / forwardLength) * defaultForwardDistance;
+        offset[2] = (forwardZ / forwardLength) * defaultForwardDistance;
+      }
+
+      preview.followPlayerOffset = offset;
+    }
+
+    const nextPosition = [
+      playerX + Number(preview.followPlayerOffset[0] || 0),
+      Array.isArray(preview.position) ? Number(preview.position[1] || 0.02) : 0.02,
+      playerZ + Number(preview.followPlayerOffset[2] || 0)
+    ];
+
+    if (hasFinitePlacementBounds(preview.bounds)) {
+      nextPosition[0] = clampNumber(nextPosition[0], preview.bounds.minX, preview.bounds.maxX);
+      nextPosition[2] = clampNumber(nextPosition[2], preview.bounds.minZ, preview.bounds.maxZ);
+    }
+
+    preview.position = nextPosition;
+  }
+
+  function updateSolarStationPlacementPreview() {
     const preview = session.strawBedPlacementPreview;
     if (!preview?.active) {
       if (
@@ -1322,33 +1949,13 @@ export function startGameLoop({
       return null;
     }
 
-    const movementInput = controls.getPlacementMovementInput?.() || { horizontal: 0, vertical: 0 };
-    const movementAxes = camera.getMovementAxes();
-    let moveX =
-      movementAxes.right[0] * Number(movementInput.horizontal || 0) +
-      movementAxes.up[0] * Number(movementInput.vertical || 0);
-    let moveZ =
-      movementAxes.right[2] * Number(movementInput.horizontal || 0) +
-      movementAxes.up[2] * Number(movementInput.vertical || 0);
-    const moveLength = Math.hypot(moveX, moveZ);
-
-    if (moveLength > 0.001) {
-      moveX /= moveLength;
-      moveZ /= moveLength;
-      preview.position = Array.isArray(preview.position) ?
-        [...preview.position] :
-        [0, 0.02, 0];
-      preview.position[0] += moveX * SOLAR_STATION_PLACEMENT_PREVIEW_SPEED * deltaTime;
-      preview.position[2] += moveZ * SOLAR_STATION_PLACEMENT_PREVIEW_SPEED * deltaTime;
-
-      if (hasFinitePlacementBounds(preview.bounds)) {
-        preview.position[0] = clampNumber(preview.position[0], preview.bounds.minX, preview.bounds.maxX);
-        preview.position[2] = clampNumber(preview.position[2], preview.bounds.minZ, preview.bounds.maxZ);
-      }
-    }
+    syncPlacementPreviewPositionToPlayer(preview, SOLAR_STATION_PLACEMENT_FOLLOW_DISTANCE);
 
     const snappedPosition = getSnappedSolarStationPreviewPosition(preview);
-    const previewRect = getPlacementRect(snappedPosition, SOLAR_STATION_PLACEMENT_PREVIEW_FOOTPRINT);
+    const previewRect = getPlacementRect(
+      snappedPosition,
+      getPlacementPreviewFootprintWorldSize(preview, SOLAR_STATION_PLACEMENT_GRID_FOOTPRINT)
+    );
     const hasCollision = isSolarStationPlacementBlocked(
       session,
       controls.storyState,
@@ -1371,7 +1978,7 @@ export function startGameLoop({
       ];
       session.strawBedModelInstance.yaw = baseYaw + Number(preview.yaw || 0);
       session.strawBedModelInstance.active = true;
-      session.strawBedModelInstance.alpha = preview.valid ? 0.66 : 0.58;
+      session.strawBedModelInstance.alpha = WORKBENCH_PLACEMENT_PREVIEW_ALPHA;
       session.strawBedModelInstance.tint = preview.valid ? [0.55, 1, 0.46] : [1, 0.04, 0.02];
       session.strawBedModelInstance.tintStrength = preview.valid ? 0.22 : 0.82;
     }
@@ -1395,6 +2002,7 @@ export function startGameLoop({
       session.strawBedModelInstance.tintStrength = 0;
     }
 
+    playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
     hud?.pushNotice?.("Solar Station placement canceled.");
     return true;
   }
@@ -1421,6 +2029,7 @@ export function startGameLoop({
       session.leafDenModelInstance.tintStrength = 0;
     }
 
+    playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
     hud?.pushNotice?.("House Kit placement canceled.");
     return true;
   }
@@ -1446,6 +2055,7 @@ export function startGameLoop({
     rotatePreview(session.leafDenKitPlacementPreview);
 
     if (rotated) {
+      playSoundEvent(SOUND_EVENT_IDS.UI_NAVIGATE);
       hud?.pushNotice?.("Preview rotated.");
     }
 
@@ -1469,7 +2079,7 @@ export function startGameLoop({
     if (session.campfire?.position && flags.campfireSpatOut) {
       candidates.push({
         kind: "trainHouse",
-        label: "Train House",
+        label: SANDBOTS_ITEM_NAMES.thermalCabin,
         placement: session.campfire,
         fallbackSize: [1.7, 1.45],
         rotateSize: true
@@ -1630,7 +2240,10 @@ export function startGameLoop({
       originalSize: getWorkbenchRotationTargetSize(target),
       pendingSize: getWorkbenchRotationTargetSize(target)
     };
-    hud?.pushNotice?.(`${target.label} selected. LB/RB rotate, X confirm, B cancel.`);
+    hud?.pushNotice?.(
+      `${target.label} selected. ${resolveWorkbenchRotationPrompt(getCurrentInputModalityState())}.`
+    );
+    playSoundEvent(SOUND_EVENT_IDS.UI_CONFIRM);
     return true;
   }
 
@@ -1640,6 +2253,7 @@ export function startGameLoop({
     }
 
     workbenchRotationSelection = null;
+    playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
     hud?.pushNotice?.("Rotation canceled.");
     return true;
   }
@@ -1661,6 +2275,7 @@ export function startGameLoop({
     }
 
     workbenchRotationSelection = null;
+    playSoundEvent(SOUND_EVENT_IDS.UI_CONFIRM);
     hud?.pushNotice?.(`${target.label} rotation set.`);
     return true;
   }
@@ -1731,6 +2346,7 @@ export function startGameLoop({
       );
     }
 
+    playSoundEvent(SOUND_EVENT_IDS.UI_NAVIGATE);
     hud?.pushNotice?.(`${target.label} preview rotated. X confirm.`);
     return true;
   }
@@ -1753,36 +2369,13 @@ export function startGameLoop({
     };
   }
 
-  function updateLeafDenKitPlacementPreview(deltaTime) {
+  function updateLeafDenKitPlacementPreview() {
     const preview = session.leafDenKitPlacementPreview;
     if (!preview?.active) {
       return null;
     }
 
-    const movementInput = controls.getPlacementMovementInput?.() || { horizontal: 0, vertical: 0 };
-    const movementAxes = camera.getMovementAxes();
-    let moveX =
-      movementAxes.right[0] * Number(movementInput.horizontal || 0) +
-      movementAxes.up[0] * Number(movementInput.vertical || 0);
-    let moveZ =
-      movementAxes.right[2] * Number(movementInput.horizontal || 0) +
-      movementAxes.up[2] * Number(movementInput.vertical || 0);
-    const moveLength = Math.hypot(moveX, moveZ);
-
-    if (moveLength > 0.001) {
-      moveX /= moveLength;
-      moveZ /= moveLength;
-      preview.position = Array.isArray(preview.position) ?
-        [...preview.position] :
-        [0, 0.02, 0];
-      preview.position[0] += moveX * LEAF_DEN_KIT_PLACEMENT_PREVIEW_SPEED * deltaTime;
-      preview.position[2] += moveZ * LEAF_DEN_KIT_PLACEMENT_PREVIEW_SPEED * deltaTime;
-
-      if (hasFinitePlacementBounds(preview.bounds)) {
-        preview.position[0] = clampNumber(preview.position[0], preview.bounds.minX, preview.bounds.maxX);
-        preview.position[2] = clampNumber(preview.position[2], preview.bounds.minZ, preview.bounds.maxZ);
-      }
-    }
+    syncPlacementPreviewPositionToPlayer(preview);
 
     const snappedPosition = getSnappedSolarStationPreviewPosition(preview);
     const previewSize = getRotatedPlacementSize(
@@ -1791,9 +2384,13 @@ export function startGameLoop({
         LEAF_DEN_KIT_PLACEMENT_PREVIEW_FOOTPRINT,
       preview.yaw
     );
+    const previewCollisionSize = getPlacementPreviewFootprintWorldSize(
+      preview,
+      LEAF_DEN_KIT_PLACEMENT_GRID_FOOTPRINT
+    );
     const validation = validateBuildingKitPlacement({
       position: snappedPosition,
-      size: previewSize,
+      size: previewCollisionSize,
       blockers: getSolarStationPlacementBlockers(session, controls.storyState)
     });
     const insideSolarStationPowerRadius = validation.valid ?
@@ -1823,7 +2420,7 @@ export function startGameLoop({
       ];
       instance.scale = baseScale;
       instance.yaw = baseYaw + Number(preview.yaw || 0);
-      instance.alpha = preview.valid ? 0.66 : 0.58;
+      instance.alpha = WORKBENCH_PLACEMENT_PREVIEW_ALPHA;
       instance.tint = preview.valid ? [0.55, 1, 0.46] : [1, 0.04, 0.02];
       instance.tintStrength = preview.valid ? 0.22 : 0.82;
       instance.active = true;
@@ -1942,7 +2539,7 @@ export function startGameLoop({
       storyState: controls.storyState,
       inventory: controls.inventory
     })) {
-      hud.pushNotice("Charmander needs Carbon to use Fire.");
+      hud.pushNotice(`${SANDBOTS_CHARACTER_NAMES.thermalBot} needs Carbon to use ${SANDBOTS_ABILITY_NAMES.thermalTorch}.`);
       return false;
     }
 
@@ -1979,38 +2576,6 @@ export function startGameLoop({
     playFieldMoveInvalidSfx();
   }
 
-  function triggerGameplayOpeningShipImpactEffect(shipEvent, now) {
-    const canvasWidth = worldCanvas?.width || 426;
-    const canvasHeight = worldCanvas?.height || 240;
-    let projectedOrigin = null;
-
-    if (
-      Array.isArray(shipEvent?.position) &&
-      typeof camera.project === "function"
-    ) {
-      const projected = camera.project(
-        [
-          shipEvent.position[0],
-          shipEvent.position[1] + 0.36,
-          shipEvent.position[2]
-        ],
-        canvasWidth,
-        canvasHeight
-      );
-
-      if (projected && projected.depth <= 1) {
-        projectedOrigin = [projected.x, projected.y];
-      }
-    }
-
-    gameplayOpeningImpactEffect.trigger({
-      origin: projectedOrigin,
-      width: canvasWidth,
-      height: canvasHeight,
-      now
-    });
-  }
-
   function getGroundActionFeedback(now) {
     if (!groundActionFeedback || groundActionFeedback.expiresAt <= now) {
       groundActionFeedback = null;
@@ -2028,7 +2593,7 @@ export function startGameLoop({
     };
   }
 
-  function getLeafResourceBillboards(resourceNodes, texture, uvRect, storyState) {
+  function getLeafResourceBillboards(resourceNodes, texture, uvRect, storyState, renderCenter = null) {
     if (!texture || !Array.isArray(resourceNodes)) {
       return [];
     }
@@ -2040,7 +2605,12 @@ export function startGameLoop({
     return resourceNodes
       .filter((resourceNode) => (
         resourceNode?.itemId === LEAVES_ITEM_ID &&
-        isResourceNodeActive(resourceNode, storyState)
+        isResourceNodeActive(resourceNode, storyState) &&
+        isWorldPositionWithinRenderDistance(
+          resourceNode.position,
+          renderCenter,
+          NATURE_PATCH_BILLBOARD_PREPARE_DISTANCE
+        )
       ))
       .map((resourceNode) => ({
         texture,
@@ -2054,13 +2624,21 @@ export function startGameLoop({
       }));
   }
 
-  function getLeafDropBillboards(fieldDrops, texture, uvRect) {
+  function getLeafDropBillboards(fieldDrops, texture, uvRect, renderCenter = null) {
     if (!texture || !Array.isArray(fieldDrops)) {
       return [];
     }
 
     return fieldDrops
-      .filter((drop) => drop?.itemId === LEAVES_ITEM_ID && !drop.collected)
+      .filter((drop) => (
+        drop?.itemId === LEAVES_ITEM_ID &&
+        !drop.collected &&
+        isWorldPositionWithinRenderDistance(
+          drop.position,
+          renderCenter,
+          NATURE_PATCH_BILLBOARD_PREPARE_DISTANCE
+        )
+      ))
       .map((drop) => ({
         texture,
         position: drop.position,
@@ -2770,14 +3348,17 @@ export function startGameLoop({
   function performGameplayDestroyAction(options) {
     const cutEffectPatch = getDestroyableLandscapePatchForInteractOptions(options);
     if (!cutEffectPatch) {
+      playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
       hud?.pushNotice?.("Nothing to destroy here.");
       return false;
     }
 
-    return performGameplayInteractAction({
+    const result = performGameplayInteractAction({
       ...options,
       allowDestroyInstantiatedObject: true
     });
+    playSoundEvent(result ? SOUND_EVENT_IDS.GAMEPLAY_IMPACT : SOUND_EVENT_IDS.UI_CANCEL);
+    return result;
   }
 
   function updateLandscapeCutEffects(deltaTime) {
@@ -2903,12 +3484,17 @@ export function startGameLoop({
           swayStrength: 0
         });
       } else {
+        const grassBillboardScaleX = Number(groundGrassPatch.size?.[0]) || 1;
+        const grassBillboardScaleY = Number(groundGrassPatch.size?.[1]) || grassBillboardScaleX;
         nextFrame.render.grassBillboards.push({
           texture: groundGrassPatch.state === "alive" ?
             session.greenGrassTexture :
             session.deadGrassTexture,
           position: offset,
-          size: groundGrassPatch.size.map((value) => value * pose.scale),
+          size: [
+            grassBillboardScaleX * pose.scale,
+            grassBillboardScaleY * pose.scale
+          ],
           alpha: pose.alpha
         });
       }
@@ -2968,7 +3554,18 @@ export function startGameLoop({
       return 0;
     }
 
-    return clamp01(Number(revealBoxOpening.elapsed || 0) / Number(revealBoxOpening.duration || 1));
+    const rawProgress = clamp01(
+      Number(revealBoxOpening.elapsed || 0) / Number(revealBoxOpening.duration || 1)
+    );
+    const openStart = clamp01(
+      Number(revealBoxOpening.openStartProgress ?? BULBASAUR_REVEAL_BOX_OPEN_START_PROGRESS)
+    );
+
+    if (rawProgress <= openStart) {
+      return 0;
+    }
+
+    return clamp01((rawProgress - openStart) / Math.max(0.001, 1 - openStart));
   }
 
   function syncRepairBoxInstance(instance, basePosition, active, { openingProgress = 0 } = {}) {
@@ -3003,6 +3600,47 @@ export function startGameLoop({
     }
 
     instance.active = Boolean(active);
+  }
+
+  function applyBulbasaurRevealBoxCinematic(encounter) {
+    const instance = encounter?.repairModuleInstance;
+    const opening = encounter?.revealBoxOpening;
+
+    if (!instance || !opening?.active) {
+      return;
+    }
+
+    const duration = Math.max(0.001, Number(opening.duration || BULBASAUR_REVEAL_BOX_DURATION));
+    const elapsed = Math.max(0, Number(opening.elapsed || 0));
+    const progress = clamp01(elapsed / duration);
+    const shakeEnd = clamp01(
+      Number(opening.shakeEndProgress ?? BULBASAUR_REVEAL_BOX_SHAKE_END_PROGRESS)
+    );
+    const openStart = clamp01(
+      Number(opening.openStartProgress ?? BULBASAUR_REVEAL_BOX_OPEN_START_PROGRESS)
+    );
+    const chargeProgress = clamp01(progress / Math.max(0.001, shakeEnd));
+    const charge = chargeProgress * chargeProgress;
+    const isDramaticPause = progress >= shakeEnd && progress < openStart;
+    const shakeEnvelope = isDramaticPause ? 0 : Math.sin(chargeProgress * Math.PI * 0.5);
+    const shake = shakeEnvelope * (0.018 + charge * 0.12);
+    const light = clamp01(progress / Math.max(0.001, openStart));
+
+    if (progress < openStart) {
+      instance.yaw += elapsed * BULBASAUR_REVEAL_BOX_SPIN_ACCELERATION * charge;
+      instance.pitch += Math.sin(elapsed * (24 + charge * 38)) * shake;
+      instance.roll += Math.cos(elapsed * (28 + charge * 42)) * shake;
+      instance.offset = [
+        instance.offset[0] + Math.sin(elapsed * (31 + charge * 28)) * shake,
+        instance.offset[1] + Math.abs(Math.sin(elapsed * (18 + charge * 30))) * shake * 1.8,
+        instance.offset[2] + Math.cos(elapsed * (29 + charge * 26)) * shake
+      ];
+    }
+
+    instance.tint = [1.45, 1.72, 0.84];
+    instance.tintStrength = Math.max(Number(instance.tintStrength || 0), 0.32 + light * 0.58);
+    instance.alpha = 1;
+    instance.scale *= 1 + Math.sin(progress * Math.PI) * 0.045;
   }
 
   function applyBulbasaurRepairBoxRustle(encounter) {
@@ -3049,6 +3687,7 @@ export function startGameLoop({
       !hideBoxAfterReveal && (openingProgress > 0 || !encounter.visible),
       { openingProgress }
     );
+    applyBulbasaurRevealBoxCinematic(encounter);
     applyBulbasaurRepairBoxRustle(encounter);
   }
 
@@ -3320,6 +3959,12 @@ export function startGameLoop({
         continue;
       }
 
+      if (repairModuleInstance === session.bulbasaurEncounter?.repairModuleInstance &&
+        session.bulbasaurEncounter?.revealBoxOpening?.active) {
+        highlighted = true;
+        continue;
+      }
+
       if (!highlighted && repairModuleInstance.active) {
         repairModuleInstance.tint = REPAIR_BOX_ACTIVE_TINT;
         repairModuleInstance.tintStrength = REPAIR_BOX_ACTIVE_TINT_STRENGTH;
@@ -3349,6 +3994,28 @@ export function startGameLoop({
       {
         id: `${selectedRepairModule.id}-rustling-particles`,
         position: [...selectedRepairModule.offset]
+      } :
+      null;
+  }
+
+  function getBulbasaurRevealParticleTarget() {
+    const encounter = session.bulbasaurEncounter;
+    const opening = encounter?.revealBoxOpening;
+
+    if (!opening?.active) {
+      return null;
+    }
+
+    const position =
+      encounter?.repairModuleInstance?.offset ||
+      encounter?.repairModuleInstance?.baseOffset ||
+      getEncounterRepairBoxPosition(encounter);
+
+    return Array.isArray(position) ?
+      {
+        id: "grow-bot-reveal-rays",
+        position: [...position],
+        progress: clamp01(Number(opening.elapsed || 0) / Number(opening.duration || 1))
       } :
       null;
   }
@@ -3422,19 +4089,19 @@ export function startGameLoop({
 
     const repairBoxTargets = [
       {
-        name: "Squirtle",
+        name: SANDBOTS_BOT_NAMES.hydro,
         encounter: session.actTwoSquirtle
       },
       {
-        name: "Bulbasaur",
+        name: SANDBOTS_BOT_NAMES.grow,
         encounter: session.bulbasaurEncounter
       },
       {
-        name: "Charmander",
+        name: SANDBOTS_BOT_NAMES.thermal,
         encounter: session.charmanderEncounter
       },
       {
-        name: "Timburr",
+        name: SANDBOTS_BOT_NAMES.builder,
         encounter: session.timburrEncounter
       }
     ];
@@ -4131,14 +4798,14 @@ export function startGameLoop({
         ];
         if (!tryMoveCompanionToPosition(charmander, nextPosition)) {
           session.charmanderFireAction = null;
-          cancelBlockedCompanionAction("Charmander");
+          cancelBlockedCompanionAction(SANDBOTS_BOT_NAMES.thermal);
           syncCharmanderModelInstance();
           return;
         }
       } else {
         if (isCompanionPositionBlockedByConstruction(action.approachPosition)) {
           session.charmanderFireAction = null;
-          cancelBlockedCompanionAction("Charmander");
+          cancelBlockedCompanionAction(SANDBOTS_BOT_NAMES.thermal);
           syncCharmanderModelInstance();
           return;
         }
@@ -4288,14 +4955,14 @@ export function startGameLoop({
         ];
         if (!tryMoveCompanionToPosition(bulbasaur, nextPosition)) {
           session.bulbasaurLeafageAction = null;
-          cancelBlockedCompanionAction("Bulbasaur");
+          cancelBlockedCompanionAction(SANDBOTS_BOT_NAMES.grow);
           syncBulbasaurModelInstance();
           return;
         }
       } else {
         if (isCompanionPositionBlockedByConstruction(action.approachPosition)) {
           session.bulbasaurLeafageAction = null;
-          cancelBlockedCompanionAction("Bulbasaur");
+          cancelBlockedCompanionAction(SANDBOTS_BOT_NAMES.grow);
           syncBulbasaurModelInstance();
           return;
         }
@@ -4765,14 +5432,14 @@ export function startGameLoop({
         ];
         if (!tryMoveCompanionToPosition(squirtle, nextPosition)) {
           session.squirtleWaterGunAction = null;
-          cancelBlockedCompanionAction("Squirtle");
+          cancelBlockedCompanionAction(SANDBOTS_BOT_NAMES.hydro);
           syncSquirtleModelInstance();
           return;
         }
       } else {
         if (isCompanionPositionBlockedByConstruction(action.approachPosition)) {
           session.squirtleWaterGunAction = null;
-          cancelBlockedCompanionAction("Squirtle");
+          cancelBlockedCompanionAction(SANDBOTS_BOT_NAMES.hydro);
           syncSquirtleModelInstance();
           return;
         }
@@ -5813,8 +6480,7 @@ export function startGameLoop({
 
     if (
       !session.leafDen?.position ||
-      !controls.storyState.flags.leafDenKitPlaced ||
-      !controls.storyState.flags.leafDenBuilt
+      !controls.storyState.flags.leafDenKitPlaced
     ) {
       instance.active = false;
       return;
@@ -5895,7 +6561,7 @@ export function startGameLoop({
     return session.playerHouseModelInstances;
   }
 
-  function syncPlayerHouseModelInstances(deltaTime = 0) {
+  function syncPlayerHouseModelInstances(deltaTime = 0, renderCenter = null) {
     const instances = ensurePlayerHouseModelInstances();
 
     for (let index = 0; index < instances.length; index += 1) {
@@ -5905,6 +6571,21 @@ export function startGameLoop({
         if (instance) {
           instance.active = false;
         }
+        continue;
+      }
+
+      const isSelectedForRotation = workbenchRotationSelection?.kind === `playerHouse:${house.id}`;
+      const hasSpawnEffect = Boolean(house.spawnEffect);
+      if (
+        !isSelectedForRotation &&
+        !hasSpawnEffect &&
+        !isWorldPositionWithinRenderDistance(
+          house.position,
+          renderCenter,
+          PLAYER_CONSTRUCTION_MODEL_PREPARE_DISTANCE
+        )
+      ) {
+        instance.active = false;
         continue;
       }
 
@@ -6015,17 +6696,77 @@ export function startGameLoop({
     }
   }
 
-  function revealBulbasaurAtRepairPosition(encounter) {
+  function getBulbasaurRevealLandingPosition(encounter) {
     if (!encounter || !Array.isArray(encounter.repairPosition)) {
+      return null;
+    }
+
+    return [...encounter.repairPosition];
+  }
+
+  function getBulbasaurRevealOriginPosition(encounter) {
+    const boxPosition = getEncounterRepairBoxPosition(encounter);
+    const landingPosition = getBulbasaurRevealLandingPosition(encounter);
+    const originBase = Array.isArray(boxPosition) ? boxPosition : landingPosition;
+
+    if (!originBase) {
+      return null;
+    }
+
+    return [
+      originBase[0],
+      originBase[1] + BULBASAUR_REVEAL_BOT_FALL_HEIGHT,
+      originBase[2]
+    ];
+  }
+
+  function revealBulbasaurAtRepairPosition(encounter, { falling = false } = {}) {
+    const landingPosition = getBulbasaurRevealLandingPosition(encounter);
+
+    if (!landingPosition) {
       return false;
     }
 
+    const originPosition = falling ? getBulbasaurRevealOriginPosition(encounter) : null;
+
     encounter.visible = true;
     encounter.jumpTimer = 0;
-    encounter.originPosition = null;
-    encounter.landingPosition = null;
-    encounter.position = [...encounter.repairPosition];
+    encounter.originPosition = originPosition;
+    encounter.landingPosition = falling && originPosition ? landingPosition : null;
+    encounter.position = originPosition ? [...originPosition] : landingPosition;
     return true;
+  }
+
+  function updateBulbasaurRevealFall(opening, encounter, progress) {
+    if (!opening?.bulbasaurVisible || !encounter?.originPosition || !encounter?.landingPosition) {
+      return;
+    }
+
+    const fallStart = clamp01(
+      Number(opening.visibleProgress ?? BULBASAUR_REVEAL_VISIBLE_PROGRESS)
+    );
+    const fallEnd = clamp01(
+      Number(opening.fallEndProgress ?? BULBASAUR_REVEAL_BOT_FALL_END_PROGRESS)
+    );
+    const fallProgress = clamp01((progress - fallStart) / Math.max(0.001, fallEnd - fallStart));
+    const easedProgress = fallProgress * fallProgress;
+    const landingBounce = Math.sin(fallProgress * Math.PI) * 0.16;
+
+    encounter.position = [
+      encounter.originPosition[0] +
+        (encounter.landingPosition[0] - encounter.originPosition[0]) * easedProgress,
+      encounter.originPosition[1] +
+        (encounter.landingPosition[1] - encounter.originPosition[1]) * easedProgress +
+        landingBounce,
+      encounter.originPosition[2] +
+        (encounter.landingPosition[2] - encounter.originPosition[2]) * easedProgress
+    ];
+
+    if (fallProgress >= 1) {
+      encounter.position = [...encounter.landingPosition];
+      encounter.originPosition = null;
+      encounter.landingPosition = null;
+    }
   }
 
   function updateBulbasaurRevealBoxOpening(deltaTime, encounter) {
@@ -6046,14 +6787,23 @@ export function startGameLoop({
     opening.elapsed = Math.min(opening.duration, Number(opening.elapsed || 0) + deltaTime);
     const progress = clamp01(opening.elapsed / opening.duration);
     updateRepairBoxRevealFlash(opening, encounter);
+    if (!opening.sfxStarted) {
+      playGrowBotRevealSfx();
+      opening.sfxStarted = true;
+    }
 
-    if (progress >= BULBASAUR_REVEAL_VISIBLE_PROGRESS && !opening.bulbasaurVisible) {
-      revealBulbasaurAtRepairPosition(encounter);
+    const visibleProgress = clamp01(
+      Number(opening.visibleProgress ?? BULBASAUR_REVEAL_VISIBLE_PROGRESS)
+    );
+
+    if (progress >= visibleProgress && !opening.bulbasaurVisible) {
+      revealBulbasaurAtRepairPosition(encounter, { falling: true });
       opening.bulbasaurVisible = true;
       if (opening.hideBoxWhenVisible && encounter.repairModuleInstance) {
         encounter.repairModuleInstance.active = false;
       }
     }
+    updateBulbasaurRevealFall(opening, encounter, progress);
 
     if (progress >= 1) {
       revealBulbasaurAtRepairPosition(encounter);
@@ -6672,6 +7422,41 @@ export function startGameLoop({
     });
   }
 
+  function getRepairBoxRevealRayBillboards(target, texture, now, uvRect) {
+    if (!texture || !target?.position) {
+      return [];
+    }
+
+    const progress = clamp01(Number(target.progress || 0));
+    const charge = Math.sin(clamp01(progress / 0.72) * Math.PI * 0.5);
+    const time = now * 0.001;
+
+    return Array.from({ length: BULBASAUR_REVEAL_BOX_RAY_COUNT }, (_, index) => {
+      const lane = index / BULBASAUR_REVEAL_BOX_RAY_COUNT;
+      const cycle = (time * (0.72 + charge * 1.2) + lane) % 1;
+      const angle = lane * Math.PI * 2 + time * (0.7 + charge * 2.2);
+      const radius = 0.14 + cycle * (0.62 + charge * 0.34);
+      const lift = 0.14 + cycle * (1.32 + charge * 0.54);
+      const size =
+        BULBASAUR_REVEAL_BOX_RAY_BASE_SIZE *
+        (0.8 + charge * 1.15) *
+        (1 - cycle * 0.34);
+
+      return {
+        texture,
+        position: [
+          target.position[0] + Math.cos(angle) * radius,
+          target.position[1] + lift,
+          target.position[2] + Math.sin(angle) * radius
+        ],
+        size: [size * 0.72, size * 1.9],
+        uvRect,
+        alpha: 0.38 + charge * 0.5,
+        rotation: angle + Math.PI * 0.5
+      };
+    });
+  }
+
   function frame(now) {
     const nextFrame = frameSnapshotController.beginFrame();
     const rawDeltaTime = Math.max(0, (now - previousTime) / 1000);
@@ -6719,6 +7504,40 @@ export function startGameLoop({
         now,
         gameplayActive: isGameFlow(gameFlowValues.GAMEPLAY)
       });
+    gameplayOpeningCameraFrame = null;
+    controls.setGameplayCinematicInputActive?.(gameplayOpeningCameraActive);
+    if (gameplayOpeningCameraActive) {
+      setCinematicSkipHoldActive(
+        gameplayOpeningSkipControl,
+        Boolean(controls.isCinematicSkipActionActive?.()),
+        now * 0.001
+      );
+      const skipControlFrame = updateCinematicControlState(gameplayOpeningSkipControl, deltaTime);
+      if (skipControlFrame.skipCompleted) {
+        gameplayOpeningCameraFrame = gameplayCameraDirector.skipOpening({
+          now,
+          gameplayActive: true,
+          playerPosition: session.playerCharacter?.getPosition?.() || null,
+          canFollow: true,
+          spawnPlayer(spawnPosition) {
+            session.spawnActTwoPlayer?.({
+              configureCamera: false,
+              position: spawnPosition
+            });
+            return session.playerCharacter?.getPosition?.() || null;
+          },
+          movePlayer(playerPosition) {
+            session.playerCharacter?.setPosition?.(playerPosition);
+          },
+          ship: session.gameplayOpeningShip
+        });
+        controls.clearPendingActions();
+        controls.clearMovementInput();
+        resetCinematicControlState(gameplayOpeningSkipControl);
+      }
+    } else {
+      resetCinematicControlState(gameplayOpeningSkipControl);
+    }
     const solarStationPlacementPreviewActive = Boolean(session.strawBedPlacementPreview?.active);
     const leafDenKitPlacementPreviewActive = Boolean(session.leafDenKitPlacementPreview?.active);
     const movementBlocked = Boolean(
@@ -6838,6 +7657,7 @@ export function startGameLoop({
     while (controls.consumeCameraZoomCycleRequest?.()) {
       if (canCycleCameraZoom) {
         cameraZoomPresetController.cycle();
+        playSoundEvent(SOUND_EVENT_IDS.UI_NAVIGATE);
       }
     }
 
@@ -6885,8 +7705,8 @@ export function startGameLoop({
       cancelLeafDenKitPlacementPreview();
     }
 
-    let solarStationPlacementPreview = updateSolarStationPlacementPreview(deltaTime);
-    let leafDenKitPlacementPreview = updateLeafDenKitPlacementPreview(deltaTime);
+    let solarStationPlacementPreview = updateSolarStationPlacementPreview();
+    let leafDenKitPlacementPreview = updateLeafDenKitPlacementPreview();
     updateSolarStationSpawnEffect(deltaTime);
     syncSolarStationWorkbenchRotationVisual(now * 0.001);
     let playerMovedThisFrame = false;
@@ -6898,9 +7718,7 @@ export function startGameLoop({
       !pokedexModalOpen &&
       !skillLearnActive &&
       !scriptedInteractionActive &&
-      !dialogueActive &&
-      !solarStationPlacementPreview &&
-      !leafDenKitPlacementPreview
+      !dialogueActive
     ) {
       const previousPlayerPosition = session.playerCharacter.getPosition();
       session.playerCharacter.update(deltaTime);
@@ -6957,9 +7775,7 @@ export function startGameLoop({
         !pokedexModalOpen &&
         !skillLearnActive &&
         !scriptedInteractionActive &&
-        !dialogueActive &&
-        !solarStationPlacementPreview &&
-        !leafDenKitPlacementPreview
+        !dialogueActive
     });
     updateNatureRevivalEffects(session.natureRevivalEffects, deltaTime);
     updateTreeRevivalLeafBursts(deltaTime);
@@ -7072,6 +7888,7 @@ export function startGameLoop({
       !skillLearnActive &&
       !scriptedInteractionActive
     ) {
+      playSoundEvent(SOUND_EVENT_IDS.UI_CONFIRM);
       const playerPosition = session.playerCharacter.getPosition();
       const primaryActionTarget = gameplay.findNearbyActionTarget({
         playerPosition,
@@ -7234,12 +8051,16 @@ export function startGameLoop({
           });
         }
       } else if (primaryActionRepeatedFieldMove) {
+        playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
         triggerInvalidFieldMoveFeedback(primaryActionAlreadyResolvedGroundCell, now);
       } else if (primaryActionInvalidLeafageUse) {
+        playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
         leafageInvalidTargetPromptUntil = now + LEAFAGE_INVALID_TARGET_PROMPT_DURATION_MS;
       } else if (primaryActionInvalidFireUse) {
+        playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
         fireInvalidTargetPromptUntil = now + FIRE_INVALID_TARGET_PROMPT_DURATION_MS;
       } else if (primaryActionPlacementBlocked) {
+        playSoundEvent(SOUND_EVENT_IDS.UI_CANCEL);
         // The trigger is reserved for the selected move. Placements use their own place controls.
       } else if (primaryActionIsPlacement) {
         performHarvestAction(playerPosition, {
@@ -7451,6 +8272,7 @@ export function startGameLoop({
       !scriptedInteractionActive &&
       !dialogueActive
     ) {
+      playSoundEvent(SOUND_EVENT_IDS.UI_CONFIRM);
       performGameplayInteractAction({
         playerPosition: session.playerCharacter.getPosition(),
         npcActors: session.npcActors,
@@ -7494,6 +8316,7 @@ export function startGameLoop({
     }
 
     if (controls.consumeFollowerCallRequest?.()) {
+      playSoundEvent(SOUND_EVENT_IDS.BOT_SIGNAL);
       const leafDenHelpCall =
         controls.storyState.flags.leafDenKitPlaced &&
         !controls.storyState.flags.leafDenConstructionStarted;
@@ -7502,29 +8325,29 @@ export function startGameLoop({
         const called = [];
         if (controls.storyState.flags.timburrRevealed) {
           controls.storyState.flags.timburrFollowing = true;
-          called.push("Timburr");
+          called.push(SANDBOTS_BOT_NAMES.builder);
         }
         if (controls.storyState.flags.charmanderRevealed) {
           controls.storyState.flags.charmanderFollowing = true;
-          called.push("Charmander");
+          called.push(SANDBOTS_BOT_NAMES.thermal);
         }
         hud.pushNotice(called.length ?
           `${called.join(" and ")} are following you.` :
-          "No Pokemon are ready to help with construction yet.");
+          "No bots are ready to help with construction yet.");
       } else if (
         controls.storyState.flags.charmanderRevealed &&
         !controls.storyState.flags.charmanderCampfireLit &&
         session.campfire
       ) {
         controls.storyState.flags.charmanderFollowing = true;
-        hud.pushNotice("Charmander is following you.");
+        hud.pushNotice(`${SANDBOTS_BOT_NAMES.thermal} is following you.`);
       } else if (
         controls.storyState.flags.charmanderCelebrationSuggested &&
         !controls.storyState.flags.charmanderCelebrationComplete &&
         controls.storyState.flags.charmanderRevealed
       ) {
         controls.storyState.flags.charmanderFollowing = true;
-        hud.pushNotice("Charmander is following you.");
+        hud.pushNotice(`${SANDBOTS_BOT_NAMES.thermal} is following you.`);
       }
     }
 
@@ -7625,7 +8448,7 @@ export function startGameLoop({
 
           if (controls.storyState.flags.bulbasaurStrawBedChallengeCompletionNoticePending) {
             controls.storyState.flags.bulbasaurStrawBedChallengeCompletionNoticePending = false;
-            hud.pushNotice("First set of challenges complete. Talk to Bulbasaur.");
+            hud.pushNotice("First habitat check complete. Talk to Grow Bot.");
           }
         }
 
@@ -7705,13 +8528,11 @@ export function startGameLoop({
           const collectedLeppaBerryPositions = getNewlyCollectedDropPositions(leppaBerrySnapshots);
           hud.syncInventoryUi(controls.inventory);
           queueSupplyPickupFlyItems(LEPPA_BERRY_ITEM_ID, collectedLeppaBerryPositions);
-          hud.pushNotice(`+${collectedLeppaBerryCount} Leppa Berry`);
+          hud.pushNotice(`+${collectedLeppaBerryCount} ${SANDBOTS_ITEM_NAMES.pulseBerry}`);
           triggerSupplyCounterPrompt(LEPPA_BERRY_ITEM_ID, controls.inventory, now);
         }
       }
     }
-
-    let gameplayOpeningCameraFrame = null;
 
     if (!cinematicActive) {
       if (tutorialCameraFocus && session.playerCharacter) {
@@ -7721,7 +8542,7 @@ export function startGameLoop({
           zoom: 3.95,
           distance: 7.35
         });
-      } else if (isGameFlow(gameFlowValues.GAMEPLAY)) {
+      } else if (isGameFlow(gameFlowValues.GAMEPLAY) && !gameplayOpeningCameraFrame?.skipped) {
         gameplayOpeningCameraFrame = gameplayCameraDirector.update({
           now,
           gameplayActive: true,
@@ -7755,7 +8576,6 @@ export function startGameLoop({
         shipFallSfxController.update({
           active: false
         });
-        triggerGameplayOpeningShipImpactEffect(shipEvent, now);
         shipImpactSfxController.update({
           active: true,
           nowSeconds: now * 0.001
@@ -7972,24 +8792,40 @@ export function startGameLoop({
     if (!session.leafDenKitPlacementPreview?.active) {
       leafDenKitPlacementPreview = null;
     }
+    const inputModalityState = getCurrentInputModalityState();
     const transientNoticeRoute = resolveTransientNoticeRoute(hud.getNoticeMessage());
     const playerCounterPromptText = getPlayerCounterPrompt(now);
     const solarStationPlacementPrompt = solarStationPlacementPreview ?
       (
         solarStationPlacementPreview.valid ?
-          "Move Solar Station preview  X / Enter Place  B Cancel  LB/RB Rotate" :
-          "Blocked  Move away from objects  B Cancel  LB/RB Rotate"
+          resolvePlacementPreviewPrompt("Move Solar Station preview", inputModalityState) :
+          resolvePlacementPreviewPrompt("Blocked  Move away from objects", inputModalityState, {
+            includePlace: false
+          })
       ) :
       "";
     const leafDenKitPlacementPrompt = leafDenKitPlacementPreview ?
       (
         leafDenKitPlacementPreview.valid ?
-          "Move House Kit preview  X / Enter Place  B Cancel  LB/RB Rotate" :
+          resolvePlacementPreviewPrompt("Move House Kit preview", inputModalityState) :
           leafDenKitPlacementPreview.invalidReason === "outside-solar-station-radius" ?
-            "Needs Solar Station power radius  B Cancel  LB/RB Rotate" :
-            "Blocked  Move away from objects  B Cancel  LB/RB Rotate"
+            resolvePlacementPreviewPrompt("Needs blue support zone", inputModalityState, {
+              includePlace: false
+            }) :
+            resolvePlacementPreviewPrompt("Blocked  Move away from objects", inputModalityState, {
+              includePlace: false
+            })
       ) :
       "";
+    const pendingPlacementIntent =
+      !solarStationPlacementPreview && !leafDenKitPlacementPreview ?
+        getActivePendingPlacementIntent(session, controls.storyState, controls.inventory) :
+        null;
+    const pendingPlacementPrompt = getPendingPlacementPrompt(
+      pendingPlacementIntent,
+      nearbyHarvestTarget,
+      inputModalityState
+    );
     const selectedWorkbenchRotationTarget =
       !solarStationPlacementPreview &&
       !leafDenKitPlacementPreview ?
@@ -8008,9 +8844,9 @@ export function startGameLoop({
         getNearestRotatableWorkbenchPlacement() :
         null;
     const workbenchRotationPrompt = selectedWorkbenchRotationTarget ?
-      "X Confirm  LB/RB Rotate  B Cancel" :
+      resolveWorkbenchRotationPrompt(inputModalityState) :
       nearbyWorkbenchRotationTarget ?
-        "Press X" :
+        resolveInputPrompt(UI_PROMPT_ACTION.OPEN_BAG, inputModalityState) :
         "";
     const promptCopy =
       gameplayOpeningCameraActive ||
@@ -8021,6 +8857,7 @@ export function startGameLoop({
       "" :
       solarStationPlacementPrompt ||
       leafDenKitPlacementPrompt ||
+      pendingPlacementPrompt ||
       workbenchRotationPrompt ||
       gameplay.buildNearbyPrompt({
         harvestTarget: nearbyHarvestTarget,
@@ -8041,36 +8878,29 @@ export function startGameLoop({
       !scriptedInteractionActive &&
       !gameplayDialogue.isActive() &&
       Boolean(highlightedGroundCell);
-    const solarStationPlacementGroundCell =
-      solarStationPlacementPreview?.snappedPosition ?
-        {
-          id: "solar-station-placement-preview",
-          offset: solarStationPlacementPreview.snappedPosition,
-          surfaceY: solarStationPlacementPreview.snappedPosition[1],
-          tileSpan: Math.max(
-            SOLAR_STATION_PLACEMENT_PREVIEW_FOOTPRINT[0],
-            SOLAR_STATION_PLACEMENT_PREVIEW_FOOTPRINT[1]
-          ),
-          highlightTargetState: solarStationPlacementPreview.valid ? "valid" : "invalid"
-        } :
-        null;
-    const leafDenKitPlacementGroundCell =
-      leafDenKitPlacementPreview?.snappedPosition ?
-        {
-          id: "leaf-den-kit-placement-preview",
-          offset: leafDenKitPlacementPreview.snappedPosition,
-          surfaceY: leafDenKitPlacementPreview.snappedPosition[1],
-          tileSpan: Math.max(
-            leafDenKitPlacementPreview.effectiveSize?.[0] ||
-              leafDenKitPlacementPreview.size?.[0] ||
-              LEAF_DEN_KIT_PLACEMENT_PREVIEW_FOOTPRINT[0],
-            leafDenKitPlacementPreview.effectiveSize?.[1] ||
-              leafDenKitPlacementPreview.size?.[1] ||
-              LEAF_DEN_KIT_PLACEMENT_PREVIEW_FOOTPRINT[1]
-          ),
-          highlightTargetState: leafDenKitPlacementPreview.valid ? "valid" : "invalid"
-        } :
-        null;
+    const solarStationPlacementGroundCells = buildPlacementPreviewFootprintCells(
+      solarStationPlacementPreview,
+      {
+        idPrefix: "solar-station-placement-preview",
+        footprint: SOLAR_STATION_PLACEMENT_GRID_FOOTPRINT,
+        targetState: solarStationPlacementPreview?.valid ? "valid" : "invalid"
+      }
+    );
+    const solarStationPlacementGroundCell = solarStationPlacementGroundCells[0] || null;
+    const solarStationPowerRadiusGroundCells = solarStationPlacementPreview ?
+      buildSolarStationPreviewPowerRadiusGroundCells(session, solarStationPlacementPreview) :
+      leafDenKitPlacementPreview ?
+        buildPlacedSolarStationPowerRadiusGroundCells(session, controls.storyState) :
+        [];
+    const leafDenKitPlacementGroundCells = buildPlacementPreviewFootprintCells(
+      leafDenKitPlacementPreview,
+      {
+        idPrefix: "leaf-den-kit-placement-preview",
+        footprint: LEAF_DEN_KIT_PLACEMENT_GRID_FOOTPRINT,
+        targetState: leafDenKitPlacementPreview?.valid ? "valid" : "invalid"
+      }
+    );
+    const leafDenKitPlacementGroundCell = leafDenKitPlacementGroundCells[0] || null;
     const workbenchRotationGroundCell = selectedWorkbenchRotationTarget ?
       getWorkbenchRotationGroundCell(selectedWorkbenchRotationTarget) :
       null;
@@ -8089,6 +8919,7 @@ export function startGameLoop({
       nextFrame.hud.inventory = controls.inventory;
       nextFrame.hud.playerPosition = session.playerCharacter?.getPosition() || [0, 0, 0];
       nextFrame.hud.promptCopy = promptCopy;
+      nextFrame.hud.inputModalityState = inputModalityState;
       nextFrame.hud.statusMessage = promptCopy;
     }
 
@@ -8104,7 +8935,10 @@ export function startGameLoop({
     syncLeafDenConstructionClouds(now * 0.001);
     syncConstructionCloudBurstEffects(now * 0.001);
     syncLeafDenModelInstance(deltaTime);
-    syncPlayerHouseModelInstances(deltaTime);
+    syncPlayerHouseModelInstances(
+      deltaTime,
+      camera.getPose?.()?.target || session.playerCharacter?.getPosition?.() || null
+    );
     nextFrame.render.viewProjection = followedViewProjection;
     nextFrame.render.sceneObjects = getSquirtleAssemblySceneObjects(
       getGameplayOpeningShipSceneObjects(
@@ -8114,6 +8948,12 @@ export function startGameLoop({
       session.actTwoSquirtle
     );
     nextFrame.render.skyTexture = session.skyTexture;
+    const psxDistanceFogSettings = resolvePsxDistanceFogSettings({
+      sceneId: cinematicActive ? gameFlowValues.CINEMATIC : gameFlowValues.GAMEPLAY
+    });
+    nextFrame.render.psxDistanceFog = psxDistanceFogSettings.enabled ?
+      psxDistanceFogSettings :
+      null;
 
     const tangrowthActor = session.npcActors.find((npcActor) => npcActor.id === "tangrowth");
     const tangrowthPosition =
@@ -8356,6 +9196,10 @@ export function startGameLoop({
     const shouldShowLeafDenKitPlacementPrompt =
       canShowWorldSpaceUi &&
       Boolean(leafDenKitPlacementPreview?.snappedPosition);
+    const shouldShowPendingPlacementPrompt =
+      canShowWorldSpaceUi &&
+      session.playerCharacter &&
+      Boolean(pendingPlacementPrompt);
     const shouldShowWorkbenchRotationPrompt =
       canShowWorldSpaceUi &&
       session.playerCharacter &&
@@ -8377,25 +9221,25 @@ export function startGameLoop({
 
     if (shouldShowTangrowthLogChairSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "I made something for you.";
+      nextFrame.worldSpeech.text = "I saved a field plan for you.";
       nextFrame.worldSpeech.worldPosition = tangrowthPosition;
     }
 
     if (shouldShowTangrowthPokemonCenterSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "This way. The old Pokemon Center is ahead.";
+      nextFrame.worldSpeech.text = `This way. The old ${SANDBOTS_WORLD_TERMS.terminal} is ahead.`;
       nextFrame.worldSpeech.worldPosition = tangrowthPosition;
     }
 
     if (shouldShowTangrowthHouseSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "Let's talk about houses.";
+      nextFrame.worldSpeech.text = "Human shelter plans are ready.";
       nextFrame.worldSpeech.worldPosition = tangrowthPosition;
     }
 
     if (shouldShowTangrowthCelebrationSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "Bring Charmander here.";
+      nextFrame.worldSpeech.text = `Bring ${SANDBOTS_BOT_NAMES.thermal} here.`;
       nextFrame.worldSpeech.worldPosition = tangrowthPosition;
     }
 
@@ -8407,45 +9251,45 @@ export function startGameLoop({
 
     if (shouldShowBulbasaurMissionSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "This is no good...";
+      nextFrame.worldSpeech.text = "The soil is dry. It wants a repair, not a path.";
       nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
     }
 
     if (shouldShowBulbasaurWorkbenchGuideSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "This way! The Workbench is over here!";
+      nextFrame.worldSpeech.text = "Workbench ping found. Follow me.";
       nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
     }
 
     if (shouldShowBulbasaurRequestReadySpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "You did it!";
+      nextFrame.worldSpeech.text = "Dry patch restored. Soil response logged.";
       nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
     }
 
     if (shouldShowBulbasaurStrawBedSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "I thought of something!";
+      nextFrame.worldSpeech.text = "I can share Solar Station plans.";
       nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
     }
 
     if (shouldShowBulbasaurStrawBedCompleteSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "That looks so cozy!";
+      nextFrame.worldSpeech.text = "Solar Station online. Habitat stability rising.";
       nextFrame.worldSpeech.worldPosition = session.bulbasaurEncounter.position;
     }
 
     if (shouldShowCharmanderFollowSpeech) {
       nextFrame.worldSpeech.visible = true;
       nextFrame.worldSpeech.text = controls.storyState.flags.charmanderFollowing ?
-        "I'll follow you to the fire!" :
-        "Call me when you're ready.";
+        "Route locked. Lead me to the heat station." :
+        "Signal me when the heat station is ready.";
       nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
     }
 
     if (shouldShowCharmanderCelebrationSpeech) {
       nextFrame.worldSpeech.visible = true;
-      nextFrame.worldSpeech.text = "Let's celebrate!";
+      nextFrame.worldSpeech.text = "Heat station stable. That counts as a celebration.";
       nextFrame.worldSpeech.worldPosition = session.charmanderEncounter.position;
     }
 
@@ -8465,67 +9309,118 @@ export function startGameLoop({
     }
 
     if (shouldShowSolarStationPlacementPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = solarStationPlacementPreview.valid ?
-        "X / Enter Place" :
-        "Blocked";
-      nextFrame.worldPrompt.worldPosition = solarStationPlacementPreview.snappedPosition;
+      setFrameWorldPrompt(nextFrame, {
+        kind: "placement",
+        target: "solarStation",
+        valid: solarStationPlacementPreview.valid,
+        text: solarStationPlacementPreview.valid ?
+          resolveInputPrompt(UI_PROMPT_ACTION.PLACE, inputModalityState) :
+          getColonyFeedbackPrompt(COLONY_FEEDBACK_IDS.WORLD_PROMPT_BLOCKED),
+        worldPosition: solarStationPlacementPreview.snappedPosition
+      });
     } else if (shouldShowLeafDenKitPlacementPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = leafDenKitPlacementPreview.valid ?
-        "X / Enter Place" :
-        leafDenKitPlacementPreview.invalidReason === "outside-solar-station-radius" ?
-          "Needs power" :
-          "Blocked";
-      nextFrame.worldPrompt.worldPosition = leafDenKitPlacementPreview.snappedPosition;
+      setFrameWorldPrompt(nextFrame, {
+        kind: "placement",
+        target: "houseKit",
+        valid: leafDenKitPlacementPreview.valid,
+        text: leafDenKitPlacementPreview.valid ?
+          resolveInputPrompt(UI_PROMPT_ACTION.PLACE, inputModalityState) :
+          leafDenKitPlacementPreview.invalidReason === "outside-solar-station-radius" ?
+            getColonyFeedbackPrompt(COLONY_FEEDBACK_IDS.WORLD_PROMPT_NEEDS_POWER) :
+            getColonyFeedbackPrompt(COLONY_FEEDBACK_IDS.WORLD_PROMPT_BLOCKED),
+        worldPosition: leafDenKitPlacementPreview.snappedPosition
+      });
+    } else if (shouldShowPendingPlacementPrompt) {
+      setFrameWorldPrompt(nextFrame, {
+        kind: "placementIntent",
+        target: pendingPlacementIntent?.placeableId || pendingPlacementIntent?.itemId || "placement",
+        valid: pendingPlacementIntent?.blockedReason !== "needs-solar-station",
+        text: getPendingPlacementWorldPromptText(
+          pendingPlacementIntent,
+          nearbyHarvestTarget,
+          inputModalityState
+        ),
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowWorkbenchRotationPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = workbenchRotationPrompt;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "workbenchRotation",
+        text: workbenchRotationPrompt,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowPlayerCounterPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = playerCounterPromptText;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "counter",
+        text: playerCounterPromptText,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowFieldMoveSwitchPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = fieldMoveSwitchPrompt.html;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "fieldMoveSwitch",
+        html: fieldMoveSwitchPrompt.html,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowSquirtleChargingPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = "charging";
-      nextFrame.worldPrompt.worldPosition = squirtleChargingPosition;
+      setFrameWorldPrompt(nextFrame, {
+        kind: "charging",
+        companionId: "squirtle",
+        abilityId: "waterGun",
+        worldPosition: squirtleChargingPosition
+      });
     } else if (shouldShowInvalidLeafageUsePrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = LEAFAGE_INVALID_TARGET_PROMPT_TEXT;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "invalidMoveTarget",
+        abilityId: "leafage",
+        message: LEAFAGE_INVALID_TARGET_PROMPT_TEXT,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowInvalidFireUsePrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = FIRE_INVALID_TARGET_PROMPT_TEXT;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "invalidMoveTarget",
+        abilityId: "fire",
+        message: FIRE_INVALID_TARGET_PROMPT_TEXT,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowTransientWorldPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = transientNoticeRoute.worldPromptMessage;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "transientNotice",
+        text: transientNoticeRoute.worldPromptMessage,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowRepairBoxPrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = nearbyRepairBoxPrompt.text;
-      nextFrame.worldPrompt.worldPosition = nearbyRepairBoxPrompt.worldPosition;
+      setFrameWorldPrompt(nextFrame, {
+        kind: "repairBox",
+        text: nearbyRepairBoxPrompt.text,
+        worldPosition: nearbyRepairBoxPrompt.worldPosition
+      });
     } else if (shouldShowLeafageFirstUsePrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = leafageEquipped ? LEAFAGE_USE_PROMPT_TEXT : LEAFAGE_SWITCH_PROMPT_TEXT;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "firstUse",
+        abilityId: "leafage",
+        text: leafageEquipped ? LEAFAGE_USE_PROMPT_TEXT : LEAFAGE_SWITCH_PROMPT_TEXT,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     } else if (shouldShowWaterGunFirstUsePrompt) {
-      nextFrame.worldPrompt.visible = true;
-      nextFrame.worldPrompt.text = WATER_GUN_FIRST_USE_PROMPT_TEXT;
-      nextFrame.worldPrompt.worldPosition = session.playerCharacter.getPosition();
+      setFrameWorldPrompt(nextFrame, {
+        kind: "firstUse",
+        abilityId: "waterGun",
+        text: WATER_GUN_FIRST_USE_PROMPT_TEXT,
+        worldPosition: session.playerCharacter.getPosition()
+      });
     }
 
     if (solarStationPlacementGroundCell) {
       nextFrame.groundCellHighlight.visible = true;
-      nextFrame.groundCellHighlight.groundCell = solarStationPlacementGroundCell;
+      nextFrame.groundCellHighlight.markedGroundCells.push(
+        ...solarStationPowerRadiusGroundCells,
+        ...solarStationPlacementGroundCells
+      );
     } else if (leafDenKitPlacementGroundCell) {
       nextFrame.groundCellHighlight.visible = true;
-      nextFrame.groundCellHighlight.groundCell = leafDenKitPlacementGroundCell;
+      nextFrame.groundCellHighlight.markedGroundCells.push(
+        ...solarStationPowerRadiusGroundCells,
+        ...leafDenKitPlacementGroundCells
+      );
     } else if (workbenchRotationGroundCell) {
       nextFrame.groundCellHighlight.visible = true;
       nextFrame.groundCellHighlight.groundCell = workbenchRotationGroundCell;
@@ -8585,8 +9480,10 @@ export function startGameLoop({
       session.playerCharacter && !cinematicActive ?
         session.playerCharacter.getPosition() :
         null;
+    const natureRenderCenter = camera.getPose?.()?.target || grassBendPlayerPosition;
     const grassCollisionObjects = getGrassCollisionObjects();
     const selectedRepairBoxParticleTarget = getSelectedRepairBoxParticleTarget();
+    const bulbasaurRevealParticleTarget = getBulbasaurRevealParticleTarget();
     let shouldShowRepairBoxRustlingParticles = false;
 
     for (const groundGrassPatch of session.groundGrassPatches) {
@@ -8608,23 +9505,13 @@ export function startGameLoop({
         );
       const shouldRustleGrass = false;
       const rustleOffset = shouldRustleGrass ? Math.sin(now * 0.024) * 0.11 : 0;
-      const playerBend = getGrassPlayerBend(groundGrassPatch, grassBendPlayerPosition);
-      const grassRevivalScale = getNatureRevivalScale(
-        session.natureRevivalEffects,
-        groundGrassPatch.id
-      );
-      const grassAlpha = getGrassObjectCollisionAlpha(
-        groundGrassPatch,
-        grassCollisionObjects
-      );
-
-      const aliveGrassModelAvailable = Boolean(
+      const standardAliveGrassModelAvailable = Boolean(
         groundGrassPatch.state === "alive" &&
         groundGrassPatch.leafageObjectId !== "garden1" &&
         session.tallGrassModel &&
         Array.isArray(session.tallGrassInstances)
       );
-      const leafageGardenModelAvailable = Boolean(
+      const gardenGrassModelAvailable = Boolean(
         groundGrassPatch.state === "alive" &&
         groundGrassPatch.leafageObjectId === "garden1" &&
         session.leafageGardenModel &&
@@ -8634,6 +9521,49 @@ export function startGameLoop({
         groundGrassPatch.state !== "alive" &&
         session.deadGrassModel &&
         Array.isArray(session.deadGrassInstances)
+      );
+      const grassBillboardScaleX = Number(groundGrassPatch.size?.[0]) || 1;
+      const grassBillboardScaleY = Number(groundGrassPatch.size?.[1]) || grassBillboardScaleX;
+      const canUseGrassBillboardFallback =
+        standardAliveGrassModelAvailable ||
+        deadGrassModelAvailable ||
+        !gardenGrassModelAvailable;
+      const patchPrepareDistance = canUseGrassBillboardFallback ?
+        NATURE_PATCH_BILLBOARD_PREPARE_DISTANCE :
+        NATURE_PATCH_MODEL_PREPARE_DISTANCE;
+      if (
+        !hasRustlingEncounter &&
+        !isWorldPositionWithinRenderDistance(
+          groundGrassPatch.position,
+          natureRenderCenter,
+          patchPrepareDistance
+        )
+      ) {
+        continue;
+      }
+
+      const playerBend = getGrassPlayerBend(groundGrassPatch, grassBendPlayerPosition);
+      const grassRevivalScale = getNatureRevivalScale(
+        session.natureRevivalEffects,
+        groundGrassPatch.id
+      );
+      const grassAlpha = getGrassObjectCollisionAlpha(
+        groundGrassPatch,
+        grassCollisionObjects
+      );
+      const shouldUseGrassModelLod =
+        hasRustlingEncounter ||
+        isWorldPositionWithinRenderDistance(
+          groundGrassPatch.position,
+          natureRenderCenter,
+          NATURE_PATCH_GRASS_MODEL_LOD_DISTANCE
+        );
+      const aliveGrassModelAvailable = Boolean(
+        standardAliveGrassModelAvailable && shouldUseGrassModelLod
+      );
+      const leafageGardenModelAvailable = gardenGrassModelAvailable;
+      const nearDeadGrassModelAvailable = Boolean(
+        deadGrassModelAvailable && shouldUseGrassModelLod
       );
 
       if (leafageGardenModelAvailable) {
@@ -8670,7 +9600,7 @@ export function startGameLoop({
           yaw: getTallGrassYaw(groundGrassPatch),
           swayStrength: getTallGrassSway(groundGrassPatch, shouldRustleGrass, now) + playerBend.swayStrength
         });
-      } else if (deadGrassModelAvailable) {
+      } else if (nearDeadGrassModelAvailable) {
         session.deadGrassInstances.push({
           id: `dead-grass-${groundGrassPatch.id}`,
           offset: [
@@ -8697,7 +9627,10 @@ export function startGameLoop({
             groundGrassPatch.position[1],
             groundGrassPatch.position[2] + playerBend.offsetZ
           ],
-          size: groundGrassPatch.size.map((value) => value * grassRevivalScale),
+          size: [
+            grassBillboardScaleX * grassRevivalScale,
+            grassBillboardScaleY * grassRevivalScale
+          ],
           alpha: grassAlpha
         });
       }
@@ -8709,7 +9642,22 @@ export function startGameLoop({
 
     appendLandscapeCutEffectRenderables(nextFrame);
 
-    if (shouldShowRepairBoxRustlingParticles && selectedRepairBoxParticleTarget) {
+    if (bulbasaurRevealParticleTarget) {
+      nextFrame.render.genericBillboards.push(
+        ...getRepairBoxRevealRayBillboards(
+          bulbasaurRevealParticleTarget,
+          session.natureRevivalSparkTexture,
+          now,
+          rendering.fullUvRect
+        ),
+        ...getRustlingGrassParticleBillboards(
+          bulbasaurRevealParticleTarget,
+          session.natureRevivalSparkTexture,
+          now,
+          rendering.fullUvRect
+        )
+      );
+    } else if (shouldShowRepairBoxRustlingParticles && selectedRepairBoxParticleTarget) {
       nextFrame.render.genericBillboards.push(
         ...getRustlingGrassParticleBillboards(
           selectedRepairBoxParticleTarget,
@@ -8721,21 +9669,30 @@ export function startGameLoop({
     }
 
     for (const groundFlowerPatch of session.groundFlowerPatches) {
+      if (
+        !isWorldPositionWithinRenderDistance(
+          groundFlowerPatch.position,
+          natureRenderCenter,
+          NATURE_PATCH_BILLBOARD_PREPARE_DISTANCE
+        )
+      ) {
+        continue;
+      }
+
       const flowerRevivalScale = getNatureRevivalScale(
         session.natureRevivalEffects,
         groundFlowerPatch.id
       );
 
       if (groundFlowerPatch.state === "alive") {
-        nextFrame.render.flowerBillboards.push(
-          ...getFlowerArrangementBillboards({
-            groundFlowerPatch,
-            texture: session.greenFlowerTexture,
-            playerPosition: grassBendPlayerPosition,
-            revivalScale: flowerRevivalScale,
-            now
-          })
-        );
+        getFlowerArrangementBillboards({
+          groundFlowerPatch,
+          texture: session.greenFlowerTexture,
+          playerPosition: grassBendPlayerPosition,
+          revivalScale: flowerRevivalScale,
+          now,
+          target: nextFrame.render.flowerBillboards
+        });
         continue;
       }
 
@@ -8748,7 +9705,15 @@ export function startGameLoop({
 
     nextFrame.render.woodTexture = session.woodTexture;
     nextFrame.render.woodDrops = session.woodDrops.filter((drop) => {
-      return drop?.itemId !== LEAVES_ITEM_ID;
+      return (
+        drop?.itemId !== LEAVES_ITEM_ID &&
+        !drop.collected &&
+        isWorldPositionWithinRenderDistance(
+          drop.position,
+          natureRenderCenter,
+          NATURE_PATCH_BILLBOARD_PREPARE_DISTANCE
+        )
+      );
     });
     nextFrame.render.genericBillboards.push(
       ...getWoodCollectPopBillboards(session.woodTexture, rendering.fullUvRect)
@@ -8757,7 +9722,8 @@ export function startGameLoop({
       ...getLeafDropBillboards(
         session.woodDrops,
         session.leavesTexture,
-        rendering.fullUvRect
+        rendering.fullUvRect,
+        natureRenderCenter
       )
     );
     nextFrame.render.genericBillboards.push(
@@ -8765,12 +9731,20 @@ export function startGameLoop({
         session.resourceNodes,
         session.leavesTexture,
         rendering.fullUvRect,
-        controls.storyState
+        controls.storyState,
+        natureRenderCenter
       )
     );
     nextFrame.render.genericBillboards.push(
       ...(session.leppaBerryDrops || [])
-        .filter((leppaBerryDrop) => !leppaBerryDrop.collected)
+        .filter((leppaBerryDrop) => (
+          !leppaBerryDrop.collected &&
+          isWorldPositionWithinRenderDistance(
+            leppaBerryDrop.position,
+            natureRenderCenter,
+            NATURE_PATCH_BILLBOARD_PREPARE_DISTANCE
+          )
+        ))
         .map((leppaBerryDrop) => ({
           texture: session.leppaBerryTexture,
           position: leppaBerryDrop.position,
@@ -8886,18 +9860,14 @@ export function startGameLoop({
     }
     if (session.leafDen && controls.storyState.flags.leafDenKitPlaced) {
       const leafDenBuilt = Boolean(controls.storyState.flags.leafDenBuilt);
-      const shouldRenderLeafDenBillboard = !leafDenBuilt || !session.leafDenModelInstance;
+      const shouldRenderLeafDenBillboard = !session.leafDenModelInstance;
 
       if (shouldRenderLeafDenBillboard) {
         nextFrame.render.genericBillboards.push(
           applyPlayerPlacementSpawnToBillboard(session.leafDen, {
-            texture: leafDenBuilt ?
-              session.leafDenTexture :
-              session.leafDenKitTexture,
+            texture: session.leafDenTexture,
             position: session.leafDen.position,
-            size: leafDenBuilt ?
-              [2.55, 1.85] :
-              session.leafDen.size,
+            size: [2.55, 1.85],
             uvRect: rendering.fullUvRect,
             rotation: Number(session.leafDen.yaw || 0)
           }, deltaTime)
@@ -8979,7 +9949,7 @@ export function startGameLoop({
         uvRect: rendering.fullUvRect
       });
     }
-    if (session.billCameo?.visible) {
+    if (session.billCameo?.visible && session.billCameo.texture) {
       nextFrame.render.genericBillboards.push({
         texture: session.billCameo.texture,
         position: session.billCameo.position,
@@ -9111,11 +10081,15 @@ export function startGameLoop({
     );
     appendTreeRevivalLeafBurstBillboards(nextFrame);
     if (rendering.debugColliders) {
+      const debugColliders = [
+        ...(session.elevatedTerrainColliders || []),
+        ...getInteractionDebugColliders()
+      ];
       nextFrame.colliderGizmos.visible = true;
-      nextFrame.colliderGizmos.colliders = session.elevatedTerrainColliders || [];
+      nextFrame.colliderGizmos.colliders = debugColliders;
       nextFrame.render.genericBillboards.push(
         ...getColliderGizmoBillboards({
-          colliders: session.elevatedTerrainColliders,
+          colliders: debugColliders,
           textures: session.colliderGizmoTextures
         })
       );

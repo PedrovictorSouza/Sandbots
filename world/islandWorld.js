@@ -14,6 +14,11 @@ import {
   formatMoveTargetPromptByAbilityId
 } from "../app/sandbox/moveData.js";
 import { isFirstTaughtActionFreedomWindowActive } from "../app/story/earlyFreedomWindow.js";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES
+} from "../app/story/sandbotsLexicon.js";
+import { normalizeSandbotsVisibleText } from "../app/story/sandbotsTerminologyNormalizer.js";
 import { createSpatialHashIndex } from "./spatialHash.js";
 
 const WOOD_DROP_HEIGHT = 0.78;
@@ -27,9 +32,10 @@ const LEPPA_TREE_INTERACT_DISTANCE = 4.2;
 const LEPPA_TREE_WATERED_TILE_MIN_RADIUS_FACTOR = 0.35;
 const LEPPA_TREE_WATERED_TILE_MAX_RADIUS_FACTOR = 1.65;
 const LOG_CHAIR_INTERACT_DISTANCE = 2.35;
-const LEAF_DEN_INTERACT_DISTANCE = 2.85;
+const LEAF_DEN_INTERACT_DISTANCE = 4.4;
 const INSTANTIATED_OBJECT_INTERACT_DISTANCE = 2.2;
-export const BULBASAUR_TALK_INTERACT_DISTANCE = POKEMON_TALK_INTERACT_DISTANCE * 2;
+export const HELPER_BOT_TALK_INTERACT_DISTANCE = 8.2;
+export const BULBASAUR_TALK_INTERACT_DISTANCE = HELPER_BOT_TALK_INTERACT_DISTANCE;
 const INTERACTABLE_OBJECT_REACH_MIN = 2.55;
 const PALM_SHAKE_DURATION = 0.42;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
@@ -51,6 +57,10 @@ const ACTIVE_RUSTLING_PATCH_FLAG_BY_POKEMON = Object.freeze([
 const LEPPA_TREE_REVIVED_TINT = Object.freeze([1.82, 1.72, 1.24]);
 const LEPPA_TREE_REVIVED_TINT_STRENGTH = 0.76;
 const terrainColliderIndexCache = new WeakMap();
+
+export function normalizeWorldPromptCopy(value) {
+  return normalizeSandbotsVisibleText(value);
+}
 
 export function createFacingStaticController(facing) {
   return {
@@ -1207,6 +1217,7 @@ export function findNearbyInteractable(
   const rustlingGrassCellId = storyState?.flags?.rustlingGrassCellId;
   const rustlingGrassActive =
     !storyState?.flags?.bulbasaurRevealed &&
+    storyState?.flags?.chopperBulbasaurRepairBoxIntroComplete &&
     Boolean(rustlingGrassCellId);
 
   if (rustlingGrassActive) {
@@ -1231,7 +1242,7 @@ export function findNearbyInteractable(
         nearest = {
           kind: "grassEncounter",
           id: "rustlingGrass",
-          label: "Inspect dismantled Bulbasaur",
+          label: `Check on ${SANDBOTS_BOT_NAMES.grow}`,
           cellId: rustlingGrassPatch.cellId
         };
         nearestDistance = distance;
@@ -1315,7 +1326,7 @@ export function findNearbyInteractable(
         nearest = {
           kind: "charmanderGrassEncounter",
           id: "charmanderRustlingGrass",
-          label: "Repair dismantled Charmander",
+          label: `Help ${SANDBOTS_BOT_NAMES.thermal}`,
           cellId: rustlingGrassPatch.cellId
         };
         nearestDistance = distance;
@@ -1347,7 +1358,7 @@ export function findNearbyInteractable(
         nearest = {
           kind: "timburrGrassEncounter",
           id: "timburrRustlingGrass",
-          label: "Repair dismantled Timburr",
+          label: `Help ${SANDBOTS_BOT_NAMES.builder}`,
           cellId: rustlingGrassPatch.cellId
         };
         nearestDistance = distance;
@@ -1378,7 +1389,7 @@ export function findNearbyInteractable(
     setNearbyBulbasaurTarget({
       kind: bulbasaurRequestReady ? "bulbasaurRequestComplete" : "bulbasaurMission",
       id: bulbasaurRequestReady ? "bulbasaurLeafageReward" : "bulbasaurDryGrassMission",
-      label: "Talk to Bulbasaur",
+      label: `Talk to ${SANDBOTS_BOT_NAMES.grow}`,
       cellId: rustlingGrassCellId
     });
   }
@@ -1408,7 +1419,7 @@ export function findNearbyInteractable(
     nearest = {
       kind: "leppaBerryTree",
       id: "leppaTree",
-      label: "Pick Leppa Berry"
+      label: "Pick Pulse Berry"
     };
     nearestDistance = nearbyLeppaTree.distance;
   }
@@ -1420,7 +1431,7 @@ export function findNearbyInteractable(
     nearest = {
       kind: "leppaTreeLeafageOptions",
       id: "leppaTree",
-      label: "Leafage Options"
+      label: `${SANDBOTS_ITEM_NAMES.growTool} Options`
     };
     nearestDistance = nearbyLeppaTree.distance;
   }
@@ -1450,7 +1461,7 @@ export function findNearbyInteractable(
     setNearbyBulbasaurTarget({
       kind: "bulbasaurStrawBedComplete",
       id: "bulbasaurStrawBedComplete",
-      label: "Talk to Bulbasaur",
+      label: `Talk to ${SANDBOTS_BOT_NAMES.grow}`,
       cellId: rustlingGrassCellId
     });
   }
@@ -1507,7 +1518,7 @@ export function findNearbyInteractable(
       nearest = {
         kind: "timburrLeafDenFurnitureComplete",
         id: "timburr",
-        label: "Talk to Timburr"
+        label: `Talk to ${SANDBOTS_BOT_NAMES.builder}`
       };
       nearestDistance = distance;
     }
@@ -1530,7 +1541,7 @@ export function findNearbyInteractable(
       nearest = {
         kind: "charmanderCelebrationRequest",
         id: "charmander",
-        label: "Talk to Charmander"
+        label: `Talk to ${SANDBOTS_BOT_NAMES.thermal}`
       };
       nearestDistance = distance;
     }
@@ -1551,9 +1562,7 @@ export function findNearbyInteractable(
       playerPosition[2] - encounter.position[2]
     );
 
-    const interactDistance = id === "bulbasaur" ?
-      BULBASAUR_TALK_INTERACT_DISTANCE :
-      POKEMON_TALK_INTERACT_DISTANCE;
+    const interactDistance = HELPER_BOT_TALK_INTERACT_DISTANCE;
 
     if (distance <= interactDistance && distance < nearestDistance) {
       nearest = {
@@ -1568,19 +1577,19 @@ export function findNearbyInteractable(
 
   setNearbyCompanionTarget({
     id: "bulbasaur",
-    label: "Bulbasaur",
+    label: SANDBOTS_BOT_NAMES.grow,
     encounter: bulbasaurEncounter,
     revealedFlag: "bulbasaurRevealed"
   });
   setNearbyCompanionTarget({
     id: "charmander",
-    label: "Charmander",
+    label: SANDBOTS_BOT_NAMES.thermal,
     encounter: charmanderEncounter,
     revealedFlag: "charmanderRevealed"
   });
   setNearbyCompanionTarget({
     id: "timburr",
-    label: "Timburr",
+    label: SANDBOTS_BOT_NAMES.builder,
     encounter: timburrEncounter,
     revealedFlag: "timburrRevealed"
   });
@@ -1631,87 +1640,101 @@ export function buildNearbyPrompt({
   pendingWaterGunCount = 0
 }) {
   const interactPromptPrefix = "[E / X]";
+  const placePromptPrefix = "[X / Enter]";
+  const targetLabel = normalizeWorldPromptCopy(interactTarget?.target?.label || "");
+  const questTitle = normalizeWorldPromptCopy(quest?.title || "Explore");
+  const questActionLabel = normalizeWorldPromptCopy(quest?.actionLabel || "Interact");
+  const formatInteractPrompt = (detail) => {
+    const promptDetail = normalizeWorldPromptCopy(detail || "");
+    if (!promptDetail || promptDetail === targetLabel || promptDetail === "Explore") {
+      return `${interactPromptPrefix} ${targetLabel}`;
+    }
+
+    return `${interactPromptPrefix} ${targetLabel} • ${promptDetail}`;
+  };
 
   if (transientMessage) {
-    return transientMessage;
+    return normalizeWorldPromptCopy(transientMessage);
   }
 
   if (harvestTarget?.logChairPlacement) {
-    return "[Enter] Place the Log Chair nearby";
+    return `${placePromptPrefix} Place the Log Chair nearby`;
   }
 
   if (harvestTarget?.strawBedPlacement) {
     return harvestTarget.strawBedPlacement.canPlace ?
-      "[E / X] Place the Solar Station on open terrain" :
-      "[E / X] Move to open terrain";
+      `${placePromptPrefix} Place the Solar Station on open terrain` :
+      `${placePromptPrefix} Move to open terrain`;
   }
 
   if (harvestTarget?.leafDenKitPlacement) {
-    return "[Enter] Place the House Kit";
+    return harvestTarget.leafDenKitPlacement?.canPlace === false ?
+      `${placePromptPrefix} Place the Solar Station first` :
+      `${placePromptPrefix} Place the House Kit`;
   }
 
   if (harvestTarget?.leafDenFurniturePlacement) {
-    return "[Enter] Place furniture inside the House";
+    return `${placePromptPrefix} Place furniture inside the House`;
   }
 
   if (harvestTarget?.dittoFlagPlacement) {
-    return "[Enter] Place the Ditto Flag on the House";
+    return `${placePromptPrefix} Place the ${SANDBOTS_ITEM_NAMES.colonyFlag} on the House`;
   }
 
   if (
     interactTarget?.target?.id === "tangrowth" &&
     quest?.id === "spit-out-campfire"
   ) {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • Place Train House`;
+    return `${interactPromptPrefix} ${targetLabel} • Place ${SANDBOTS_ITEM_NAMES.thermalCabin}`;
   }
 
   if (interactTarget?.target?.id === "ruinedPokemonCenter") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • Inspect`;
+    return `${interactPromptPrefix} ${targetLabel} • Inspect`;
   }
 
   if (interactTarget?.target?.id === "pokemonCenterPc") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • Check PC`;
+    return `${interactPromptPrefix} ${targetLabel} • Check terminal`;
   }
 
   if (interactTarget?.target?.kind === "leafDenConstruction") {
     return storyState?.flags?.leafDenConstructionStarted ?
-      `${interactPromptPrefix} ${interactTarget.target.label} • Check construction` :
-      `${interactPromptPrefix} ${interactTarget.target.label} • Start construction`;
+      `${interactPromptPrefix} ${targetLabel} • Check construction` :
+      `${interactPromptPrefix} ${targetLabel} • Start construction`;
   }
 
   if (interactTarget?.target?.kind === "leafDenEntrance") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • Enter`;
+    return `${interactPromptPrefix} ${targetLabel} • Enter`;
   }
 
   if (interactTarget?.target?.kind === "timburrLeafDenFurnitureComplete") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • Complete request`;
+    return `${interactPromptPrefix} ${targetLabel} • Complete request`;
   }
 
   if (interactTarget?.target?.kind === "charmanderCelebrationRequest") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • Celebration`;
+    return `${interactPromptPrefix} ${targetLabel} • Celebration`;
   }
 
   if (interactTarget?.target?.kind === "leppaTreeLeafageOptions") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • Choose Leafage object`;
+    return `${interactPromptPrefix} ${targetLabel} • Choose ${SANDBOTS_ITEM_NAMES.growTool} object`;
   }
 
   if (interactTarget?.target?.action === "destroyInstantiatedObject") {
     const actionLabel = quest?.actionLabel === "Destroy" ?
       quest.actionLabel :
       (interactTarget.target.actionLabel || "Cut");
-    return `[Y] ${interactTarget.target.label} • ${actionLabel}`;
+    return `[Y] ${targetLabel} • ${normalizeWorldPromptCopy(actionLabel)}`;
   }
 
   if (interactTarget?.target?.kind === "logChairSeat") {
-    return `[X] ${interactTarget.target.label}`;
+    return `[X] ${targetLabel}`;
   }
 
   if (interactTarget?.target?.kind === "station") {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • ${quest.title}`;
+    return formatInteractPrompt(questTitle);
   }
 
   if (interactTarget?.target) {
-    return `${interactPromptPrefix} ${interactTarget.target.label} • ${quest.title}`;
+    return formatInteractPrompt(questTitle);
   }
 
   if (harvestTarget?.resourceNode) {
@@ -1722,7 +1745,7 @@ export function buildNearbyPrompt({
 
   if (harvestTarget?.palm) {
     if (activeMoveId === "waterGun") {
-      return "[Enter] Use Water Gun on the dead tree";
+      return `[Enter] Use ${SANDBOTS_ITEM_NAMES.hydroTool} on the dead tree`;
     }
 
     if (
@@ -1730,18 +1753,18 @@ export function buildNearbyPrompt({
       !storyState.flags.bulbasaurStrawBedChallengeComplete &&
       !storyState.flags.strawBedRecipeUnlocked
     ) {
-      return "[Enter] Use Water Gun on the tree";
+      return `[Enter] Use ${SANDBOTS_ITEM_NAMES.hydroTool} on the tree`;
     }
 
     return "[Enter] Hit the palm tree to drop Wood";
   }
 
   if (harvestTarget?.leppaTree?.action === "water") {
-    return "[Enter] Use Water Gun on the dead tree";
+    return `[Enter] Use ${SANDBOTS_ITEM_NAMES.hydroTool} on the dead tree`;
   }
 
   if (harvestTarget?.leppaTree?.action === "headbutt") {
-    return "[Enter] Headbutt the tree to drop a Leppa Berry";
+    return "[Enter] Headbutt the tree to drop a Pulse Berry";
   }
 
   if (harvestTarget?.leafageGroundCell) {
@@ -1762,7 +1785,7 @@ export function buildNearbyPrompt({
     return activeMoveGuidance;
   }
 
-  return `${quest.title} • ${quest.actionLabel}`;
+  return `${questTitle} • ${questActionLabel}`;
 }
 
 export function createKeyboardController(

@@ -1,4 +1,5 @@
 import { createBagDetailsController } from "../ui/bagDetailsController.js";
+import { getResourcePurposeByItemId } from "../story/resourcePurposeCatalog.js";
 import { createGameplayDialogueController } from "../ui/gameplayDialogueController.js";
 import { createGameplayUiVisibilityController } from "../ui/gameplayUiVisibilityController.js";
 import { createColliderGizmoOverlay } from "../ui/colliderGizmoOverlay.js";
@@ -34,7 +35,8 @@ export function createUiRuntime({
   clearGameFlowInput,
   isBuilderPanelOpen,
   setBuilderPanelOpen,
-  onPokedexScriptedClose
+  onPokedexScriptedClose,
+  onNoticePushed = null
 }) {
   const {
     status,
@@ -121,7 +123,7 @@ export function createUiRuntime({
       resourceHarvestPrompt,
       interactPrompt,
       questSystem,
-      initialStatus: status?.textContent || "Inicializando cena...",
+      initialStatus: status?.textContent || "Initializing scene...",
       questTitleElement: questFocusTitle,
       questBodyElement: questFocusBody,
       nearbyHabitatsValueElement: nearbyHabitatsValue
@@ -132,7 +134,7 @@ export function createUiRuntime({
   }, {
     onError(error) {
       hudBoundary.setLoading(false);
-      setStatusFallback(error?.message || "Falha ao carregar o HUD.", true);
+      setStatusFallback(error?.message || "Failed to load HUD.", true);
     }
   });
 
@@ -161,6 +163,9 @@ export function createUiRuntime({
       });
     },
     pushNotice(message, duration) {
+      if (typeof onNoticePushed === "function") {
+        onNoticePushed(message);
+      }
       return invokeHud("pushNotice", [message, duration], {
         replayIfUnloaded: true
       });
@@ -228,7 +233,7 @@ export function createUiRuntime({
   function createLazyUiModule(loadFactory) {
     return createLazyModuleHandle(loadFactory, {
       onError(error) {
-        hud.setStatus(error?.message || "Falha ao carregar a interface.", true);
+        hud.setStatus(error?.message || "Failed to load interface.", true);
       }
     });
   }
@@ -254,7 +259,8 @@ export function createUiRuntime({
     iconElement: bagDetailsIcon,
     nameElement: bagDetailsName,
     countElement: bagDetailsCount,
-    descriptionElement: bagDetailsDescription
+    descriptionElement: bagDetailsDescription,
+    getItemPurpose: (itemId) => getResourcePurposeByItemId(itemId)?.playerFacingPurpose || ""
   });
   const bagUiRuntime = createBagUiRuntime({
     bagDetails,

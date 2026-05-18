@@ -40,6 +40,82 @@ export function assertImmutableFirstQuest(quests) {
   }
 }
 
+export function getQuestFlowReachability(quests) {
+  const questById = new Map((quests || []).map((quest) => [quest.id, quest]));
+  const reachableQuestIds = new Set();
+  const missingNextQuestIds = [];
+  let loopQuestId = null;
+  let currentQuestId = quests?.[0]?.id || null;
+
+  while (currentQuestId) {
+    if (reachableQuestIds.has(currentQuestId)) {
+      loopQuestId = currentQuestId;
+      break;
+    }
+
+    const quest = questById.get(currentQuestId);
+    if (!quest) {
+      break;
+    }
+
+    reachableQuestIds.add(currentQuestId);
+    if (!quest.nextQuestId) {
+      break;
+    }
+
+    if (!questById.has(quest.nextQuestId)) {
+      missingNextQuestIds.push({
+        questId: quest.id,
+        nextQuestId: quest.nextQuestId
+      });
+      break;
+    }
+
+    currentQuestId = quest.nextQuestId;
+  }
+
+  const unreachableQuestIds = [];
+  const detachedQuestIds = [];
+  for (const quest of quests || []) {
+    if (reachableQuestIds.has(quest.id)) {
+      continue;
+    }
+
+    if (quest.detached) {
+      detachedQuestIds.push(quest.id);
+    } else {
+      unreachableQuestIds.push(quest.id);
+    }
+  }
+
+  return {
+    reachableQuestIds: [...reachableQuestIds],
+    detachedQuestIds,
+    unreachableQuestIds,
+    missingNextQuestIds,
+    loopQuestId
+  };
+}
+
+export function assertReachableQuestFlow(quests) {
+  const reachability = getQuestFlowReachability(quests);
+
+  if (reachability.loopQuestId) {
+    throw new Error(`Quest flow contains a nextQuestId loop at ${reachability.loopQuestId}.`);
+  }
+
+  if (reachability.missingNextQuestIds.length > 0) {
+    const missing = reachability.missingNextQuestIds
+      .map((entry) => `${entry.questId} -> ${entry.nextQuestId}`)
+      .join(", ");
+    throw new Error(`Quest flow points to missing quest(s): ${missing}.`);
+  }
+
+  if (reachability.unreachableQuestIds.length > 0) {
+    throw new Error(`Unreachable quest(s) must be connected or marked detached: ${reachability.unreachableQuestIds.join(", ")}.`);
+  }
+}
+
 export function isImmutableFirstQuestCompleted(state, quests) {
   const firstQuestId = quests?.[0]?.id;
   const firstQuest = firstQuestId ? state?.quests?.[firstQuestId] : null;

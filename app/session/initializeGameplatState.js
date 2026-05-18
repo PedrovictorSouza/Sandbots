@@ -5,6 +5,11 @@ import { createSnowstormParticleField } from "./snowstormParticleField.js";
 
 const STARTING_WOOD_DROP_SIZE = 0.78;
 const STARTING_WOOD_PICKUP_RADIUS = 0.64;
+const STARTING_WOOD_DROP_SAMPLE_STEP = 3;
+const STARTING_WOOD_CLEARING_ZONES = Object.freeze([
+  Object.freeze({ center: [12, -3.5], radius: 9 }),
+  Object.freeze({ center: [1.42, 62.48], radius: 18 })
+]);
 const STARTING_WOOD_DROP_POSITIONS = Object.freeze([
   [7.25, 0.02, -2.1],
   [9.15, 0.02, -4.6],
@@ -68,9 +73,18 @@ const STARTING_WOOD_DROP_POSITIONS = Object.freeze([
   [107.8, 0.02, 49.8]
 ]);
 
+function isInsideStartingWoodClearing(position) {
+  return STARTING_WOOD_CLEARING_ZONES.some((zone) => {
+    const dx = Number(position?.[0] || 0) - zone.center[0];
+    const dz = Number(position?.[2] || 0) - zone.center[1];
+    return Math.hypot(dx, dz) < zone.radius;
+  });
+}
+
 function createStartingWoodDrops() {
   return STARTING_WOOD_DROP_POSITIONS
-    .filter((_, index) => index % 2 === 0)
+    .filter((_, index) => index % STARTING_WOOD_DROP_SAMPLE_STEP === 0)
+    .filter((position) => !isInsideStartingWoodClearing(position))
     .map((position, index) => ({
       id: `starting-wood-${index + 1}`,
       position: [...position],

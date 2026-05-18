@@ -32,7 +32,7 @@ export async function createGameSession({
 }) {
   const session = createEmptySession();
 
-  setStatus("Carregando assets...");
+  setStatus("Loading assets...");
   const assets = await loadSessionAssets({ gl, setStatus });
   buildSessionResources(session, assets, { worldTextureFactory });
 

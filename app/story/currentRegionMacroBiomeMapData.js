@@ -14,7 +14,7 @@ function deepFreeze(value) {
 const CURRENT_REGION_MACRO_BIOME_BY_ID = deepFreeze({
   "hearth-hollow": {
     macroBiomeId: MACRO_BIOME_IDS.ASH_WILDS,
-    reason: "Current central tutorial and first-home space."
+    reason: "Current central tutorial and first colony hub space."
   },
   "north-wool-ridge": {
     macroBiomeId: MACRO_BIOME_IDS.GRANITE_RIDGE,
@@ -38,7 +38,7 @@ const CURRENT_REGION_MACRO_BIOME_BY_ID = deepFreeze({
   },
   "old-burrow-ruins": {
     macroBiomeId: MACRO_BIOME_IDS.SKYFORGE_SPIRES,
-    reason: "Existing ruins are reserved for later staged repair progression."
+    reason: "Existing ruins are reserved for later staged colony repair progression."
   },
   "outer-north-ridge": {
     macroBiomeId: MACRO_BIOME_IDS.GRANITE_RIDGE,

@@ -18,47 +18,47 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
           <section class="skill-learn-overlay" id="skill-learn-overlay" hidden aria-label="Skill learned"></section>
           <section class="cinematic-overlay" id="cinematic-overlay" hidden aria-label="Act two cinematic"></section>
           <section class="tutorial-overlay" id="tutorial-overlay" hidden aria-label="Act two tutorial"></section>
-          <section class="pokedex-overlay" id="pokedex-overlay" hidden aria-label="Pokedex entry">
+          <section class="pokedex-overlay" id="pokedex-overlay" hidden aria-label="Colony Codex entry">
             <article class="pokedex-entry">
               <div class="pokedex-entry__details">
                 <header class="pokedex-entry__heading">
-                  <span data-pokedex-field="number">No. 007</span>
-                  <strong data-pokedex-field="name">Squirtle</strong>
+                  <span data-pokedex-field="number">Bot H-01</span>
+                  <strong data-pokedex-field="name">Hydro Bot</strong>
                 </header>
-                <div class="pokedex-entry__tabs" aria-label="Pokedex sections">
+                <div class="pokedex-entry__tabs" aria-label="Colony Codex sections">
                   <button class="pokedex-entry__nav" data-pokedex-action="prev" type="button" aria-label="Previous page">L</button>
                   <button class="pokedex-entry__tab" data-pokedex-page-target="details" data-active="true" type="button" aria-label="Details">&#9675;</button>
-                  <button class="pokedex-entry__tab" data-pokedex-page-target="where-to-find" data-active="false" type="button" aria-label="Where to Find">&#9632;</button>
-                  <button class="pokedex-entry__tab" data-pokedex-page-target="specialties" data-active="false" type="button" aria-label="Specialties and Likes">&hearts;</button>
-                  <button class="pokedex-entry__tab" data-pokedex-page-target="requests" data-active="false" type="button" aria-label="Requests">!</button>
+                  <button class="pokedex-entry__tab" data-pokedex-page-target="where-to-find" data-active="false" type="button" aria-label="Field Site">&#9632;</button>
+                  <button class="pokedex-entry__tab" data-pokedex-page-target="specialties" data-active="false" type="button" aria-label="Functions and Care">&hearts;</button>
+                  <button class="pokedex-entry__tab" data-pokedex-page-target="requests" data-active="false" type="button" aria-label="Field Requests">!</button>
                   <button class="pokedex-entry__nav" data-pokedex-action="next" type="button" aria-label="Next page">R</button>
                 </div>
                 <section class="pokedex-entry__page" data-pokedex-page-panel="details">
                   <div class="pokedex-entry__eyebrow" data-pokedex-field="details-eyebrow">Details</div>
-                  <div class="pokedex-entry__species" data-pokedex-field="species">Tiny Turtle Pokemon</div>
+                  <div class="pokedex-entry__species" data-pokedex-field="species">Hydro Utility Bot</div>
                   <p class="pokedex-entry__description" data-pokedex-field="description">
-                    Shoots water at prey while in the water. Withdraws into its shell when in danger.
+                    Compact field unit calibrated for Hydro Jet pressure, tree revival, and emergency hydration work.
                   </p>
                   <div class="pokedex-entry__stats">
                     <div class="pokedex-entry__stat">
-                      <span data-pokedex-field="detail-stat-label-0">Height</span>
-                      <strong data-pokedex-field="detail-stat-value-0">1'8"</strong>
+                      <span data-pokedex-field="detail-stat-label-0">Frame</span>
+                      <strong data-pokedex-field="detail-stat-value-0">Compact</strong>
                     </div>
                     <div class="pokedex-entry__stat">
-                      <span data-pokedex-field="detail-stat-label-1">Weight</span>
-                      <strong data-pokedex-field="detail-stat-value-1">19.8 lbs.</strong>
+                      <span data-pokedex-field="detail-stat-label-1">Mass</span>
+                      <strong data-pokedex-field="detail-stat-value-1">Light</strong>
                     </div>
                     <div class="pokedex-entry__stat">
-                      <span data-pokedex-field="detail-stat-label-2">Type</span>
+                      <span data-pokedex-field="detail-stat-label-2">Module</span>
                       <div class="pokedex-entry__type-badge">
                         <div class="pokedex-entry__type-icon" data-pokedex-field="detail-type-icon">&#128167;</div>
-                        <strong data-pokedex-field="detail-type-label">Water</strong>
+                        <strong data-pokedex-field="detail-type-label">Hydro</strong>
                       </div>
                     </div>
                   </div>
                 </section>
                 <section class="pokedex-entry__page pokedex-entry__page--where" data-pokedex-page-panel="where-to-find" hidden>
-                  <div class="pokedex-entry__eyebrow" data-pokedex-field="where-eyebrow">Where to Find</div>
+                  <div class="pokedex-entry__eyebrow" data-pokedex-field="where-eyebrow">Field Site</div>
                   <div class="pokedex-entry__where-body">
                     <div class="pokedex-entry__where-visual">
                       <span class="pokedex-entry__where-arrow" aria-hidden="true">&#9664;</span>
@@ -82,24 +82,24 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
                   </div>
                 </section>
                 <section class="pokedex-entry__page pokedex-entry__page--specialties" data-pokedex-page-panel="specialties" hidden>
-                  <div class="pokedex-entry__eyebrow" data-pokedex-field="specialties-eyebrow">Specialties &amp; Likes</div>
+                  <div class="pokedex-entry__eyebrow" data-pokedex-field="specialties-eyebrow">Functions &amp; Care</div>
                   <div class="pokedex-entry__specialties-grid">
                     <section class="pokedex-entry__info-card">
-                      <h3 data-pokedex-field="specialty-title">Specialties</h3>
+                      <h3 data-pokedex-field="specialty-title">Function</h3>
                       <div class="pokedex-entry__specialty-badge">
                         <span aria-hidden="true" data-pokedex-field="specialty-icon">&#128167;</span>
-                        <strong data-pokedex-field="specialty-label">Water</strong>
+                        <strong data-pokedex-field="specialty-label">Hydro recovery</strong>
                       </div>
                     </section>
                     <section class="pokedex-entry__info-card pokedex-entry__info-card--favorites">
-                      <h3 data-pokedex-field="favorites-title">Favorites</h3>
+                      <h3 data-pokedex-field="favorites-title">Care Notes</h3>
                       <ul class="pokedex-entry__favorites" data-pokedex-field="favorites-list">
-                        <li>Lots of water</li>
-                        <li>Cleanliness</li>
-                        <li>Healing</li>
-                        <li>Cute stuff</li>
-                        <li>Group activities</li>
-                        <li>Sweet flavors</li>
+                        <li>Clean tanks</li>
+                        <li>Clear channels</li>
+                        <li>Hydrated soil</li>
+                        <li>Light maintenance</li>
+                        <li>Group routines</li>
+                        <li>Low grit intake</li>
                       </ul>
                     </section>
                     <section class="pokedex-entry__info-card">
@@ -109,12 +109,12 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
                   </div>
                 </section>
                 <section class="pokedex-entry__page pokedex-entry__page--requests" data-pokedex-page-panel="requests" hidden>
-                  <div class="pokedex-entry__eyebrow">Requests</div>
+                  <div class="pokedex-entry__eyebrow">Field Requests</div>
                   <article class="pokedex-entry__request-card">
                     <div class="pokedex-entry__request-status" data-pokedex-field="request-status">No Active Request</div>
-                    <div class="pokedex-entry__request-giver" data-pokedex-field="request-giver">Pokedex</div>
+                    <div class="pokedex-entry__request-giver" data-pokedex-field="request-giver">Colony Codex</div>
                     <h3 data-pokedex-field="request-title">No requests yet</h3>
-                    <p data-pokedex-field="request-description">Keep restoring habitats and checking in with Pokemon.</p>
+                    <p data-pokedex-field="request-description">Keep restoring habitats and checking in with colony bots.</p>
                     <div class="pokedex-entry__request-row">
                       <span>Objective</span>
                       <strong data-pokedex-field="request-objective">No objective tracked.</strong>
@@ -184,7 +184,7 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
                   </div>
                 </div>
               </div>
-              <button class="pokedex-entry__close" id="pokedex-overlay-close" data-pokedex-action="close" type="button">X / Enter Close</button>
+              <button class="pokedex-entry__close" id="pokedex-overlay-close" data-pokedex-action="close" type="button" aria-label="Close Colony Codex">Close</button>
             </article>
           </section>
           <aside class="nearby-habitats-panel" aria-label="Nearby habitats">
@@ -200,7 +200,7 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
             <div class="hud-checklist" id="hud-checklist" aria-label="Quest checks"></div>
             <span id="hud-meta"></span>
             <div class="hud__signals">
-              <button class="hud-alert" id="pokedex-alert" type="button" hidden data-pulse="false">Pokedex Signal</button>
+              <button class="hud-alert" id="pokedex-alert" type="button" hidden data-pulse="false">Codex Signal</button>
             </div>
             <div class="hud-control">
               <label for="jitter-slider">
@@ -210,20 +210,20 @@ const GAME_SHELL_HTML = `<div class="game-stage" id="game-stage">
               <input id="jitter-slider" type="range" min="0" max="100" step="1" value="0" />
             </div>
           </div>
-          <aside class="missions-panel" id="missions-panel" aria-label="Missoes">
-            <div class="missions-header">Missoes</div>
+          <aside class="missions-panel" id="missions-panel" aria-label="Tasks">
+            <div class="missions-header">Tasks</div>
             <div class="missions-stack" id="missions-stack"></div>
           </aside>
-          <div class="skills-panel" id="skills-panel" aria-label="Habilidades" hidden>
-            <strong>Moves</strong>
+          <div class="skills-panel" id="skills-panel" aria-label="Tools" hidden>
+            <strong>Tools</strong>
             <div class="skills-grid" id="skills-grid"></div>
           </div>
-          <div class="inventory" id="inventory-panel" aria-label="Inventario">
+          <div class="inventory" id="inventory-panel" aria-label="Supplies">
             <strong>Supplies</strong>
             <div class="inventory-grid" id="inventory-grid"></div>
           </div>
-          <section class="builder-panel" id="builder-panel" hidden aria-label="Winter Burrow handbook"></section>
-          <div class="status" id="status">Inicializando cena...</div>
+          <section class="builder-panel" id="builder-panel" hidden aria-label="Colony handbook"></section>
+          <div class="status" id="status">Initializing scene...</div>
         </div>
         </div>
 </div>`;

@@ -23,8 +23,25 @@ import {
 
 const SCENE_LIMIT = WORLD_LIMIT;
 
-function escapeHtml(value) {
+function normalizeGuideCopy(value) {
   return String(value)
+    .replaceAll("Winter Burrow", "Sandbots")
+    .replaceAll("Aunty's", "Core Keeper Bot's")
+    .replaceAll("Aunty", "Core Keeper Bot")
+    .replaceAll("Bufo's", "Route Survey Bot's")
+    .replaceAll("Bufo", "Route Survey Bot")
+    .replaceAll("Hearth Hollow", "Core Hollow")
+    .replaceAll("Old Burrow", "Old Colony Hub")
+    .replaceAll("old burrow", "old colony hub")
+    .replaceAll("Unified Recipe Index", "Unified Plan Index")
+    .replaceAll("Marsh Pie", "Marsh Ration")
+    .replaceAll("Route Survey Bot's pie", "Route Survey Bot's ration")
+    .replaceAll("pies", "rations")
+    .replaceAll("burrow", "hub");
+}
+
+function escapeHtml(value) {
+  return normalizeGuideCopy(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -158,11 +175,11 @@ function renderRecipeDetail(recipe, meta, trackedRecipeId) {
           data-track-recipe="${escapeHtml(recipe.id)}"
           data-active="${trackedRecipeId === recipe.id ? "true" : "false"}"
         >
-          ${trackedRecipeId === recipe.id ? "Remover do HUD" : "Rastrear no HUD"}
+          ${trackedRecipeId === recipe.id ? "Remove from HUD" : "Track in HUD"}
         </button>
       </section>
       <section class="detail-block">
-        <div class="detail-block__title">Ingredients</div>
+        <div class="detail-block__title">Inputs</div>
         <ul class="detail-list">
           ${recipe.ingredients
             .map(
@@ -741,15 +758,15 @@ function renderPinned(refs, state) {
 
   if (!trackedRecipe) {
     refs.pinned.innerHTML = `
-      <div class="guide-pinned__eyebrow">Pinned Recipe</div>
+      <div class="guide-pinned__eyebrow">Pinned Plan</div>
       <strong>None</strong>
-      <p>Select any recipe and pin it to the HUD.</p>
+      <p>Select any plan and pin it to the HUD.</p>
     `;
     return;
   }
 
   refs.pinned.innerHTML = `
-    <div class="guide-pinned__eyebrow">Pinned Recipe</div>
+    <div class="guide-pinned__eyebrow">Pinned Plan</div>
     <strong>${escapeHtml(trackedRecipe.name)}</strong>
     <p>${escapeHtml(formatIngredientList(trackedRecipe.ingredients))}</p>
   `;
@@ -757,13 +774,13 @@ function renderPinned(refs, state) {
 
 function renderHeader(refs, state) {
   const meta = GUIDE_SECTIONS[state.view];
-  refs.overline.textContent = meta.overline;
-  refs.title.textContent = meta.title;
-  refs.description.textContent = meta.description;
+  refs.overline.textContent = normalizeGuideCopy(meta.overline);
+  refs.title.textContent = normalizeGuideCopy(meta.title);
+  refs.description.textContent = normalizeGuideCopy(meta.description);
 
   const hasSearch = isRecipeView(state.view);
   refs.searchWrap.hidden = !hasSearch;
-  refs.searchInput.placeholder = meta.searchPlaceholder || "";
+  refs.searchInput.placeholder = meta.searchPlaceholder ? normalizeGuideCopy(meta.searchPlaceholder) : "";
   refs.searchInput.value = state.search;
 }
 
@@ -772,7 +789,7 @@ function renderKpis(refs, state) {
     refs.kpis.innerHTML = [
       renderPill("Articles", String(TOOLKIT_ARTICLES.length)),
       renderPill("Guide Hooks", String(TOOLKIT_GUIDES.length)),
-      renderPill("Recipes", String(ALL_RECIPES.length)),
+      renderPill("Plans", String(ALL_RECIPES.length)),
       renderPill("Map Notes", String(SMALL_ISLAND_MAP_POINTS.length)),
     ].join("");
     return;
@@ -824,7 +841,7 @@ function renderKpis(refs, state) {
     renderPill("Showing", `${visibleRecipes.length} of ${recipes.length}`),
     renderPill("Groups", String(categories.length)),
     renderPill(
-      state.view === "database" ? "Crafting / Cooking" : "Recipes",
+      state.view === "database" ? "Plans / Meals" : "Plans",
       state.view === "database"
         ? `${CRAFTING_RECIPES.length} / ${COOKING_RECIPES.length}`
         : String(recipes.length)
@@ -861,7 +878,7 @@ function renderFilters(refs, state) {
   if (state.view === "database") {
     refs.filters.innerHTML = [
       `<button class="guide-filter" type="button" data-guide-filter="all" data-active="${state.filter === "all" ? "true" : "false"}">All</button>`,
-      `<button class="guide-filter" type="button" data-guide-filter="crafting" data-active="${state.filter === "crafting" ? "true" : "false"}">Crafting</button>`,
+      `<button class="guide-filter" type="button" data-guide-filter="crafting" data-active="${state.filter === "crafting" ? "true" : "false"}">Plans</button>`,
       `<button class="guide-filter" type="button" data-guide-filter="cooking" data-active="${state.filter === "cooking" ? "true" : "false"}">Cooking</button>`,
     ].join("");
     return;
@@ -876,10 +893,10 @@ function renderHome(refs) {
   refs.content.innerHTML = `
     <section class="guide-home-grid">
       <article class="guide-home-card guide-home-card--hero">
-        <div class="guide-home-card__eyebrow">Winter Burrow Toolkit</div>
+        <div class="guide-home-card__eyebrow">Sandbots Field Handbook</div>
         <h3>The toolkit archive now lives inside the game.</h3>
         <p>
-          The handbook now carries article-style walkthroughs, quick-launch guide hooks, recipe
+          The handbook now carries article-style walkthroughs, quick-launch guide hooks, plan
           archives, and a local field map tied to the current island scene.
         </p>
         <div class="guide-home-card__actions">
@@ -899,14 +916,14 @@ function renderHome(refs) {
         <p>Planner notes, map routing, and pickaxe progression shortcuts live here.</p>
       </article>
       <article class="guide-home-card">
-        <div class="guide-home-card__eyebrow">Crafting</div>
+        <div class="guide-home-card__eyebrow">Plans</div>
         <h3>${CRAFTING_RECIPES.length} blueprints</h3>
         <p>Planks, tools, furniture, planters, unlock sources, and attack values.</p>
       </article>
       <article class="guide-home-card">
-        <div class="guide-home-card__eyebrow">Cooking & Database</div>
+        <div class="guide-home-card__eyebrow">Meals & Database</div>
         <h3>${COOKING_RECIPES.length} meals, ${ALL_RECIPES.length} total rows</h3>
-        <p>Browse every imported recipe entry alongside the article archive and local map.</p>
+        <p>Browse every imported plan entry alongside the article archive and local map.</p>
       </article>
     </section>
   `;
@@ -919,7 +936,7 @@ function renderGuides(refs, state) {
 
   refs.content.innerHTML = `
     <section class="guides-hero">
-      <div class="guides-hero__eyebrow">Winter Burrow Guides</div>
+      <div class="guides-hero__eyebrow">Field Guides</div>
       <h3 class="guides-hero__title">Tactical Playbooks for Every Expedition</h3>
       <p class="guides-hero__copy">
         Six core guide bundles updated with our latest expedition math. Pair these with the
@@ -938,7 +955,7 @@ function renderGuides(refs, state) {
     </section>
     <section class="guides-cta">
       <div class="guides-cta__eyebrow">Looking for More Specific Advice?</div>
-      <h3 class="guides-cta__title">Detailed walkthroughs, recipe guides, and answers live in Articles.</h3>
+      <h3 class="guides-cta__title">Detailed walkthroughs, plan guides, and answers live in Articles.</h3>
       <p class="guides-cta__copy">
         Use the article shelf for long-form routes, FAQs, and more focused breakdowns of key systems.
       </p>
@@ -1035,7 +1052,7 @@ function renderRecipeBrowser(refs, state) {
     ? `<section class="recipe-grid">${visibleRecipes
         .map((recipe) => renderRecipeCard(recipe, recipe.id === selectedRecipe?.id))
         .join("")}</section>`
-    : renderEmptyState("No recipes found", "Try another search term or clear the active filter.");
+    : renderEmptyState("No plans found", "Try another search term or clear the active filter.");
 
   refs.detail.innerHTML = selectedRecipe
     ? renderRecipeDetail(selectedRecipe, GUIDE_SECTIONS[selectedRecipe.section], state.trackedRecipeId)
@@ -1117,7 +1134,7 @@ function renderKnitting(refs) {
         <h3>Pattern data not included in the imported brief.</h3>
         <p>
           The section is implemented as part of the handbook shell, but it is waiting on real
-          knitting recipes, yarn requirements, warmth stats, and unlock records.
+          equipment plans, material requirements, stability stats, and unlock records.
         </p>
       </article>
       <article class="guide-home-card">
@@ -1128,7 +1145,7 @@ function renderKnitting(refs) {
       <article class="guide-home-card">
         <div class="guide-home-card__eyebrow">Current Recommendation</div>
         <h3>Use Database for now</h3>
-        <p>Crafting and Cooking are fully populated, so the unified index remains the fastest browse path.</p>
+        <p>Plan and meal entries are fully populated, so the unified index remains the fastest browse path.</p>
       </article>
     </section>
   `;
@@ -1141,9 +1158,9 @@ export function mountGuidePanelShell(root) {
     <div class="guide-shell">
       <aside class="guide-sidebar" aria-label="Handbook navigation">
         <div class="guide-brand">
-          <span class="guide-brand__eyebrow">Winter Burrow Logo</span>
-          <strong class="guide-brand__title">Winter Burrow Toolkit</strong>
-          <p class="guide-brand__copy">Guides, articles, recipes, and route notes wired into Small Island.</p>
+          <span class="guide-brand__eyebrow">Colony Archive</span>
+          <strong class="guide-brand__title">Sandbots Field Handbook</strong>
+          <p class="guide-brand__copy">Guides, articles, plans, and route notes wired into the colony.</p>
         </div>
         <nav class="guide-nav" id="guide-nav" aria-label="Handbook sections"></nav>
         <section class="guide-pinned" id="guide-pinned"></section>

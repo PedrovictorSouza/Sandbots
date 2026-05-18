@@ -1,3 +1,9 @@
+import {
+  fetchArrayBufferAsset,
+  fetchGltfAsset,
+  fetchJsonAsset
+} from "./assetFetch.ts";
+
 export const FULL_UV_RECT = [0, 0, 1, 1];
 export const WORLD_MARKER_HEIGHT = 0.04;
 export const WORLD_MARKER_SIZE = [1.05, 1.05];
@@ -37,9 +43,11 @@ const SCENE_VERTEX_SOURCE = `
   uniform float uWorldCurvatureMaxDrop;
   uniform vec2 uPixelSnap;
   uniform float uTime;
+  uniform vec3 uFogOrigin;
 
   varying vec2 vTexCoord;
   varying vec3 vWorldNormal;
+  varying float vFogDistance;
 
   vec3 applyWorldCurvature(vec3 world) {
     vec2 delta = world.xz - uWorldCurvatureOrigin.xz;
@@ -121,6 +129,7 @@ const SCENE_VERTEX_SOURCE = `
     gl_Position = clip;
     vTexCoord = aTexCoord;
     vWorldNormal = normal;
+    vFogDistance = length(world.xz - uFogOrigin.xz);
   }
 `;
 
@@ -132,8 +141,13 @@ const SCENE_FRAGMENT_SOURCE = `
   uniform vec3 uInstanceTint;
   uniform float uInstanceTintStrength;
   uniform float uInstanceAlpha;
+  uniform vec3 uFogColor;
+  uniform float uFogNear;
+  uniform float uFogFar;
+  uniform float uFogIntensity;
   varying vec2 vTexCoord;
   varying vec3 vWorldNormal;
+  varying float vFogDistance;
 
   void main() {
     vec4 texel = texture2D(uTexture, vTexCoord);
@@ -158,8 +172,12 @@ const SCENE_FRAGMENT_SOURCE = `
       litColor * uInstanceTint,
       clamp(uInstanceTintStrength, 0.0, 1.0)
     );
+    float fogRange = max(uFogFar - uFogNear, 0.001);
+    float fogProgress = clamp((vFogDistance - uFogNear) / fogRange, 0.0, 1.0);
+    float fogBlend = smoothstep(0.0, 1.0, fogProgress) * clamp(uFogIntensity, 0.0, 1.0);
+    vec3 foggedColor = mix(tintedColor, uFogColor, fogBlend);
 
-    gl_FragColor = vec4(tintedColor, texel.a * clamp(uInstanceAlpha, 0.0, 1.0));
+    gl_FragColor = vec4(foggedColor, texel.a * clamp(uInstanceAlpha, 0.0, 1.0));
   }
 `;
 
@@ -410,6 +428,11 @@ export function createWorldRenderingResources(gl) {
     worldCurvatureMaxDrop: gl.getUniformLocation(program, "uWorldCurvatureMaxDrop"),
     pixelSnap: gl.getUniformLocation(program, "uPixelSnap"),
     time: gl.getUniformLocation(program, "uTime"),
+    fogOrigin: gl.getUniformLocation(program, "uFogOrigin"),
+    fogColor: gl.getUniformLocation(program, "uFogColor"),
+    fogNear: gl.getUniformLocation(program, "uFogNear"),
+    fogFar: gl.getUniformLocation(program, "uFogFar"),
+    fogIntensity: gl.getUniformLocation(program, "uFogIntensity"),
     texture: gl.getUniformLocation(program, "uTexture"),
     brightness: gl.getUniformLocation(program, "uBrightness"),
     instanceTint: gl.getUniformLocation(program, "uInstanceTint"),
@@ -1393,18 +1416,8 @@ export async function loadPicoModel({
   onStatus?.(`Carregando ${gltfPath}...`);
 
   const [gltf, picoData] = await Promise.all([
-    fetch(gltfPath).then((response) => {
-      if (!response.ok) {
-        throw new Error(`Nao foi possivel carregar ${gltfPath}`);
-      }
-      return response.json();
-    }),
-    fetch(txtPath).then((response) => {
-      if (!response.ok) {
-        throw new Error(`Nao foi possivel carregar ${txtPath}`);
-      }
-      return response.json();
-    })
+    fetchGltfAsset(gltfPath),
+    fetchJsonAsset(txtPath)
   ]);
 
   const basePath = gltfPath.includes("/") ?
@@ -1417,12 +1430,7 @@ export async function loadPicoModel({
     ) :
     null;
   const [binBuffer, textureImage] = await Promise.all([
-    fetch(`${basePath}${gltf.buffers[0].uri}`).then((response) => {
-      if (!response.ok) {
-        throw new Error(`Nao foi possivel carregar ${gltf.buffers[0].uri}`);
-      }
-      return response.arrayBuffer();
-    }),
+    fetchArrayBufferAsset(`${basePath}${gltf.buffers[0].uri}`),
     resolvedTexturePath ?
       loadImageAsset(resolvedTexturePath).catch(() => null) :
       Promise.resolve(null)
@@ -1484,12 +1492,7 @@ export async function loadTexturedModel({
 }) {
   onStatus?.(`Carregando ${gltfPath}...`);
 
-  const gltf = await fetch(gltfPath).then((response) => {
-    if (!response.ok) {
-      throw new Error(`Nao foi possivel carregar ${gltfPath}`);
-    }
-    return response.json();
-  });
+  const gltf = await fetchGltfAsset(gltfPath);
 
   const basePath = gltfPath.includes("/") ?
     gltfPath.slice(0, gltfPath.lastIndexOf("/") + 1) :
@@ -1503,12 +1506,7 @@ export async function loadTexturedModel({
     );
 
   const [binBuffer, textureImage] = await Promise.all([
-    fetch(resolvedBinPath).then((response) => {
-      if (!response.ok) {
-        throw new Error(`Nao foi possivel carregar ${resolvedBinPath}`);
-      }
-      return response.arrayBuffer();
-    }),
+    fetchArrayBufferAsset(resolvedBinPath),
     loadImageAsset(resolvedTexturePath)
   ]);
 

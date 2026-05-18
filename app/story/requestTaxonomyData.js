@@ -13,7 +13,8 @@ export const REQUEST_ARCHETYPE = Object.freeze({
   ENVIRONMENTAL_RESTORATION: "environmental-restoration",
   INITIATION_CHALLENGE: "initiation-challenge",
   CELEBRATION_MOOD: "celebration-mood",
-  ABILITY_UNLOCK: "ability-unlock",
+  BOT_FUNCTION_UNLOCK: "bot-function-unlock",
+  ABILITY_UNLOCK: "bot-function-unlock",
   HABITAT_HOME: "habitat-home",
   CRAFTING_COOKING: "crafting-cooking",
   ESCORT_FOLLOW: "escort-follow",
@@ -23,7 +24,7 @@ export const REQUEST_ARCHETYPE = Object.freeze({
 });
 
 const REQUEST_KINDS = Object.freeze(Object.values(REQUEST_KIND));
-const REQUEST_ARCHETYPES = Object.freeze(Object.values(REQUEST_ARCHETYPE));
+const REQUEST_ARCHETYPES = Object.freeze([...new Set(Object.values(REQUEST_ARCHETYPE))]);
 const REQUIRED_CREDITS_TOKEN_SET = new Set(REQUIRED_CREDITS_TOKEN_IDS);
 
 export function listRequestKinds() {

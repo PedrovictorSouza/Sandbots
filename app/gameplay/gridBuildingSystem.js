@@ -35,7 +35,7 @@ export const GRID_INPUT_EVENTS = Object.freeze({
 export const DEFAULT_PLACEABLE_OBJECTS = Object.freeze([
   Object.freeze({
     id: GRID_PLACEABLE_IDS.TRAIN_HOUSE,
-    name: "Train House",
+    name: "Thermal Cabin",
     prefabKey: "trainHouseModel",
     footprint: Object.freeze({ width: 3, height: 3 }),
     placementType: GRID_PLACEMENT_TYPES.OBJECT,

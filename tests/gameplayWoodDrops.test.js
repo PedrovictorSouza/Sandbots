@@ -8,7 +8,7 @@ import {
 } from "../world/islandWorld.js";
 
 describe("gameplay field resource drops", () => {
-  it("starts the planet with a smaller readable supply of sturdy sticks and leaf piles", () => {
+  it("starts the planet with an exploration-sized supply of sturdy sticks and leaf piles", () => {
     const session = createEmptySession();
 
     initializeGameplayState(session, {
@@ -24,11 +24,13 @@ describe("gameplay field resource drops", () => {
     const xs = positions.map((position) => position[0]);
     const zs = positions.map((position) => position[2]);
     const leafNodes = session.resourceNodes.filter((node) => node.itemId === LEAVES_ITEM_ID);
-    expect(session.woodDrops.length).toBeGreaterThanOrEqual(30);
-    expect(session.woodDrops.length).toBeLessThanOrEqual(35);
+    expect(session.woodDrops.length).toBeGreaterThanOrEqual(14);
+    expect(session.woodDrops.length).toBeLessThanOrEqual(18);
     expect(new Set(session.woodDrops.map((drop) => drop.id)).size).toBe(session.woodDrops.length);
     expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(180);
     expect(Math.max(...zs) - Math.min(...zs)).toBeGreaterThan(80);
+    expect(positions.every((position) => Math.hypot(position[0] - 1.42, position[2] - 62.48) >= 18)).toBe(true);
+    expect(positions.every((position) => Math.hypot(position[0] - 12, position[2] + 3.5) >= 20)).toBe(true);
     expect(session.woodDrops.every((drop) => drop.collected === false)).toBe(true);
     expect(leafNodes.length).toBe(5);
     expect(new Set(leafNodes.map((node) => node.id)).size).toBe(leafNodes.length);

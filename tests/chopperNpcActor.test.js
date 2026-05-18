@@ -23,14 +23,43 @@ function createNpcActor(position = [0, 0, 0]) {
 }
 
 describe("chopperNpcActor", () => {
-  it("applies the Chopper model forward offset to logical face yaw", () => {
+  it("keeps Chopper model yaw aligned with logical face yaw", () => {
     const npcActor = createNpcActor([0, 0, 0]);
     npcActor.faceYaw = Math.PI * 0.5;
 
     const chopperActor = createChopperNpcActor({ npcActor });
 
-    expect(chopperActor.bodyInstance.yaw).toBeCloseTo(Math.PI * 1.5);
-    expect(chopperActor.propellerInstance.yaw).toBeCloseTo(Math.PI * 1.5);
+    expect(chopperActor.bodyInstance.yaw).toBeCloseTo(Math.PI * 0.5);
+    expect(chopperActor.propellerInstance.yaw).toBeCloseTo(Math.PI * 0.5);
+  });
+
+  it("adds a secondary-axis turn pose when Chopper changes facing", () => {
+    const steadyNpcActor = createNpcActor([0, 0, 0]);
+    const steadyChopperActor = createChopperNpcActor({ npcActor: steadyNpcActor });
+    const turningNpcActor = createNpcActor([0, 0, 0]);
+    const turningChopperActor = createChopperNpcActor({ npcActor: turningNpcActor });
+
+    turningNpcActor.faceYaw = Math.PI * 0.5;
+
+    updateChopperNpcActor(steadyChopperActor, {
+      deltaTime: 0.12,
+      storyState: { flags: {} },
+      isDialogueActive: true,
+      isNpcActive: () => true
+    });
+    updateChopperNpcActor(turningChopperActor, {
+      deltaTime: 0.12,
+      storyState: { flags: {} },
+      isDialogueActive: true,
+      isNpcActive: () => true
+    });
+
+    expect(turningChopperActor.bodyInstance.yaw).toBeGreaterThan(0);
+    expect(turningChopperActor.bodyInstance.yaw).toBeLessThan(Math.PI * 0.5);
+    expect(Math.abs(turningChopperActor.bodyInstance.pitch - steadyChopperActor.bodyInstance.pitch)).toBeGreaterThan(0.005);
+    expect(Math.abs(turningChopperActor.bodyInstance.roll - steadyChopperActor.bodyInstance.roll)).toBeGreaterThan(0.005);
+    expect(turningChopperActor.propellerInstance.pitch).toBeCloseTo(turningChopperActor.bodyInstance.pitch);
+    expect(turningChopperActor.propellerInstance.roll).toBeCloseTo(turningChopperActor.bodyInstance.roll);
   });
 
   it("flies the Chopper NPC to a target before completing the scripted approach", () => {
@@ -199,5 +228,37 @@ describe("chopperNpcActor", () => {
     });
 
     expect(npcActor.character.getPosition()).not.toEqual([12.4, 0.02, -8.4]);
+  });
+
+  it("settles into a quieter listening hover during dialogue", () => {
+    const freeNpcActor = createNpcActor([0, 0.02, 0]);
+    const freeChopperActor = createChopperNpcActor({ npcActor: freeNpcActor });
+    const dialogueNpcActor = createNpcActor([0, 0.02, 0]);
+    const dialogueChopperActor = createChopperNpcActor({ npcActor: dialogueNpcActor });
+
+    updateChopperNpcActor(freeChopperActor, {
+      deltaTime: 0.5,
+      storyState: { flags: {} },
+      isNpcActive: () => true,
+      isDialogueActive: () => false
+    });
+    updateChopperNpcActor(dialogueChopperActor, {
+      deltaTime: 0.5,
+      storyState: { flags: {} },
+      isNpcActive: () => true,
+      isDialogueActive: () => true
+    });
+
+    const baseHoverY = 1.37;
+    const freeLift = Math.abs(freeChopperActor.bodyInstance.offset[1] - baseHoverY);
+    const dialogueLift = Math.abs(dialogueChopperActor.bodyInstance.offset[1] - baseHoverY);
+
+    expect(dialogueLift).toBeLessThan(freeLift);
+    expect(Math.abs(dialogueChopperActor.bodyInstance.offset[0])).toBeLessThan(
+      Math.abs(freeChopperActor.bodyInstance.offset[0])
+    );
+    expect(Math.abs(dialogueChopperActor.bodyInstance.roll)).toBeLessThan(
+      Math.abs(freeChopperActor.bodyInstance.roll)
+    );
   });
 });

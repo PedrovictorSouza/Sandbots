@@ -17,6 +17,8 @@ export async function playFirstChopperCinematic({
   dialogueId,
   transitionVeil = null,
   focusConversation = () => {},
+  focusGuideTarget = null,
+  performGuideAction = null,
   openConversation = () => false,
   clearGameFlowInput = () => {}
 } = {}) {
@@ -28,9 +30,22 @@ export async function playFirstChopperCinematic({
   storyState.flags[FIRST_CHOPPER_CINEMATIC_FLAG] = true;
   clearGameFlowInput();
 
+  const hasGuideBeat =
+    typeof focusGuideTarget === "function" ||
+    typeof performGuideAction === "function";
+
   await transitionVeil?.show?.();
-  focusConversation();
+  if (hasGuideBeat) {
+    focusGuideTarget?.();
+  } else {
+    focusConversation();
+  }
   await transitionVeil?.hide?.();
+
+  if (hasGuideBeat) {
+    await performGuideAction?.();
+    focusConversation();
+  }
 
   return openConversation();
 }

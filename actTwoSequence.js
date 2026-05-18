@@ -4,6 +4,14 @@ import {
   ACT_TWO_PLAYER_CAMERA_DISTANCE,
   ACT_TWO_PLAYER_CAMERA_ZOOM
 } from "./actTwoSceneConfig.js";
+import {
+  createCinematicControlState,
+  getCinematicControlViewState,
+  handleCinematicControlKeydown,
+  handleCinematicControlKeyup,
+  resetCinematicControlState,
+  updateCinematicControlState
+} from "./app/scene/cinematicControlPolicy.js";
 
 const ACT_TWO_TITLE = "Act 2";
 const ACT_TWO_SUBTITLE = "The island starts breathing again.";
@@ -48,10 +56,6 @@ const CINEMATIC_KEYFRAMES = [
 const TITLE_VISIBLE_FOR = 2.8;
 const REVEAL_DURATION = 1.15;
 const END_HOLD = 0.55;
-const SKIP_HOLD_DURATION = 0.65;
-const SKIP_PROMPT_VISIBLE_FOR = 1.6;
-const SKIP_KEY_CODES = new Set(["Enter", "KeyX", "Space", "Escape"]);
-const FEEDBACK_KEY_CODES = new Set(["Enter", "KeyX", "Space", "KeyE", "KeyM", "Escape"]);
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -130,9 +134,7 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
     active: false,
     elapsed: 0,
     totalDuration: getTotalDuration(),
-    skipHoldActive: false,
-    skipHoldElapsed: 0,
-    skipPromptUntil: 0,
+    cinematicControl: createCinematicControlState(),
   };
 
   let refs = null;
@@ -183,19 +185,16 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
     refs.title.style.opacity = `${getTitleOpacity(state.elapsed)}`;
 
     if (refs.skipPrompt && refs.skipProgress) {
-      const promptVisible = state.skipHoldActive || state.elapsed < state.skipPromptUntil;
-      const skipProgress = clamp01(state.skipHoldElapsed / SKIP_HOLD_DURATION);
-      refs.skipPrompt.style.opacity = promptVisible ? "1" : "0";
-      refs.skipPrompt.style.transform = promptVisible ? "translate(-50%, 0)" : "translate(-50%, 8px)";
-      refs.skipProgress.style.transform = `scaleX(${skipProgress})`;
+      const skipView = getCinematicControlViewState(state.cinematicControl, state.elapsed);
+      refs.skipPrompt.style.opacity = skipView.promptVisible ? "1" : "0";
+      refs.skipPrompt.style.transform = skipView.promptVisible ? "translate(-50%, 0)" : "translate(-50%, 8px)";
+      refs.skipProgress.style.transform = `scaleX(${skipView.skipProgress})`;
     }
   }
 
   function finish() {
     state.active = false;
-    state.skipHoldActive = false;
-    state.skipHoldElapsed = 0;
-    state.skipPromptUntil = 0;
+    resetCinematicControlState(state.cinematicControl);
     syncUiMode();
     unmount();
     onComplete();
@@ -204,17 +203,10 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
   function start() {
     state.active = true;
     state.elapsed = 0;
-    state.skipHoldActive = false;
-    state.skipHoldElapsed = 0;
-    state.skipPromptUntil = 0;
+    resetCinematicControlState(state.cinematicControl);
     syncUiMode();
     mount();
     camera.setPose(CINEMATIC_KEYFRAMES[0]);
-    applyVisuals();
-  }
-
-  function showSkipPrompt() {
-    state.skipPromptUntil = Math.max(state.skipPromptUntil, state.elapsed + SKIP_PROMPT_VISIBLE_FOR);
     applyVisuals();
   }
 
@@ -225,12 +217,10 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
 
     state.elapsed = Math.min(state.totalDuration, state.elapsed + deltaTime);
 
-    if (state.skipHoldActive) {
-      state.skipHoldElapsed = Math.min(SKIP_HOLD_DURATION, state.skipHoldElapsed + deltaTime);
-      if (state.skipHoldElapsed >= SKIP_HOLD_DURATION) {
-        finish();
-        return;
-      }
+    const controlFrame = updateCinematicControlState(state.cinematicControl, deltaTime);
+    if (controlFrame.skipCompleted) {
+      finish();
+      return;
     }
 
     camera.setPose(getPoseAtTime(state.elapsed));
@@ -252,19 +242,14 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
         return false;
       }
 
-      const key = String(event.key || "").toLowerCase();
+      const controlResult = handleCinematicControlKeydown(
+        state.cinematicControl,
+        event,
+        state.elapsed
+      );
 
-      if (
-        SKIP_KEY_CODES.has(event.code) ||
-        FEEDBACK_KEY_CODES.has(event.code) ||
-        ["w", "a", "s", "d"].includes(key)
-      ) {
-        showSkipPrompt();
-        if (SKIP_KEY_CODES.has(event.code) && !event.repeat) {
-          state.skipHoldActive = true;
-          state.skipHoldElapsed = 0;
-          applyVisuals();
-        }
+      if (controlResult.handled) {
+        applyVisuals();
         event.preventDefault();
         return true;
       }
@@ -276,17 +261,14 @@ export function createActTwoSequence({ root, uiLayer, camera, onComplete = () =>
         return false;
       }
 
-      const key = String(event.key || "").toLowerCase();
+      const controlResult = handleCinematicControlKeyup(
+        state.cinematicControl,
+        event,
+        state.elapsed
+      );
 
-      if (SKIP_KEY_CODES.has(event.code)) {
-        state.skipHoldActive = false;
-        state.skipHoldElapsed = 0;
-        showSkipPrompt();
-        event.preventDefault();
-        return true;
-      }
-
-      if (["w", "a", "s", "d"].includes(key)) {
+      if (controlResult.handled) {
+        applyVisuals();
         event.preventDefault();
         return true;
       }

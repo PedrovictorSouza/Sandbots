@@ -17,6 +17,7 @@ import {
   findNearbyLogChair,
   findNearbyLeppaTree,
   getLeppaTreeSurroundingGroundCells,
+  normalizeWorldPromptCopy,
   reviveLeppaTreeFromWateredTiles,
   updateBulbasaurStrawBedChallengeCompletion,
   validateBuildingKitPlacement,
@@ -24,6 +25,7 @@ import {
 } from "../world/islandWorld.js";
 import {
   INTERACTABLE_DEFS,
+  COLONY_TERMINAL_INTERACT_DISTANCE,
   LEAVES_ITEM_ID,
   LEPPA_BERRY_ITEM_ID,
   POKEMON_TALK_INTERACT_DISTANCE,
@@ -91,7 +93,7 @@ describe("findNearbyInteractable", () => {
     });
   });
 
-  it("detects the ruined Pokemon Center from outside its solid collider footprint", () => {
+  it("detects the Ruined Colony Terminal from outside its solid collider footprint", () => {
     const result = findNearbyInteractable(
       [
         RUINED_POKEMON_CENTER_POSITION[0] + 4.8,
@@ -102,7 +104,7 @@ describe("findNearbyInteractable", () => {
       [
         {
           id: "ruinedPokemonCenter",
-          label: "Ruined Pokemon Center",
+          label: "Ruined Colony Terminal",
           type: "site",
           position: [...RUINED_POKEMON_CENTER_POSITION],
           interactDistance: RUINED_POKEMON_CENTER_INTERACT_DISTANCE,
@@ -116,13 +118,13 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "site",
         id: "ruinedPokemonCenter",
-        label: "Ruined Pokemon Center"
+        label: "Ruined Colony Terminal"
       },
       distance: expect.any(Number)
     });
   });
 
-  it("keeps the Pokemon Center guide stop outside the solid collider and within inspect reach", () => {
+  it("keeps the Colony Terminal guide stop outside the solid collider and within inspect reach", () => {
     const colliderCenter = [
       RUINED_POKEMON_CENTER_POSITION[0],
       RUINED_POKEMON_CENTER_POSITION[2] + 0.15
@@ -143,7 +145,7 @@ describe("findNearbyInteractable", () => {
     expect(guideInspectDistance).toBeLessThanOrEqual(RUINED_POKEMON_CENTER_INTERACT_DISTANCE);
   });
 
-  it("prioritizes Pokemon Center inspection over nearby Tangrowth guide chatter", () => {
+  it("prioritizes Colony Terminal inspection over nearby Chopper guide chatter", () => {
     const result = findNearbyInteractable(
       [...RUINED_POKEMON_CENTER_GUIDE_POSITION],
       [
@@ -159,7 +161,7 @@ describe("findNearbyInteractable", () => {
       [
         {
           id: "ruinedPokemonCenter",
-          label: "Ruined Pokemon Center",
+          label: "Ruined Colony Terminal",
           type: "site",
           position: [...RUINED_POKEMON_CENTER_POSITION],
           interactDistance: RUINED_POKEMON_CENTER_INTERACT_DISTANCE,
@@ -173,13 +175,46 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "site",
         id: "ruinedPokemonCenter",
-        label: "Ruined Pokemon Center"
+        label: "Ruined Colony Terminal"
       },
       distance: expect.any(Number)
     });
   });
 
   it("detects an active rustling grass encounter", () => {
+    const result = findNearbyInteractable(
+      [8.1, 0, -3.9],
+      [],
+      [],
+      {
+        flags: {
+          bulbasaurRevealed: false,
+          chopperBulbasaurRepairBoxIntroComplete: true,
+          rustlingGrassCellId: "ground-3-1"
+        }
+      },
+      [
+        {
+          id: "grass-3",
+          cellId: "ground-3-1",
+          position: [8.4, 0.02, -4.2],
+          state: "alive"
+        }
+      ]
+    );
+
+    expect(result).toEqual({
+      target: {
+        kind: "grassEncounter",
+        id: "rustlingGrass",
+        label: "Check on Grow Bot",
+        cellId: "ground-3-1"
+      },
+      distance: expect.any(Number)
+    });
+  });
+
+  it("does not detect the Grow Bot repair box before the dry grass mission handoff is complete", () => {
     const result = findNearbyInteractable(
       [8.1, 0, -3.9],
       [],
@@ -200,15 +235,7 @@ describe("findNearbyInteractable", () => {
       ]
     );
 
-    expect(result).toEqual({
-      target: {
-        kind: "grassEncounter",
-        id: "rustlingGrass",
-        label: "Inspect dismantled Bulbasaur",
-        cellId: "ground-3-1"
-      },
-      distance: expect.any(Number)
-    });
+    expect(result).toBeNull();
   });
 
   it("uses a wider talk reach for revealed Pokemon companions", () => {
@@ -237,16 +264,47 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "pokemonCompanion",
         id: "bulbasaur",
-        label: "Follow me: Bulbasaur",
+        label: "Follow me: Grow Bot",
         position: [0, 0.02, 0]
       },
       distance: expect.any(Number)
     });
   });
 
-  it("keeps other Pokemon companion talk reach unchanged", () => {
+  it("lets the player talk to Grow Bot without standing on the model", () => {
     const result = findNearbyInteractable(
-      [POKEMON_TALK_INTERACT_DISTANCE * 2 - 0.05, 0, 0],
+      [7.75, 0, 0],
+      [],
+      [],
+      {
+        flags: {
+          bulbasaurRevealed: true
+        }
+      },
+      [],
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        visible: true,
+        position: [0, 0.02, 0]
+      }
+    );
+
+    expect(result).toMatchObject({
+      target: {
+        kind: "pokemonCompanion",
+        id: "bulbasaur",
+        label: "Follow me: Grow Bot"
+      }
+    });
+  });
+
+  it("lets the player talk to other helpers without standing on their models", () => {
+    const result = findNearbyInteractable(
+      [BULBASAUR_TALK_INTERACT_DISTANCE - 0.05, 0, 0],
       [],
       [],
       {
@@ -264,7 +322,13 @@ describe("findNearbyInteractable", () => {
       }
     );
 
-    expect(result).toBeNull();
+    expect(result).toMatchObject({
+      target: {
+        kind: "pokemonCompanion",
+        id: "charmander",
+        label: "Follow me: Thermal Bot"
+      }
+    });
   });
 
   it("does not keep showing a generic talk prompt for Pokemon already following", () => {
@@ -297,6 +361,7 @@ describe("findNearbyInteractable", () => {
     const storyState = {
       flags: {
         bulbasaurRevealed: false,
+        chopperBulbasaurRepairBoxIntroComplete: true,
         rustlingGrassCellId: "ground-3-1"
       }
     };
@@ -342,7 +407,7 @@ describe("findNearbyInteractable", () => {
     expect(resultNearModule?.target).toEqual({
       kind: "grassEncounter",
       id: "rustlingGrass",
-      label: "Inspect dismantled Bulbasaur",
+      label: "Check on Grow Bot",
       cellId: "ground-3-1"
     });
     expect(resultNearGrass).toBeNull();
@@ -373,7 +438,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "charmanderGrassEncounter",
         id: "charmanderRustlingGrass",
-        label: "Repair dismantled Charmander",
+        label: "Help Thermal Bot",
         cellId: "ground-8-7"
       },
       distance: expect.any(Number)
@@ -431,13 +496,13 @@ describe("findNearbyInteractable", () => {
     expect(resultNearCharmanderModule?.target).toEqual({
       kind: "charmanderGrassEncounter",
       id: "charmanderRustlingGrass",
-      label: "Repair dismantled Charmander",
+      label: "Help Thermal Bot",
       cellId: "ground-8-7"
     });
     expect(resultNearTimburrModule?.target).toEqual({
       kind: "timburrGrassEncounter",
       id: "timburrRustlingGrass",
-      label: "Repair dismantled Timburr",
+      label: "Help Builder Bot",
       cellId: "boulder-ground-0"
     });
   });
@@ -469,7 +534,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "bulbasaurMission",
         id: "bulbasaurDryGrassMission",
-        label: "Talk to Bulbasaur",
+        label: "Talk to Grow Bot",
         cellId: "ground-3-1"
       },
       distance: expect.any(Number)
@@ -556,7 +621,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "bulbasaurMission",
         id: "bulbasaurDryGrassMission",
-        label: "Talk to Bulbasaur",
+        label: "Talk to Grow Bot",
         cellId: "ground-3-1",
         position: [12.2, 0.02, -2.1]
       },
@@ -606,7 +671,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "bulbasaurMission",
         id: "bulbasaurDryGrassMission",
-        label: "Talk to Bulbasaur",
+        label: "Talk to Grow Bot",
         cellId: "ground-3-1",
         position: [8.55, 0.02, -5.7]
       },
@@ -641,7 +706,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "bulbasaurMission",
         id: "bulbasaurDryGrassMission",
-        label: "Talk to Bulbasaur",
+        label: "Talk to Grow Bot",
         cellId: "ground-3-1"
       },
       distance: expect.any(Number)
@@ -676,7 +741,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "bulbasaurRequestComplete",
         id: "bulbasaurLeafageReward",
-        label: "Talk to Bulbasaur",
+        label: "Talk to Grow Bot",
         cellId: "ground-3-1"
       },
       distance: expect.any(Number)
@@ -737,7 +802,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "timburrGrassEncounter",
         id: "timburrRustlingGrass",
-        label: "Repair dismantled Timburr",
+        label: "Help Builder Bot",
         cellId: "boulder-ground-0"
       },
       distance: expect.any(Number)
@@ -938,7 +1003,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "bulbasaurStrawBedComplete",
         id: "bulbasaurStrawBedComplete",
-        label: "Talk to Bulbasaur",
+        label: "Talk to Grow Bot",
         cellId: "ground-3-1"
       },
       distance: expect.any(Number)
@@ -1107,25 +1172,24 @@ describe("findNearbyInteractable", () => {
   });
 
   it("uses a forgiving reach for station and site object interactables", () => {
+    const colonyTerminal = INTERACTABLE_DEFS.find((interactable) => {
+      return interactable.id === "pokemonCenterPc";
+    });
+
     expect(findNearbyInteractable(
-      [2.45, 0, 0],
-      [],
       [
-        {
-          id: "pokemonCenterPc",
-          label: "Pokemon Center PC",
-          type: "site",
-          position: [0, 0.02, 0],
-          interactDistance: 1.85,
-          activeWhen: () => true
-        }
+        POKEMON_CENTER_PC_POSITION[0] + COLONY_TERMINAL_INTERACT_DISTANCE - 0.05,
+        0,
+        POKEMON_CENTER_PC_POSITION[2]
       ],
-      { flags: { bulbasaurRevealed: true } }
+      [],
+      [colonyTerminal],
+      { flags: { ruinedPokemonCenterInspected: true } }
     )).toEqual({
       target: {
         kind: "site",
         id: "pokemonCenterPc",
-        label: "Pokemon Center PC"
+        label: "Colony Terminal"
       },
       distance: expect.any(Number)
     });
@@ -1155,7 +1219,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "site",
         id: "pokemonCenterPc",
-        label: "Pokemon Center PC"
+        label: "Colony Terminal"
       },
       distance: expect.any(Number)
     });
@@ -1187,7 +1251,7 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Place"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("[Enter] Place the Log Chair nearby");
+    })).toBe("[X / Enter] Place the Log Chair nearby");
   });
 
   it("detects the placed House Kit as a construction target", () => {
@@ -1200,6 +1264,10 @@ describe("findNearbyInteractable", () => {
     };
 
     expect(findNearbyLeafDen(leafDen.position, leafDen, storyState)).toEqual({
+      leafDen,
+      distance: expect.any(Number)
+    });
+    expect(findNearbyLeafDen([leafDen.position[0] + 4.25, 0, leafDen.position[2]], leafDen, storyState)).toEqual({
       leafDen,
       distance: expect.any(Number)
     });
@@ -1244,7 +1312,7 @@ describe("findNearbyInteractable", () => {
         title: "Build a House",
         actionLabel: "Place"
       }
-    })).toBe("[Enter] Place the House Kit");
+    })).toBe("[X / Enter] Place the House Kit");
 
     expect(buildNearbyPrompt({
       interactTarget: {
@@ -1332,7 +1400,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "timburrLeafDenFurnitureComplete",
         id: "timburr",
-        label: "Talk to Timburr"
+        label: "Talk to Builder Bot"
       },
       distance: expect.any(Number)
     });
@@ -1364,7 +1432,7 @@ describe("findNearbyInteractable", () => {
       target: {
         kind: "charmanderCelebrationRequest",
         id: "charmander",
-        label: "Talk to Charmander"
+        label: "Talk to Thermal Bot"
       },
       distance: expect.any(Number)
     });
@@ -1432,7 +1500,7 @@ describe("findNearbyInteractable", () => {
         title: "Solar Station Recipe",
         actionLabel: "Place"
       }
-    })).toBe("[E / X] Place the Solar Station on open terrain");
+    })).toBe("[X / Enter] Place the Solar Station on open terrain");
   });
 
   it("describes the Ditto Flag placement action in the nearby prompt", () => {
@@ -1448,7 +1516,7 @@ describe("findNearbyInteractable", () => {
         title: "Place Ditto Flag on your house",
         actionLabel: "Place"
       }
-    })).toBe("[Enter] Place the Ditto Flag on the House");
+    })).toBe("[X / Enter] Place the Colony Flag on the House");
   });
 
   it("uses A or E copy for Workbench interaction prompts", () => {
@@ -1465,7 +1533,27 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Interact"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("[E / X] Workbench • Workbench");
+    })).toBe("[E / X] Workbench");
+  });
+
+  it("normalizes legacy prompt copy at the world prompt boundary", () => {
+    expect(normalizeWorldPromptCopy("Talk to Bulbasaur with Water Gun near the Pokemon Center PC")).toBe(
+      "Talk to Grow Bot with Hydro Jet near the Colony Terminal"
+    );
+
+    expect(buildNearbyPrompt({
+      interactTarget: {
+        target: {
+          kind: "site",
+          id: "pokemonCenterPc",
+          label: "Pokemon Center PC"
+        }
+      },
+      quest: {
+        title: "Open Pokedex Challenges",
+        actionLabel: "Check"
+      }
+    })).toBe("[E / X] Colony Terminal • Check terminal");
   });
 
   it("describes the revived Leppa tree Leafage selector in the nearby prompt", () => {
@@ -1473,14 +1561,14 @@ describe("findNearbyInteractable", () => {
       interactTarget: {
         target: {
           kind: "leppaTreeLeafageOptions",
-          label: "Leafage Options"
+          label: "Bio-Grow Options"
         }
       },
       quest: {
         title: "Any quest",
         actionLabel: "Choose"
       }
-    })).toBe("[E / X] Leafage Options • Choose Leafage object");
+    })).toBe("[E / X] Bio-Grow Options • Choose Bio-Grow object");
   });
 
   it("detects a nearby Leafage-instantiated object as destroyable", () => {
@@ -1703,7 +1791,7 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Grow"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("[Enter] Use Leafage to grow tall grass");
+    })).toBe("[Enter] Use Bio-Grow to grow tall grass");
   });
 
   it("describes active moves when no target is available", () => {
@@ -1716,7 +1804,7 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Grow"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("Leafage: grow tall grass on restored ground.");
+    })).toBe("Bio-Grow: grow tall grass on restored ground.");
 
     expect(buildNearbyPrompt({
       harvestTarget: null,
@@ -1728,7 +1816,7 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Restore"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("Water Gun: Squirtle has 2 tiles queued.");
+    })).toBe("Hydro Jet: Hydro Bot has 2 tiles queued.");
   });
 
   it("shows Squirtle queue status in the Water Gun ground prompt", () => {
@@ -1745,7 +1833,7 @@ describe("findNearbyInteractable", () => {
         actionLabel: "Restore"
       },
       getItemLabel: (itemId) => itemId
-    })).toBe("[Enter] Mark dry ground for Squirtle • 1 queued");
+    })).toBe("[Enter] Mark dry ground for Hydro Bot • 1 queued");
   });
 });
 

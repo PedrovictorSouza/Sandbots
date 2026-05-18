@@ -2,35 +2,35 @@ export const MEMORY_SLIDES = [
   {
     id: "camera",
     kind: "device",
-    title: "Recovered Device",
-    label: "Pokedex Camera",
-    caption: "The lens still glows like it wants another memory.",
+    title: "Damaged Tool",
+    label: "Colony Scanner",
+    caption: "The lens still works. It can read soil, power, water, and failing systems.",
   },
   {
     id: "town",
     kind: "town",
-    title: "Recovered Place",
-    label: "Old Town",
-    caption: "Tree lines, routes, and a town square you almost recognize.",
+    title: "Mission Target",
+    label: "Future Habitat",
+    caption: "Earth sent plans for homes, gardens, and clean paths. The planet has none of them yet.",
   },
   {
-    id: "trainer",
+    id: "crash",
     kind: "trainer",
-    title: "Recovered Photo",
-    label: "Trainer Snapshot",
-    caption: "A warm hand, a familiar smile, and a moment that still feels safe.",
+    title: "Entry Failure",
+    label: "Capsules Scattered",
+    caption: "The ship split apart above a tiny world. Helper bots are missing across the surface.",
   },
 ];
 
 export const GENDER_OPTIONS = [
   {
     id: "masculino",
-    label: "Masculino",
+    label: "Builder A",
     accent: "#6fc4ff",
   },
   {
     id: "feminino",
-    label: "Feminino",
+    label: "Builder B",
     accent: "#ff9adf",
   },
 ];

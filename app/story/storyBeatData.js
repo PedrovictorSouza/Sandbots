@@ -21,6 +21,11 @@ import {
   TANGROWTH_TALL_GRASS_RETURN_DIALOGUE
 } from "../../dialogue/gameplayDialogueContent.js";
 import { QUEST_EVENT } from "../quest/questData.js";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES,
+  SANDBOTS_WORLD_TERMS
+} from "./sandbotsLexicon.js";
 
 export const FIELD_TASK_IDS = Object.freeze({
   MAKING_HABITATS: "making-habitats",
@@ -112,21 +117,21 @@ function buildChopperOnboardingLines(context = {}, { dialogueLines = [] } = {}) 
 export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   [FIELD_TASK_IDS.MAKING_HABITATS]: {
     id: FIELD_TASK_IDS.MAKING_HABITATS,
-    title: "Making habitats",
-    description: "Arrange tall grass, trees, rocks and furniture into the right combinations to create a Pokemon Habitat!",
+    title: "Making colony zones",
+    description: "Arrange tall grass, trees, rocks and furniture into the right combinations to create a viable colony zone.",
     completeFlag: "makingHabitatsComplete",
     background: true
   },
   [FIELD_TASK_IDS.BULBASAUR_DRY_GRASS_REQUEST]: {
     id: FIELD_TASK_IDS.BULBASAUR_DRY_GRASS_REQUEST,
-    title: "Talk to Bulbasaur",
-    description: "Bulbasaur has a request. Help him, and he will teach you a new move.",
+    title: `Talk to ${SANDBOTS_BOT_NAMES.grow}`,
+    description: `${SANDBOTS_BOT_NAMES.grow} has a request. Help it, and it will unlock a new field tool.`,
     completeFlag: "bulbasaurDryGrassMissionAccepted"
   },
   [FIELD_TASK_IDS.REVIVE_LEPPA_TREE]: {
     id: FIELD_TASK_IDS.REVIVE_LEPPA_TREE,
     title: "Revive the dead tree",
-    description: "Use Water Gun on the four dry tiles around the dead tree.",
+    description: `Use ${SANDBOTS_ITEM_NAMES.hydroTool} on the four dry tiles around the dead tree so the route can prove water still reaches deep roots.`,
     completeFlag: "leppaTreeRevived"
   },
   [FIELD_TASK_IDS.WATER_DRY_TALL_GRASS]: {
@@ -137,7 +142,7 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
         BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET,
         Number(storyState.flags?.restoredGrassCount || 0)
       );
-      return `Water the dry tall grass for Bulbasaur. ${current}/${BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET} restored.`;
+      return `Water the dry tall grass for ${SANDBOTS_BOT_NAMES.grow} so it can test whether habitat grass can return. ${current}/${BULBASAUR_DRY_TALL_GRASS_RESTORE_TARGET} restored.`;
     },
     isComplete(storyState = {}) {
       return Number(storyState.flags?.restoredGrassCount || 0) >=
@@ -147,8 +152,8 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   },
   [FIELD_TASK_IDS.BULBASAUR_LEAFAGE_REWARD]: {
     id: FIELD_TASK_IDS.BULBASAUR_LEAFAGE_REWARD,
-    title: "Return to Bulbasaur",
-    description: "Talk to Bulbasaur to complete the request and learn Leafage.",
+    title: `Return to ${SANDBOTS_BOT_NAMES.grow}`,
+    description: `Talk to ${SANDBOTS_BOT_NAMES.grow} to complete the request and learn ${SANDBOTS_ITEM_NAMES.growTool} for the first habitat patch.`,
     completeFlag: "bulbasaurDryGrassRequestTurnedIn"
   },
   [FIELD_TASK_IDS.BULBASAUR_GREEN_CORNER_PLAY_SEED]: {
@@ -159,10 +164,10 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const current = Math.min(4, Number(flags.leafageTallGrassCount || 0));
 
       if (flags.leafageTallGrassHabitatCreated) {
-        return "Bulbasaur's green corner is ready. Pokemon have a cozy place to gather.";
+        return `${SANDBOTS_BOT_NAMES.grow}'s green corner is ready. Bots have a cozy place to gather.`;
       }
 
-      return `Use Leafage where you want Pokemon to gather. ${current}/4 tall grass grown.`;
+      return `Use ${SANDBOTS_ITEM_NAMES.growTool} where you want bots to gather; this turns restored soil into a colony corner. ${current}/4 tall grass grown.`;
     },
     completeFlag: "leafageTallGrassHabitatCreated",
     background: true,
@@ -170,33 +175,33 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   },
   [FIELD_TASK_IDS.GIVE_LEPPA_BERRY]: {
     id: FIELD_TASK_IDS.GIVE_LEPPA_BERRY,
-    title: "Give Leppa Berry to Bulbasaur",
+    title: `Give Pulse Berry to ${SANDBOTS_BOT_NAMES.grow}`,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.leppaBerryGiftComplete) {
-        return "You gave the Leppa Berry to a friend for Bulbasaur.";
+        return `You gave the Pulse Berry to a friend for ${SANDBOTS_BOT_NAMES.grow}.`;
       }
 
       if (flags.leppaBerryCollected) {
-        return "Talk to Squirtle or Bulbasaur and choose Look at this! to show the Leppa Berry.";
+        return `Talk to ${SANDBOTS_BOT_NAMES.hydro} or ${SANDBOTS_BOT_NAMES.grow} and choose Look at this! to show the Pulse Berry.`;
       }
 
       if (flags.leppaBerryDropped) {
-        return "Pick up the Leppa Berry from the ground.";
+        return "Pick up the Pulse Berry from the ground.";
       }
 
       if (flags.leppaTreeRevived) {
-        return "Press X by the revived tree to pick a Leppa Berry.";
+        return "Press X by the revived tree to pick a Pulse Berry.";
       }
 
-      return "Use Water Gun on the four tiles around a dead tree to revive it.";
+      return `Use ${SANDBOTS_ITEM_NAMES.hydroTool} on the four tiles around a dead tree to revive it.`;
     },
     completeFlag: "leppaBerryGiftComplete"
   },
   [FIELD_TASK_IDS.TANGROWTH_LOG_CHAIR]: {
     id: FIELD_TASK_IDS.TANGROWTH_LOG_CHAIR,
-    title: "Tangrowth",
+    title: SANDBOTS_BOT_NAMES.overseer,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
@@ -223,77 +228,77 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const flags = storyState.flags || {};
 
       if (flags.campfireCrafted) {
-        return "You made Charmander's Train House at the Workbench.";
+        return `You made ${SANDBOTS_BOT_NAMES.thermal}'s ${SANDBOTS_ITEM_NAMES.thermalCabin} at the Workbench.`;
       }
 
       if (flags.workbenchDiyRecipesReceived) {
-        return "Use the Workbench to create Charmander's Train House.";
+        return `Use the Workbench to create ${SANDBOTS_BOT_NAMES.thermal}'s ${SANDBOTS_ITEM_NAMES.thermalCabin}.`;
       }
 
-      return "Follow Bulbasaur to the nearby area and interact with the Workbench.";
+      return `Follow ${SANDBOTS_BOT_NAMES.grow} to the nearby area and interact with the Workbench.`;
     },
     completeFlag: "campfireCrafted"
   },
   [FIELD_TASK_IDS.SPIT_OUT_CAMPFIRE]: {
     id: FIELD_TASK_IDS.SPIT_OUT_CAMPFIRE,
-    title: "Train House",
+    title: SANDBOTS_ITEM_NAMES.thermalCabin,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.campfireSpatOut) {
-        return "You placed Charmander's Train House.";
+        return `You placed ${SANDBOTS_BOT_NAMES.thermal}'s ${SANDBOTS_ITEM_NAMES.thermalCabin}.`;
       }
 
-      return "Press A or E anywhere outside to place Charmander's Train House.";
+      return `Press A or E anywhere outside to place ${SANDBOTS_BOT_NAMES.thermal}'s ${SANDBOTS_ITEM_NAMES.thermalCabin}.`;
     },
     completeFlag: "campfireSpatOut"
   },
   [FIELD_TASK_IDS.CHARMANDER_TALL_GRASS]: {
     id: FIELD_TASK_IDS.CHARMANDER_TALL_GRASS,
-    title: "Charmander",
+    title: SANDBOTS_BOT_NAMES.thermal,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.charmanderCampfireLit) {
-        return "Charmander moved into the Train House.";
+        return `${SANDBOTS_BOT_NAMES.thermal} moved into the ${SANDBOTS_ITEM_NAMES.thermalCabin}.`;
       }
 
       if (flags.charmanderFollowing) {
-        return "Lead Charmander close to the Train House.";
+        return `Lead ${SANDBOTS_BOT_NAMES.thermal} close to the ${SANDBOTS_ITEM_NAMES.thermalCabin}.`;
       }
 
       if (flags.charmanderRevealed) {
-        return "Press D-Pad Up or Arrow Up to ask Charmander to follow you.";
+        return `Press D-Pad Up or Arrow Up to ask ${SANDBOTS_BOT_NAMES.thermal} to follow you.`;
       }
 
       if (flags.charmanderRustlingGrassCellId) {
-        return "Repair the dismantled Charmander module.";
+        return `Help ${SANDBOTS_BOT_NAMES.thermal} in the tall grass.`;
       }
 
       const current = Math.min(4, Number(flags.leafageTallGrassCount || 0));
-      return `Use Leafage to grow a Tall Grass habitat. ${current}/4 tall grass grown.`;
+      return `Use ${SANDBOTS_ITEM_NAMES.growTool} to grow a Tall Grass habitat. ${current}/4 tall grass grown.`;
     },
     completeFlag: "charmanderCampfireLit"
   },
   [FIELD_TASK_IDS.RUINED_POKEMON_CENTER]: {
     id: FIELD_TASK_IDS.RUINED_POKEMON_CENTER,
-    title: "Ruined Pokemon Center",
+    title: SANDBOTS_WORLD_TERMS.terminalRuins,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.challengesUnlocked) {
-        return "Challenges are unlocked from the old PC.";
+        return `Habitat checks are unlocked from the old ${SANDBOTS_WORLD_TERMS.terminal}.`;
       }
 
       if (flags.ruinedPokemonCenterInspected) {
-        return "Check the PC beside the destroyed Pokemon Center.";
+        return `Check the ${SANDBOTS_WORLD_TERMS.terminal} beside the destroyed station.`;
       }
 
       if (flags.pokemonCenterGuideStarted) {
-        return "Follow Professor Tangrowth to the destroyed Pokemon Center and inspect the building.";
+        return `Follow ${SANDBOTS_BOT_NAMES.overseer} to the destroyed ${SANDBOTS_WORLD_TERMS.terminal} and inspect the building.`;
       }
 
-      return "Wait for Professor Tangrowth to lead you to the destroyed Pokemon Center.";
+      return `Wait for ${SANDBOTS_BOT_NAMES.overseer} to lead you to the destroyed ${SANDBOTS_WORLD_TERMS.terminal}.`;
     },
     completeFlag: "challengesUnlocked"
   },
@@ -304,39 +309,39 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const flags = storyState.flags || {};
 
       if (flags.boulderChallengeRewardClaimed) {
-        return "You claimed Life Coins from the Pokemon Center PC.";
+        return `The ${SANDBOTS_WORLD_TERMS.terminal} logged the Boulder-Shaded Tall Grass viability report.`;
       }
 
       if (flags.timburrRevealed) {
-        return "Return to the Pokemon Center PC to receive Life Coins.";
+        return `Return to the ${SANDBOTS_WORLD_TERMS.terminal} to log the habitat viability report.`;
       }
 
       if (flags.boulderShadedTallGrassHabitatCreated) {
-        return "Repair the dismantled Timburr module near the boulder.";
+        return `Help ${SANDBOTS_BOT_NAMES.builder} near the boulder.`;
       }
 
       const current = Math.min(4, Number(flags.boulderShadedTallGrassCount || 0));
-      return `Use Leafage near the boulder to create Boulder-Shaded Tall Grass. ${current}/4 tall grass grown.`;
+      return `Use ${SANDBOTS_ITEM_NAMES.growTool} near the boulder to create Boulder-Shaded Tall Grass. ${current}/4 tall grass grown.`;
     },
     completeFlag: "boulderChallengeRewardClaimed"
   },
   [FIELD_TASK_IDS.BULBASAUR_STRAW_BED]: {
     id: FIELD_TASK_IDS.BULBASAUR_STRAW_BED,
-    title: "Bulbasaur",
+    title: SANDBOTS_BOT_NAMES.grow,
     description(storyState = {}) {
       const flags = storyState.flags || {};
       const wateredTrees = Math.min(5, Number(flags.wateredTreeCount || 0));
       const sturdySticks = Math.min(10, Number(flags.sturdySticksGatheredForChallenge || 0));
 
       if (flags.strawBedRecipeUnlocked) {
-        return "You learned the Solar Station recipe from Bulbasaur.";
+        return `You received the ${SANDBOTS_ITEM_NAMES.solarStation} plans from ${SANDBOTS_BOT_NAMES.grow}.`;
       }
 
       if (flags.bulbasaurStrawBedChallengeComplete) {
-        return 'Talk to Bulbasaur and choose "Do you need anything?" to learn the Solar Station recipe.';
+        return `Talk to ${SANDBOTS_BOT_NAMES.grow} and choose "Do you need anything?" to receive the ${SANDBOTS_ITEM_NAMES.solarStation} plans.`;
       }
 
-      return "Prepare Bulbasaur's habitat supplies.";
+      return `Prepare ${SANDBOTS_BOT_NAMES.grow}'s habitat supplies.`;
     },
     subtasks(storyState = {}) {
       const flags = storyState.flags || {};
@@ -366,16 +371,16 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   },
   [FIELD_TASK_IDS.STRAW_BED_RECIPE]: {
     id: FIELD_TASK_IDS.STRAW_BED_RECIPE,
-    title: "Solar Station Recipe",
+    title: "Solar Station Plans",
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.bulbasaurStrawBedRequestComplete) {
-        return "Bulbasaur's Solar Station request is complete.";
+        return `${SANDBOTS_BOT_NAMES.grow}'s ${SANDBOTS_ITEM_NAMES.solarStation} request is complete.`;
       }
 
       if (flags.strawBedPlacedInBulbasaurHabitat) {
-        return "Talk to Bulbasaur after placing the Solar Station.";
+        return `Talk to ${SANDBOTS_BOT_NAMES.grow} after placing the ${SANDBOTS_ITEM_NAMES.solarStation}.`;
       }
 
       if (flags.strawBedCrafted) {
@@ -392,33 +397,33 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   },
   [FIELD_TASK_IDS.NEW_CHALLENGES_IN_PC]: {
     id: FIELD_TASK_IDS.NEW_CHALLENGES_IN_PC,
-    title: "New Challenges in PC",
+    title: `New Habitat Checks in ${SANDBOTS_WORLD_TERMS.terminal}`,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.newPcChallengesChecked) {
-        return "You checked the new Challenges added to the Pokemon Center PC.";
+        return `You checked the new habitat checks added to the ${SANDBOTS_WORLD_TERMS.terminal}.`;
       }
 
-      return "Interact with the PC to check the new Challenges that have been added.";
+      return `Interact with the ${SANDBOTS_WORLD_TERMS.terminal} to review the new habitat checks.`;
     },
     completeFlag: "newPcChallengesChecked"
   },
   [FIELD_TASK_IDS.LEAF_DEN_KIT]: {
     id: FIELD_TASK_IDS.LEAF_DEN_KIT,
-    title: "Talk to Professor Tangrowth",
+    title: `Talk to ${SANDBOTS_BOT_NAMES.overseer}`,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.leafDenKitPurchased) {
-        return "You purchased a House Kit from the PC Shop.";
+        return "The House Kit is ready for your first shelter.";
       }
 
       if (flags.leafDenKitPurchaseAvailable) {
-        return "Go to the Pokemon Center PC and purchase a House Kit from the Shop.";
+        return `Go to the ${SANDBOTS_WORLD_TERMS.terminal} and claim the House Kit.`;
       }
 
-      return "Talk to Professor Tangrowth about building houses.";
+      return `Talk to ${SANDBOTS_BOT_NAMES.overseer} about building houses.`;
     },
     completeFlag: "leafDenKitPurchased"
   },
@@ -456,11 +461,11 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       const placed = Math.min(3, Number(flags.leafDenFurniturePlacedCount || 0));
 
       if (flags.leafDenFurnitureRequestComplete) {
-        return "Timburr approved the furniture inside the House.";
+        return `${SANDBOTS_BOT_NAMES.builder} approved the furniture inside the House.`;
       }
 
       if (placed >= 3) {
-        return "Talk to Timburr to complete the request.";
+        return `Talk to ${SANDBOTS_BOT_NAMES.builder} to complete the request.`;
       }
 
       if (flags.leafDenInteriorEntered) {
@@ -473,25 +478,25 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
   },
   [FIELD_TASK_IDS.CHARMANDER_CELEBRATION]: {
     id: FIELD_TASK_IDS.CHARMANDER_CELEBRATION,
-    title: "Charmander Celebration",
+    title: `${SANDBOTS_BOT_NAMES.thermal} Celebration`,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
       if (flags.dittoFlagReceived || flags.charmanderCelebrationComplete) {
-        return "You received a Ditto Flag after the celebration.";
+        return `You received a ${SANDBOTS_ITEM_NAMES.colonyFlag} after the celebration.`;
       }
 
       if (flags.charmanderCelebrationSuggested) {
-        return "Bring Charmander to Professor Tangrowth and talk to Tangrowth.";
+        return `Bring ${SANDBOTS_BOT_NAMES.thermal} to ${SANDBOTS_BOT_NAMES.overseer} and talk to the overseer.`;
       }
 
-      return "Talk to Charmander about throwing a celebration after building the house.";
+      return `Talk to ${SANDBOTS_BOT_NAMES.thermal} about throwing a celebration after building the house.`;
     },
     completeFlag: "dittoFlagReceived"
   },
   [FIELD_TASK_IDS.DITTO_FLAG_HOUSE]: {
     id: FIELD_TASK_IDS.DITTO_FLAG_HOUSE,
-    title: "Place Ditto Flag on your house",
+    title: `Place ${SANDBOTS_ITEM_NAMES.colonyFlag} on your house`,
     description(storyState = {}) {
       const flags = storyState.flags || {};
 
@@ -500,10 +505,10 @@ export const SMALL_ISLAND_FIELD_TASKS = Object.freeze({
       }
 
       if (flags.dittoFlagSelectedForHouse) {
-        return "Head to the House and place the Ditto Flag.";
+        return `Head to the House and place the ${SANDBOTS_ITEM_NAMES.colonyFlag}.`;
       }
 
-      return "Open the bag with X and select the Ditto Flag, then head to the House.";
+      return `Open the bag with X and select the ${SANDBOTS_ITEM_NAMES.colonyFlag}, then head to the House.`;
     },
     completeFlag: "dittoFlagPlacedOnHouse"
   }
@@ -618,7 +623,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You learned Leafage."
+        message: `You learned ${SANDBOTS_ITEM_NAMES.growTool}.`
       },
       {
         type: STORY_BEAT_EFFECT.SET_FLAG,
@@ -643,7 +648,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.LEPPA_BERRY_DELIVERY,
     buildLines(context = {}) {
       const targetId = context.targetId || "bulbasaur";
-      const targetName = targetId === "squirtle" ? "Squirtle" : "Bulbasaur";
+      const targetName = targetId === "squirtle" ? SANDBOTS_BOT_NAMES.hydro : SANDBOTS_BOT_NAMES.grow;
 
       return [
         {
@@ -651,17 +656,17 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
           text: "Look at this!"
         },
         {
-          speaker: "Pokedesk",
-          text: "You chose the Leppa Berry."
+          speaker: SANDBOTS_WORLD_TERMS.codex,
+          text: "You chose the Pulse Berry."
         },
         targetId === "squirtle" ?
           {
-            speaker: "Squirtle",
-            text: "A Leppa Berry! That's perfect. Bulbasaur will feel a lot better with this."
+            speaker: SANDBOTS_BOT_NAMES.hydro,
+            text: `A Pulse Berry. Good. ${SANDBOTS_BOT_NAMES.grow}'s stabilizer should stop complaining in plant language.`
           } :
           {
-            speaker: "Bulbasaur",
-            text: "Oh! A Leppa Berry! Thank you so much. This makes the tall grass feel even more like home."
+            speaker: SANDBOTS_BOT_NAMES.grow,
+            text: "Oh! A Pulse Berry. Thank you. This makes the tall grass feel less like a crash site with leaves."
           },
         {
           speaker: targetName,
@@ -676,7 +681,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You gave away the Leppa Berry."
+        message: "You gave away the Pulse Berry."
       },
       {
         type: STORY_BEAT_EFFECT.SET_FLAG,
@@ -724,7 +729,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         speaker: "Chopper",
-        text: "Keep building habitats like that, with room for Pokemon to rest, hide, and feel at home."
+        text: "Keep building habitats like that, with room for bots to rest, hide, and pretend this is normal."
       }
     ],
     effects: [
@@ -743,15 +748,15 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     onceFlag: "bulbasaurWorkbenchGuideIntroSeen",
     fallbackLines: [
       {
-        speaker: "Bulbasaur",
+        speaker: SANDBOTS_BOT_NAMES.grow,
         text: "I was thinking about that chair. A habitat needs more than a safe patch of grass."
       },
       {
         speaker: "You",
-        text: "It needs things Pokemon can actually use."
+        text: "It needs things bots can actually use."
       },
       {
-        speaker: "Bulbasaur",
+        speaker: SANDBOTS_BOT_NAMES.grow,
         text: "Yeah! The Workbench can help us make cozy things from the materials we find. Come on, I'll show you!"
       }
     ],
@@ -770,16 +775,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.WORKBENCH_DIY_RECIPES,
     fallbackLines: [
       {
-        speaker: "Bulbasaur",
+        speaker: SANDBOTS_BOT_NAMES.grow,
         text: "Here it is! Chopper called this a Workbench."
       },
       {
-        speaker: "Bulbasaur",
-        text: "If you learn the simple wooden DIY recipes, you can make things that help habitats feel cozy."
+        speaker: SANDBOTS_BOT_NAMES.grow,
+        text: "If we leave starter plans here, the bench can make things the colony actually needs."
       },
       {
-        speaker: "Pokedesk",
-        text: "Simple wooden DIY recipes were added to your bag."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "Starter plans logged. Power plans can now issue Thermal Bot's cabin."
       }
     ],
     effects: [
@@ -789,7 +794,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You learned simple wooden DIY recipes."
+        message: "New Workbench plans available: Power."
       }
     ]
   },
@@ -802,7 +807,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You created Charmander's Train House."
+        message: `You created ${SANDBOTS_BOT_NAMES.thermal}'s ${SANDBOTS_ITEM_NAMES.thermalCabin}.`
       },
       {
         type: STORY_BEAT_EFFECT.TRACK_FIELD_TASK,
@@ -814,8 +819,8 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.CAMPFIRE_SPIT_OUT,
     fallbackLines: [
       {
-        speaker: "Pokedesk",
-        text: "You placed Charmander's Train House."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: `You placed ${SANDBOTS_BOT_NAMES.thermal}'s ${SANDBOTS_ITEM_NAMES.thermalCabin}.`
       }
     ],
     effects: [
@@ -825,7 +830,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You placed Charmander's Train House."
+        message: `You placed ${SANDBOTS_BOT_NAMES.thermal}'s ${SANDBOTS_ITEM_NAMES.thermalCabin}.`
       },
       {
         type: STORY_BEAT_EFFECT.TRACK_FIELD_TASK,
@@ -838,19 +843,19 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Chopper",
-        text: "The tall grass pinged an old heat signature. Charmander's repair module is back online."
+        text: `The tall grass pinged an old repair beacon. ${SANDBOTS_BOT_NAMES.thermal} is moving again.`
       },
       {
-        speaker: "Charmander",
-        text: "Whoa, fresh tall grass! I was hiding in there where it felt warm and safe."
+        speaker: SANDBOTS_BOT_NAMES.thermal,
+        text: "Fresh cover. My chassis stopped erroring for a second, which is my highest available compliment."
       },
       {
-        speaker: "Charmander",
-        text: "If you find my Train House, call me over. That is my home."
+        speaker: SANDBOTS_BOT_NAMES.thermal,
+        text: `If you find my ${SANDBOTS_ITEM_NAMES.thermalCabin}, call me over. That is where my heat loop belongs.`
       },
       {
-        speaker: "Pokedesk",
-        text: "Charmander was registered."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: `${SANDBOTS_BOT_NAMES.thermal} was registered.`
       }
     ],
     onceFlag: "charmanderDiscoverySeen",
@@ -858,6 +863,10 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       {
         type: STORY_BEAT_EFFECT.SET_FLAG,
         flag: "charmanderRevealed"
+      },
+      {
+        type: STORY_BEAT_EFFECT.TRACK_FIELD_TASK,
+        taskId: FIELD_TASK_IDS.CHARMANDER_TALL_GRASS
       },
       {
         type: STORY_BEAT_EFFECT.UNLOCK_SKILL,
@@ -868,7 +877,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You learned Fire."
+        message: `You learned ${SANDBOTS_ITEM_NAMES.thermalTool}.`
       },
       {
         type: STORY_BEAT_EFFECT.OPEN_POKEDEX_ENTRY,
@@ -880,16 +889,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.CHARMANDER_CAMPFIRE_LIT,
     fallbackLines: [
       {
-        speaker: "Charmander",
-        text: "Type ship! There is my crib! Whatsupp homies!"
+        speaker: SANDBOTS_BOT_NAMES.thermal,
+        text: "Thermal cabin detected. It is small, warm, and only slightly haunted by bad wiring."
       },
       {
-        speaker: "Squirtle",
-        text: "He has no homies, there is nobody here."
+        speaker: SANDBOTS_BOT_NAMES.hydro,
+        text: "There are three active bots and one ruined planet. Try to pace the celebration."
       },
       {
-        speaker: "Charmander",
-        text: "If you silicon nerds need me to PARTY F... HARD! Just call me, cuz."
+        speaker: SANDBOTS_BOT_NAMES.thermal,
+        text: "If the colony needs heat, call me. If it needs emotional stability, call someone else."
       },
     ],
     effects: [
@@ -899,7 +908,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Charmander moved into the Train House."
+        message: `${SANDBOTS_BOT_NAMES.thermal} moved into the ${SANDBOTS_ITEM_NAMES.thermalCabin}.`
       },
       {
         type: STORY_BEAT_EFFECT.SET_FLAG,
@@ -915,20 +924,20 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.RUINED_POKEMON_CENTER_INSPECTED,
     fallbackLines: [
       {
-        speaker: "Professor Tangrowth",
+        speaker: SANDBOTS_BOT_NAMES.overseer,
         text: "Well, this is what's left of our office. For a brief, beautiful moment, we had some dignity."
       },
       {
-        speaker: "Professor Tangrowth",
+        speaker: SANDBOTS_BOT_NAMES.overseer,
         text: "Then Bill had another fit of rage. The walls took it personally. The insurance, less so."
       },
       {
-        speaker: "Professor Tangrowth",
+        speaker: SANDBOTS_BOT_NAMES.overseer,
         text: "But that's life, isn't it? You build a workplace, someone has a revelation, shit is all over the place."
       },
       {
-        speaker: "Pokedesk",
-        text: "I guess journaling does not pay the bill's, right?! Go check the computer."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "Terminal core is responding. Please inspect the computer before the building lowers expectations further."
       }
     ],
     effects: [
@@ -938,7 +947,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You inspected the ruined Pokemon Center."
+        message: `You inspected the ruined ${SANDBOTS_WORLD_TERMS.terminal}.`
       }
     ]
   },
@@ -946,16 +955,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.CHALLENGES_UNLOCKED,
     fallbackLines: [
       {
-        speaker: "Pokedesk",
-        text: "The old PC flickers back online."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "The Colony Terminal flickers back online."
       },
       {
-        speaker: "Pokedesk",
-        text: "Challenges unlocked."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "Habitat checks unlocked."
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "Good. Challenges will help us prove each restored habitat can hold up."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "Good. Habitat checks will prove each restored zone can support the colony."
       }
     ],
     effects: [
@@ -981,7 +990,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Challenges unlocked."
+        message: "Habitat checks unlocked."
       }
     ]
   },
@@ -990,19 +999,19 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     fallbackLines: [
       {
         speaker: "Chopper",
-        text: "That boulder shade woke a dormant carrier unit. Timburr's repair module is responding."
+        text: `That boulder shade woke ${SANDBOTS_BOT_NAMES.builder}. The heavy-lift helper is responding.`
       },
       {
-        speaker: "Timburr",
+        speaker: SANDBOTS_BOT_NAMES.builder,
         text: "Hey! A shady patch by a boulder. That's perfect for training."
       },
       {
-        speaker: "Timburr",
+        speaker: SANDBOTS_BOT_NAMES.builder,
         text: "This place still needs a lot of work, right? I can help carry the heavy stuff."
       },
       {
-        speaker: "Pokedesk",
-        text: "Timburr was registered."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: `${SANDBOTS_BOT_NAMES.builder} was registered.`
       }
     ],
     effects: [
@@ -1020,7 +1029,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Return to the PC to claim Life Coins."
+        message: `Return to the ${SANDBOTS_WORLD_TERMS.terminal} to log viability.`
       }
     ]
   },
@@ -1028,16 +1037,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.BOULDER_CHALLENGE_REWARD,
     fallbackLines: [
       {
-        speaker: "Pokedesk",
-        text: "Challenge complete: Boulder-Shaded Tall Grass."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "Habitat check complete: Boulder-Shaded Tall Grass."
       },
       {
-        speaker: "Pokedesk",
-        text: "Life Coins received."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "Viability report logged."
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "Good work. New Pokemon finding their way back is the clearest sign this island is recovering."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "Good work. New bots finding their way back is the clearest sign this planet is recovering."
       }
     ],
     effects: [
@@ -1055,7 +1064,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You received Life Coins."
+        message: "Viability check logged."
       }
     ]
   },
@@ -1067,16 +1076,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
         text: "Do you need anything?"
       },
       {
-        speaker: "Bulbasaur",
+        speaker: SANDBOTS_BOT_NAMES.grow,
         text: "You watered the trees and gathered all those sturdy sticks! That's exactly what a grassy home needs."
       },
       {
-        speaker: "Bulbasaur",
-        text: "I drew up a Solar Station recipe for you. It should make a habitat feel much cozier."
+        speaker: SANDBOTS_BOT_NAMES.grow,
+        text: "I saved Solar Station plans for you. It should make a habitat feel much steadier."
       },
       {
-        speaker: "Pokedesk",
-        text: "Solar Station recipe was added to your bag."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "Solar Station plans were added to your bag."
       }
     ],
     effects: [
@@ -1094,7 +1103,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You learned the Solar Station recipe."
+        message: "Solar Station plans received."
       }
     ]
   },
@@ -1107,7 +1116,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You created a Solar Station."
+        message: "Solar Station prepared."
       }
     ]
   },
@@ -1115,16 +1124,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.BULBASAUR_STRAW_BED_REQUEST_COMPLETE,
     fallbackLines: [
       {
-        speaker: "Bulbasaur",
+        speaker: SANDBOTS_BOT_NAMES.grow,
         text: "A Solar Station right in the tall grass! It catches the light and hums softly."
       },
       {
-        speaker: "Bulbasaur",
+        speaker: SANDBOTS_BOT_NAMES.grow,
         text: "This habitat feels much more like home now. Thank you!"
       },
       {
-        speaker: "Pokedesk",
-        text: "Bulbasaur's request is complete."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: `${SANDBOTS_BOT_NAMES.grow}'s request is complete.`
       }
     ],
     effects: [
@@ -1142,7 +1151,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Bulbasaur's Solar Station request complete."
+        message: `${SANDBOTS_BOT_NAMES.grow}'s Solar Station request complete.`
       }
     ]
   },
@@ -1150,16 +1159,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.NEW_PC_CHALLENGES,
     fallbackLines: [
       {
-        speaker: "Pokedesk",
-        text: "The Pokemon Center PC is online again."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "The Colony Terminal is online again."
       },
       {
-        speaker: "Pokedesk",
-        text: "New Challenges have been added."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "New habitat checks have been added."
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "That means the island is ready for more habitat checks. Open the Challenges whenever you need the next lead."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "That means the planet is ready for more habitat checks. Review the terminal whenever you need the next lead."
       }
     ],
     effects: [
@@ -1185,7 +1194,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "New Challenges added."
+        message: "New habitat checks added."
       }
     ]
   },
@@ -1193,16 +1202,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.TANGROWTH_HOUSE_BUILDING_TALK,
     fallbackLines: [
       {
-        speaker: "Professor Tangrowth",
-        text: "You've been restoring habitats, but Pokemon need places to settle too."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "You've been restoring habitats, but future humans will need places to settle too."
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "A proper house gives them somewhere quiet to rest after they come back to the island."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "A proper house gives the colony a quiet, stable shelter point."
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "The Pokemon Center PC Shop should have a House Kit. Buy one and we can start from there."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "The Colony Terminal can prepare a House Kit now that the viability check passed."
       }
     ],
     effects: [
@@ -1216,7 +1225,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "House Kit is available in the PC Shop."
+        message: "House Kit ready."
       }
     ]
   },
@@ -1224,16 +1233,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.LEAF_DEN_KIT_PURCHASED,
     fallbackLines: [
       {
-        speaker: "Pokedesk",
-        text: "PC Shop opened."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "Colony construction is open."
       },
       {
-        speaker: "Pokedesk",
-        text: "House Kit purchased."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: "House Kit ready for {{playerName}}'s first shelter."
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "Good. Bring that kit with you and we will start turning these habitats into real homes."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "Good. Bring that kit with you and we will start turning this restored zone into a real home."
       }
     ],
     effects: [
@@ -1251,7 +1260,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You purchased a House Kit."
+        message: "House Kit ready for {{playerName}}'s first shelter."
       }
     ]
   },
@@ -1259,19 +1268,19 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.LEAF_DEN_CONSTRUCTION_STARTED,
     fallbackLines: [
       {
-        speaker: "Pokedesk",
-        text: "Timburr and Charmander were selected as construction helpers."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: `${SANDBOTS_BOT_NAMES.builder} and ${SANDBOTS_BOT_NAMES.thermal} were selected as construction helpers.`
       },
       {
-        speaker: "Pokedesk",
+        speaker: SANDBOTS_WORLD_TERMS.codex,
         text: "3 Sturdy Sticks and 3 Leaves were selected as materials."
       },
       {
-        speaker: "Timburr",
+        speaker: SANDBOTS_BOT_NAMES.builder,
         text: "Leave the heavy lifting to me. This House will be standing before you know it!"
       },
       {
-        speaker: "Pokedesk",
+        speaker: SANDBOTS_WORLD_TERMS.codex,
         text: "House construction has started. It will take a few seconds to complete."
       }
     ],
@@ -1290,12 +1299,12 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.LEAF_DEN_COMPLETE,
     fallbackLines: [
       {
-        speaker: "Pokedesk",
+        speaker: SANDBOTS_WORLD_TERMS.codex,
         text: "House construction is complete."
       },
       {
-        speaker: "Professor Tangrowth",
-        text: "A real house like this will make Pokemon feel much more welcome here."
+        speaker: SANDBOTS_BOT_NAMES.overseer,
+        text: "A real house like this proves humans might one day be welcome here too. Cautiously. With paperwork."
       }
     ],
     effects: [
@@ -1321,15 +1330,15 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.TIMBURR_LEAF_DEN_FURNITURE_COMPLETE,
     fallbackLines: [
       {
-        speaker: "Timburr",
+        speaker: SANDBOTS_BOT_NAMES.builder,
         text: "Nice work! Three pieces of furniture make the House feel like a real home."
       },
       {
-        speaker: "Timburr",
-        text: "Now Pokemon have places to sit, sleep, and settle in after they move here."
+        speaker: SANDBOTS_BOT_NAMES.builder,
+        text: "Now colonists have places to sit, sleep, and believe the floor is not a warning sign."
       },
       {
-        speaker: "Pokedesk",
+        speaker: SANDBOTS_WORLD_TERMS.codex,
         text: "House furniture request complete."
       }
     ],
@@ -1356,16 +1365,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.CHARMANDER_CELEBRATION_SUGGESTION,
     fallbackLines: [
       {
-        speaker: "Charmander",
+        speaker: SANDBOTS_BOT_NAMES.thermal,
         text: "The House is ready, and it feels so cozy now!"
       },
       {
-        speaker: "Charmander",
+        speaker: SANDBOTS_BOT_NAMES.thermal,
         text: "We should throw a celebration for everyone who helped build it!"
       },
       {
-        speaker: "Charmander",
-        text: "Come on, bring me to Professor Tangrowth and let's tell him!"
+        speaker: SANDBOTS_BOT_NAMES.thermal,
+        text: `Come on, bring me to ${SANDBOTS_BOT_NAMES.overseer} and let's tell him!`
       }
     ],
     effects: [
@@ -1379,7 +1388,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "Bring Charmander to Professor Tangrowth."
+        message: `Bring ${SANDBOTS_BOT_NAMES.thermal} to ${SANDBOTS_BOT_NAMES.overseer}.`
       }
     ]
   },
@@ -1387,16 +1396,16 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
     id: STORY_BEAT_IDS.CHARMANDER_CELEBRATION_CUTSCENE,
     fallbackLines: [
       {
-        speaker: "Charmander",
-        text: "Professor Tangrowth! The house is built, and we want to celebrate!"
+        speaker: SANDBOTS_BOT_NAMES.thermal,
+        text: `${SANDBOTS_BOT_NAMES.overseer}! The house is built, and we want to celebrate!`
       },
       {
-        speaker: "Professor Tangrowth",
+        speaker: SANDBOTS_BOT_NAMES.overseer,
         text: "A celebration is exactly what this island needs. Let this flag mark the first home brought back to life."
       },
       {
-        speaker: "Pokedesk",
-        text: "You received a Ditto Flag."
+        speaker: SANDBOTS_WORLD_TERMS.codex,
+        text: `You received a ${SANDBOTS_ITEM_NAMES.colonyFlag}.`
       }
     ],
     effects: [
@@ -1414,7 +1423,7 @@ export const SMALL_ISLAND_STORY_BEATS = Object.freeze({
       },
       {
         type: STORY_BEAT_EFFECT.PUSH_NOTICE,
-        message: "You received a Ditto Flag."
+        message: `You received a ${SANDBOTS_ITEM_NAMES.colonyFlag}.`
       }
     ]
   },

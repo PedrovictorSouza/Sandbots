@@ -11,11 +11,18 @@ function getViewportSize(windowRef) {
   };
 }
 
-function calculateGameScale(viewport, width, height) {
+function calculateContainScale(viewport, width, height) {
   const scaleX = viewport.width / width;
   const scaleY = viewport.height / height;
 
   return normalizeGameScale(Math.min(scaleX, scaleY));
+}
+
+function calculateCoverScale(viewport, width, height) {
+  const scaleX = viewport.width / width;
+  const scaleY = viewport.height / height;
+
+  return normalizeGameScale(Math.max(scaleX, scaleY));
 }
 
 function normalizeGameScale(value) {
@@ -25,17 +32,19 @@ function normalizeGameScale(value) {
     return 1;
   }
 
-  if (scale < 1) {
-    return scale;
-  }
-
-  return Math.max(1, Math.floor(scale));
+  return scale;
 }
 
 function normalizeFrame(frame, mode, viewport) {
   const width = Math.max(1, Math.round(Number(frame?.width) || 1));
   const height = Math.max(1, Math.round(Number(frame?.height) || 1));
-  const gameScale = normalizeGameScale(frame?.gameScale || calculateGameScale(viewport, width, height));
+  const safeScale = normalizeGameScale(
+    frame?.safeScale || frame?.gameScale || calculateContainScale(viewport, width, height)
+  );
+  const renderScale = normalizeGameScale(
+    frame?.renderScale || frame?.gameScale || calculateCoverScale(viewport, width, height)
+  );
+  const gameScale = normalizeGameScale(frame?.gameScale || safeScale);
 
   return {
     mode,
@@ -44,8 +53,8 @@ function normalizeFrame(frame, mode, viewport) {
     canvasWidth: Math.max(1, Math.round(Number(frame?.canvasWidth) || 426)),
     canvasHeight: Math.max(1, Math.round(Number(frame?.canvasHeight) || 240)),
     gameScale,
-    renderScale: gameScale,
-    safeScale: gameScale,
+    renderScale,
+    safeScale,
     sceneScale: gameScale
   };
 }

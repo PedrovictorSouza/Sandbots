@@ -804,7 +804,7 @@ describe("grid building system foundation", () => {
       "floorPlaceholder"
     ]);
     expect(database.get("trainHouse")).toMatchObject({
-      name: "Train House",
+      name: "Thermal Cabin",
       prefabKey: "trainHouseModel",
       placementType: "object",
       buildCategory: "workbench",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EARLY_FREEDOM_WINDOW_DEFAULTS,
   FIRST_TAUGHT_ACTION_IDS,
   recordFirstTaughtActionFreedomUse,
   startFirstTaughtActionFreedomWindow,
@@ -7,6 +8,13 @@ import {
 } from "../app/story/earlyFreedomWindow.js";
 
 describe("early freedom window", () => {
+  it("keeps enough default breathing room after the first taught action", () => {
+    expect(EARLY_FREEDOM_WINDOW_DEFAULTS).toMatchObject({
+      durationMs: 25000,
+      overCompletionAllowance: 5
+    });
+  });
+
   it("marks the first required taught action and starts a short window", () => {
     const storyState = { flags: {} };
 

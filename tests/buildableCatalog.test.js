@@ -29,7 +29,7 @@ describe("buildable catalog", () => {
   it("normalizes recipe buildables with inventory, grid, and ingredient data", () => {
     expect(getWorkbenchBuildableById(GRID_PLACEABLE_IDS.TRAIN_HOUSE)).toMatchObject({
       id: GRID_PLACEABLE_IDS.TRAIN_HOUSE,
-      label: "Train House",
+      label: "Thermal Cabin",
       group: GRID_BUILD_CATEGORIES.WORKBENCH,
       sourceType: BUILDABLE_SOURCE_TYPES.RECIPE,
       sourceId: "campfire",
@@ -92,7 +92,7 @@ describe("buildable catalog", () => {
       id: LEAF_DEN_KIT_ITEM_ID,
       title: "House",
       stationId: "workbench",
-      ingredients: { wood: 20 },
+      ingredients: {},
       output: { [LEAF_DEN_KIT_ITEM_ID]: 1 }
     });
   });
@@ -114,12 +114,12 @@ describe("buildable catalog", () => {
     expect(Object.isFrozen(getWorkbenchBuildableById(GRID_PLACEABLE_IDS.LEAF_DEN).requiredMaterials)).toBe(true);
   });
 
-  it("creates a Workbench recipe map that includes the House Kit craft recipe", () => {
+  it("creates a Workbench recipe map that includes the House Kit issue recipe", () => {
     const recipes = createWorkbenchRecipeMap();
 
     expect(recipes.campfire).toMatchObject({
       id: "campfire",
-      title: "Train House",
+      title: "Thermal Cabin",
       ingredients: { wood: 3 },
       output: { campfire: 1 }
     });
@@ -132,7 +132,7 @@ describe("buildable catalog", () => {
     expect(recipes[LEAF_DEN_KIT_ITEM_ID]).toMatchObject({
       id: LEAF_DEN_KIT_ITEM_ID,
       title: "House",
-      ingredients: { wood: 20 },
+      ingredients: {},
       output: { [LEAF_DEN_KIT_ITEM_ID]: 1 }
     });
     expect(Object.isFrozen(recipes)).toBe(true);

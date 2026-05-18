@@ -22,6 +22,23 @@ function hasMovedEnough(previousPosition, nextPosition) {
   return Math.hypot(dx, dz) > 0.01;
 }
 
+function clamp01(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, numericValue));
+}
+
+function resolveDustRandom(random) {
+  const nextRandom = typeof random === "function" ? random : Math.random;
+  return () => clamp01(nextRandom());
+}
+
+function getDustRandom(dustState) {
+  return resolveDustRandom(dustState?.random);
+}
+
 function emitDustParticle(dustState, playerPosition) {
   if (dustState.particles.length >= DUST_PARTICLE_LIMIT) {
     dustState.particles.shift();
@@ -29,15 +46,16 @@ function emitDustParticle(dustState, playerPosition) {
 
   const side = dustState.nextSide;
   dustState.nextSide *= -1;
+  const random = getDustRandom(dustState);
   const offset = [
-    playerPosition[0] + side * (0.14 + Math.random() * 0.08),
+    playerPosition[0] + side * (0.14 + random() * 0.08),
     playerPosition[1] + 0.06,
-    playerPosition[2] + 0.08 + Math.random() * 0.12
+    playerPosition[2] + 0.08 + random() * 0.12
   ];
   const baseScale = DUST_CLOUD_MODEL_BASE_SCALE +
-    Math.random() * DUST_CLOUD_MODEL_SCALE_VARIANCE;
-  const basePitch = -0.08 + Math.random() * 0.16;
-  const baseRoll = -0.08 + Math.random() * 0.16;
+    random() * DUST_CLOUD_MODEL_SCALE_VARIANCE;
+  const basePitch = -0.08 + random() * 0.16;
+  const baseRoll = -0.08 + random() * 0.16;
 
   dustState.particles.push({
     id: `player-dust-cloud-${dustState.nextParticleId}`,
@@ -46,19 +64,19 @@ function emitDustParticle(dustState, playerPosition) {
     position: offset,
     offset,
     drift: [
-      side * (0.16 + Math.random() * 0.08),
-      0.1 + Math.random() * 0.08,
-      0.12 + Math.random() * 0.08
+      side * (0.16 + random() * 0.08),
+      0.1 + random() * 0.08,
+      0.12 + random() * 0.08
     ],
-    size: 0.18 + Math.random() * 0.08,
+    size: 0.18 + random() * 0.08,
     baseScale,
     scale: baseScale,
-    yaw: Math.random() * Math.PI * 2,
+    yaw: random() * Math.PI * 2,
     basePitch,
     pitch: basePitch,
     baseRoll,
     roll: baseRoll,
-    rotationSpeed: side * (1.8 + Math.random() * 1.2),
+    rotationSpeed: side * (1.8 + random() * 1.2),
     alpha: 0,
     tint: DUST_CLOUD_MODEL_TINT,
     tintStrength: DUST_CLOUD_MODEL_TINT_STRENGTH,
@@ -68,13 +86,14 @@ function emitDustParticle(dustState, playerPosition) {
   dustState.nextParticleId += 1;
 }
 
-export function createPlayerDustState() {
+export function createPlayerDustState({ random = Math.random } = {}) {
   return {
     emitTimer: 0,
     lastPlayerPosition: null,
     nextParticleId: 0,
     nextSide: 1,
-    particles: []
+    particles: [],
+    random: resolveDustRandom(random)
   };
 }
 

@@ -14,7 +14,8 @@ describe("settingsState", () => {
       CAMERA: "camera",
       VOLUME: "volume",
       LANGUAGE: "language",
-      ACCESSIBILITY: "accessibility"
+      ACCESSIBILITY: "accessibility",
+      CONTROLS: "controls"
     });
     expect(SETTINGS_SCHEMA.map((group) => group.id)).toEqual([
       "camera",
@@ -43,7 +44,28 @@ describe("settingsState", () => {
       accessibility: {
         reduceMotion: false,
         highContrastHud: false,
+        crtFilter: true,
         holdToConfirm: false
+      },
+      controls: {
+        keyboard: {
+          moveUp: "KeyW",
+          moveLeft: "KeyA",
+          moveDown: "KeyS",
+          moveRight: "KeyD",
+          primaryAction: "Enter",
+          interact: "KeyE",
+          jump: "Space",
+          run: "ShiftLeft",
+          cameraZoomCycle: "KeyR",
+          pause: "KeyP",
+          pokedex: "Tab",
+          bag: "KeyX",
+          destroyAction: "KeyY",
+          followerCall: "ArrowUp",
+          previousMove: "ArrowLeft",
+          nextMove: "ArrowRight"
+        }
       }
     });
   });
@@ -63,6 +85,7 @@ describe("settingsState", () => {
         JSON.stringify({
           volume: { master: 0.25 },
           accessibility: { reduceMotion: true },
+          controls: { keyboard: { bag: "KeyZ" } },
           staleGroup: { old: true }
         }) :
         null
@@ -86,7 +109,28 @@ describe("settingsState", () => {
       accessibility: {
         reduceMotion: true,
         highContrastHud: false,
+        crtFilter: true,
         holdToConfirm: false
+      },
+      controls: {
+        keyboard: {
+          moveUp: "KeyW",
+          moveLeft: "KeyA",
+          moveDown: "KeyS",
+          moveRight: "KeyD",
+          primaryAction: "Enter",
+          interact: "KeyE",
+          jump: "Space",
+          run: "ShiftLeft",
+          cameraZoomCycle: "KeyR",
+          pause: "KeyP",
+          pokedex: "Tab",
+          bag: "KeyZ",
+          destroyAction: "KeyY",
+          followerCall: "ArrowUp",
+          previousMove: "ArrowLeft",
+          nextMove: "ArrowRight"
+        }
       }
     });
   });

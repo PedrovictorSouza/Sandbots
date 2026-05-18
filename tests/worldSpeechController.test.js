@@ -150,7 +150,7 @@ describe("createWorldSpeechController", () => {
     const controller = createWorldSpeechController({ mount });
 
     controller.showTaskPop({
-      text: "YOU RESTORED THE TALL GRASS!",
+      text: "HYDRO BOT IS ONLINE!",
       worldPosition: [0, 0, 0]
     });
 

@@ -1,7 +1,6 @@
 import {
   BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION,
   BOULDER_SHADED_TALL_GRASS_RADIUS,
-  CARBON_ITEM_ID,
   CAMPFIRE_ITEM_ID,
   DITTO_FLAG_ITEM_ID,
   LEAF_DEN_KIT_ITEM_ID,
@@ -27,6 +26,36 @@ import {
   reviveLeppaTreeFromWateredTiles
 } from "./islandWorld.js";
 import { createWorkbenchRecipeMap } from "../app/gameplay/buildableCatalog.js";
+import {
+  COLONY_FEEDBACK_IDS,
+  getColonyFeedbackNotice
+} from "../app/gameplay/colonyFeedbackContracts.js";
+import {
+  ACTION_FEEDBACK_ACTION,
+  ACTION_FEEDBACK_RESULT,
+  getActionFeedbackResponse
+} from "../app/gameplay/actionFeedbackContracts.js";
+import { createColonyCacheState } from "../app/gameplay/colonyCacheContract.js";
+import { getRequiredMaterialChargeFieldAbilityCost } from "../app/gameplay/content/fieldAbilityCosts.ts";
+import {
+  getHouseKitPlacementReadiness,
+  getHouseKitProgressState,
+  getSolarStationProgressState,
+  getTrainHouseProgressState,
+  HOUSE_KIT_PROGRESS_STATE,
+  SOLAR_STATION_PROGRESS_STATE,
+  TRAIN_HOUSE_PROGRESS_STATE
+} from "../app/story/progressionContracts.js";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES
+} from "../app/story/sandbotsLexicon.js";
+import { getResourcePurposeByItemId } from "../app/story/resourcePurposeCatalog.js";
+import {
+  COLONY_PROGRESS_EVENT,
+  emitColonyProgressQuestEvents
+} from "../app/story/progressionTriggerContract.js";
+import { MOTION_IMPACT_PRESET_IDS } from "../app/motion/motionImpactPresets.js";
 
 const BULBASAUR_RUSTLING_GRASS_RESTORE_COUNT = 4;
 const BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT = 10;
@@ -40,8 +69,9 @@ const LEAFAGE_OBJECT_ID_FLOWER = "flower";
 const BOULDER_SHADED_TALL_GRASS_GROUP_ID = "boulder-shaded-tall-grass-habitat-0";
 const LEAFAGE_GROUND_CELL_INTERACT_RADIUS_FACTOR = 0.82;
 const LEPPA_TREE_WATER_HINT_DISTANCE = 2.85;
-export const CHARMANDER_FIRE_USES_PER_CARBON = 10;
-export const CHARMANDER_FIRE_CARBON_USES_FLAG = "charmanderFireCarbonUses";
+const CHARMANDER_FIRE_COST = getRequiredMaterialChargeFieldAbilityCost("fire");
+export const CHARMANDER_FIRE_USES_PER_CARBON = CHARMANDER_FIRE_COST.usesPerUnit;
+export const CHARMANDER_FIRE_CARBON_USES_FLAG = CHARMANDER_FIRE_COST.useFlag;
 export const MAX_ACTIVE_POKEMON_FOLLOWERS = 5;
 const SOLAR_STATION_PLACEMENT_WORLD_MARGIN = 2.2;
 const POKEMON_FOLLOW_FLAGS = Object.freeze({
@@ -51,12 +81,27 @@ const POKEMON_FOLLOW_FLAGS = Object.freeze({
   timburr: "timburrFollowing"
 });
 const POKEMON_FOLLOW_NAMES = Object.freeze({
-  squirtle: "Squirtle",
-  bulbasaur: "Bulbasaur",
-  charmander: "Charmander",
-  timburr: "Timburr"
+  squirtle: SANDBOTS_BOT_NAMES.hydro,
+  bulbasaur: SANDBOTS_BOT_NAMES.grow,
+  charmander: SANDBOTS_BOT_NAMES.thermal,
+  timburr: SANDBOTS_BOT_NAMES.builder
 });
 const BEE_FIELD_FLOWER_GROUP_ID = "water-gun-flower-field-0";
+
+function formatColonyCacheInteractionNotice(inventory = {}) {
+  const cacheState = createColonyCacheState({ inventory });
+
+  if (cacheState.totalItems <= 0) {
+    return "Colony Cache empty. Gather local supplies to protect colony progress.";
+  }
+
+  const topItem = cacheState.storedItems.find((item) => item.purposeText) ||
+    cacheState.storedItems[0];
+  const supplyLabel = cacheState.totalItems === 1 ? "supply" : "supplies";
+  const purposeText = topItem?.purposeText ? ` ${topItem.label}: ${topItem.purposeText}` : "";
+
+  return `Colony Cache: ${cacheState.totalItems} protected ${supplyLabel}.${purposeText}`;
+}
 
 export function countActivePokemonFollowers(flags = {}, followFlags = POKEMON_FOLLOW_FLAGS) {
   return Object.values(followFlags)
@@ -108,19 +153,19 @@ function getCharmanderFireCarbonUses(storyState) {
 }
 
 export function canUseCharmanderFireWithCarbon({ storyState, inventory } = {}) {
-  return Number(inventory?.[CARBON_ITEM_ID] || 0) > 0;
+  return Number(inventory?.[CHARMANDER_FIRE_COST.materialId] || 0) > 0;
 }
 
 function recordCharmanderFireCarbonUse({ storyState, inventory, syncInventoryUi }) {
   storyState.flags ||= {};
-  const currentCarbon = Number(inventory?.[CARBON_ITEM_ID] || 0);
+  const currentCarbon = Number(inventory?.[CHARMANDER_FIRE_COST.materialId] || 0);
   if (currentCarbon <= 0) {
     return false;
   }
 
   const nextUses = getCharmanderFireCarbonUses(storyState) + 1;
   if (nextUses >= CHARMANDER_FIRE_USES_PER_CARBON) {
-    inventory[CARBON_ITEM_ID] = Math.max(0, currentCarbon - 1);
+    inventory[CHARMANDER_FIRE_COST.materialId] = Math.max(0, currentCarbon - 1);
     storyState.flags[CHARMANDER_FIRE_CARBON_USES_FLAG] = 0;
     syncInventoryUi(inventory);
   } else {
@@ -161,6 +206,8 @@ export function createGameplayInteractions({
   onLogChairSitRequested = () => {},
   onWorkbenchRecipesRequested = () => {},
   onWorkbenchCraftOptionsRequested = () => {},
+  onWorkbenchCraftMotionRequested = () => {},
+  onWaterGunImpactMotionRequested = () => {},
   onCampfireCraftRequested = () => {},
   onCampfireCrafted = () => {},
   onCampfireSpitOutRequested = () => {},
@@ -205,11 +252,15 @@ export function createGameplayInteractions({
 
   function pushMissedInteractNotice() {
     missedInteractAttempts += 1;
+    const noTargetResponse = getActionFeedbackResponse(
+      ACTION_FEEDBACK_ACTION.INTERACT,
+      ACTION_FEEDBACK_RESULT.NO_TARGET
+    );
 
     pushNotice(
       missedInteractAttempts >= 2 ?
-        "Still nothing nearby. Look for a PRESS X bubble or move closer, then press A / E / X." :
-        "Nothing to talk to nearby. Move closer to a marker or character, then press E."
+        noTargetResponse?.repeatMessage || "Still nothing nearby. Look for an interaction marker or move closer, then press A / E / X." :
+        noTargetResponse?.message || "Nothing to talk to nearby. Move closer to a marker or bot, then press E / X."
     );
   }
 
@@ -230,7 +281,10 @@ export function createGameplayInteractions({
     missedHarvestAttempts += 1;
 
     if (missedHarvestAttempts >= 2) {
-      pushNotice("Still no target. Move until a tile outline or PRESS X bubble appears, then press Enter / X.");
+      pushNotice(getActionFeedbackResponse(
+        ACTION_FEEDBACK_ACTION.USE_FIELD_TOOL,
+        ACTION_FEEDBACK_RESULT.NO_TARGET
+      )?.message || "Still no target. Move until a tile outline or interaction marker appears, then press X / Enter.");
       return;
     }
 
@@ -238,9 +292,9 @@ export function createGameplayInteractions({
       canPurifyGround ?
         "No target in range. Move closer to dry ground, grass, a tree, or a marker, then press Enter." :
         canUseLeafage ?
-          "No target in range. Move closer to clear ground, then press Enter to use Leafage." :
+          `No target in range. Move closer to clear ground, then press Enter to use ${SANDBOTS_ITEM_NAMES.growTool}.` :
         canUseFire ?
-          "No white ground in range. Move closer to a white tile, then press Enter to use Fire." :
+          `No white ground in range. Move closer to a white tile, then press Enter to use ${SANDBOTS_ITEM_NAMES.thermalTool}.` :
         "No resource in range. Move closer to a tree or drop, then press Enter."
     );
   }
@@ -301,10 +355,8 @@ export function createGameplayInteractions({
     return groundGrassPatches.some((patch) => patch?.cellId === groundCell.id);
   }
 
-  function canWaterGunRestoreEmptyGround(storyState = {}) {
-    const flags = storyState.flags || {};
-    return Boolean(flags.bulbasaurDryGrassMissionComplete) ||
-      Number(flags.restoredGrassCount || 0) >= BULBASAUR_DRY_GRASS_MISSION_RESTORE_COUNT;
+  function canWaterGunRestoreEmptyGround() {
+    return true;
   }
 
   function isLeppaTreeWateringGroundCell(groundCell, leppaTree, storyState = {}) {
@@ -947,7 +999,54 @@ export function createGameplayInteractions({
       targetId: resourceNode.itemId,
       amount: resourceNode.yield
     });
-    pushNotice(`+${resourceNode.yield} ${getItemLabel(resourceNode.itemId)}`);
+    const resourcePurpose = getResourcePurposeByItemId(resourceNode.itemId);
+    const baseNotice = `+${resourceNode.yield} ${getItemLabel(resourceNode.itemId)} added to Colony Cache`;
+    pushNotice(
+      resourcePurpose?.playerFacingPurpose ?
+        `${baseNotice}: ${resourcePurpose.playerFacingPurpose}` :
+        `+${resourceNode.yield} ${getItemLabel(resourceNode.itemId)} added to cache`
+    );
+  }
+
+  function formatRequirementProgress(ingredients = {}, inventory = {}) {
+    const entries = Object.entries(ingredients || {});
+    if (!entries.length) {
+      return typeof formatRequirementSummary === "function" ?
+        formatRequirementSummary(ingredients, inventory) :
+        "";
+    }
+
+    return entries.map(([itemId, requiredAmount]) => {
+      const required = Math.max(0, Number(requiredAmount || 0));
+      const owned = Math.max(0, Number(inventory?.[itemId] || 0));
+      const label = typeof getItemLabel === "function" ? getItemLabel(itemId) : itemId;
+      return `${label} ${Math.min(owned, required)}/${required}`;
+    }).join(", ");
+  }
+
+  function pushMissingRequirementNotice(ingredients, inventory) {
+    const requirementProgress = formatRequirementProgress(ingredients, inventory);
+    pushNotice(requirementProgress ? `Missing: ${requirementProgress}` : "Missing materials.");
+  }
+
+  function requestWorkbenchCraftMotion(recipe) {
+    onWorkbenchCraftMotionRequested({
+      presetId: MOTION_IMPACT_PRESET_IDS.WORKBENCH_CRAFT,
+      recipe
+    });
+  }
+
+  function requestWaterGunImpactMotion({
+    groundCell,
+    patch = null,
+    type = "ground"
+  } = {}) {
+    onWaterGunImpactMotionRequested({
+      presetId: MOTION_IMPACT_PRESET_IDS.WATER_GUN_HIT,
+      groundCell,
+      patch,
+      type
+    });
   }
 
   function craftCampfireAtWorkbench({ storyState, inventory } = {}) {
@@ -957,12 +1056,19 @@ export function createGameplayInteractions({
       return false;
     }
 
-    if (storyState.flags.campfireCrafted) {
+    const trainHouseState = getTrainHouseProgressState({ storyState, inventory });
+
+    if (trainHouseState.state === TRAIN_HOUSE_PROGRESS_STATE.READY_TO_PLACE) {
+      onCampfireSpitOutRequested({ source: "workbench" });
+      return true;
+    }
+
+    if (trainHouseState.state === TRAIN_HOUSE_PROGRESS_STATE.PLACED) {
       return false;
     }
 
     if (!hasItems(inventory, campfireRecipe.ingredients)) {
-      pushNotice(`Missing: ${formatRequirementSummary(campfireRecipe.ingredients, inventory)}`);
+      pushMissingRequirementNotice(campfireRecipe.ingredients, inventory);
       return false;
     }
 
@@ -978,6 +1084,7 @@ export function createGameplayInteractions({
     onCampfireCrafted({
       recipe: campfireRecipe
     });
+    requestWorkbenchCraftMotion(campfireRecipe);
     return true;
   }
 
@@ -988,12 +1095,23 @@ export function createGameplayInteractions({
       return false;
     }
 
-    if (storyState.flags.strawBedCrafted) {
+    const solarStationState = getSolarStationProgressState({ storyState, inventory });
+
+    if (solarStationState.state === SOLAR_STATION_PROGRESS_STATE.READY_TO_PLACE) {
+      onStrawBedPlacementRequested({ source: "workbench" });
+      return true;
+    }
+
+    if (solarStationState.state === SOLAR_STATION_PROGRESS_STATE.PLACED) {
+      return false;
+    }
+
+    if (solarStationState.state === SOLAR_STATION_PROGRESS_STATE.LOCKED) {
       return false;
     }
 
     if (!hasItems(inventory, strawBedRecipe.ingredients)) {
-      pushNotice(`Missing: ${formatRequirementSummary(strawBedRecipe.ingredients, inventory)}`);
+      pushMissingRequirementNotice(strawBedRecipe.ingredients, inventory);
       return false;
     }
 
@@ -1009,6 +1127,7 @@ export function createGameplayInteractions({
     onStrawBedCrafted({
       recipe: strawBedRecipe
     });
+    requestWorkbenchCraftMotion(strawBedRecipe);
     return true;
   }
 
@@ -1023,17 +1142,28 @@ export function createGameplayInteractions({
       return false;
     }
 
-    if (!storyState.flags.leafDenKitPurchaseAvailable && !storyState.flags.leafDenBuildAvailable) {
-      pushNotice("House is still locked.");
+    const houseKitState = getHouseKitProgressState({ storyState, inventory });
+
+    if (houseKitState.state === HOUSE_KIT_PROGRESS_STATE.LOCKED) {
+      pushNotice(getColonyFeedbackNotice(COLONY_FEEDBACK_IDS.HOUSE_KIT_LOCKED));
       return false;
+    }
+
+    if (houseKitState.state === HOUSE_KIT_PROGRESS_STATE.READY_TO_PLACE) {
+      storyState.flags.leafDenKitSelected = true;
+      syncInventoryUi(inventory);
+      pushNotice(getColonyFeedbackNotice(COLONY_FEEDBACK_IDS.HOUSE_KIT_SELECTED));
+      return true;
     }
 
     if (!hasItems(inventory, houseRecipe.ingredients)) {
-      pushNotice(`Missing: ${formatRequirementSummary(houseRecipe.ingredients, inventory)}`);
+      pushMissingRequirementNotice(houseRecipe.ingredients, inventory);
       return false;
     }
 
-    consumeItems(inventory, houseRecipe.ingredients);
+    if (Object.keys(houseRecipe.ingredients || {}).length > 0) {
+      consumeItems(inventory, houseRecipe.ingredients);
+    }
     addItems(inventory, houseRecipe.output);
     storyState.flags.leafDenKitPurchased = true;
     storyState.flags.leafDenBuildAvailable = true;
@@ -1044,7 +1174,8 @@ export function createGameplayInteractions({
       targetId: LEAF_DEN_KIT_ITEM_ID,
       amount: 1
     });
-    pushNotice("You created a House Kit.");
+    pushNotice(getColonyFeedbackNotice(COLONY_FEEDBACK_IDS.HOUSE_KIT_ISSUED));
+    requestWorkbenchCraftMotion(houseRecipe);
     return true;
   }
 
@@ -1058,54 +1189,44 @@ export function createGameplayInteractions({
     const recipeOptions = [];
 
     if (workbenchRecipes.campfire) {
-      const campfireUnlocked = Boolean(flags.workbenchDiyRecipesReceived);
+      const trainHouseState = getTrainHouseProgressState({ flags, inventory });
       recipeOptions.push({
         recipe: workbenchRecipes.campfire,
-        disabled: Boolean(flags.campfireCrafted || !campfireUnlocked),
-        status: flags.campfireCrafted ?
-          "Created" :
-          campfireUnlocked ?
-            null :
-            getLockedRecipeStatus(workbenchRecipes.campfire, inventory)
+        disabled: trainHouseState.disabled,
+        status: trainHouseState.status ||
+          (
+            trainHouseState.state === TRAIN_HOUSE_PROGRESS_STATE.LOCKED ?
+              getLockedRecipeStatus(workbenchRecipes.campfire, inventory) :
+              null
+          ),
+        actionLabel: trainHouseState.actionLabel
       });
     }
 
     if (workbenchRecipes.strawBed) {
-      const strawBedUnlocked = Boolean(flags.strawBedRecipeUnlocked);
+      const solarStationState = getSolarStationProgressState({ flags, inventory });
       recipeOptions.push({
         recipe: workbenchRecipes.strawBed,
-        disabled: Boolean(flags.strawBedCrafted || !strawBedUnlocked),
-        status: flags.strawBedCrafted ?
-          "Created" :
-          strawBedUnlocked ?
-            null :
-            getLockedRecipeStatus(workbenchRecipes.strawBed, inventory)
+        disabled: solarStationState.disabled,
+        status: solarStationState.status ||
+          (
+            solarStationState.state === SOLAR_STATION_PROGRESS_STATE.LOCKED ?
+              getLockedRecipeStatus(workbenchRecipes.strawBed, inventory) :
+              null
+          ),
+        actionLabel: solarStationState.actionLabel
       });
     }
 
     const houseRecipe = workbenchRecipes[LEAF_DEN_KIT_ITEM_ID];
 
-    const houseCreated = Boolean(
-      flags.leafDenKitPurchased ||
-      flags.leafDenKitPlaced ||
-      flags.leafDenBuilt ||
-      Number(inventory[LEAF_DEN_KIT_ITEM_ID] || 0) > 0
-    );
-    const houseUnlocked = Boolean(
-      houseCreated ||
-      flags.leafDenKitPurchaseAvailable ||
-      flags.leafDenBuildAvailable
-    );
-
     if (houseRecipe) {
+      const houseKitState = getHouseKitProgressState({ flags, inventory });
       recipeOptions.push({
         recipe: houseRecipe,
-        disabled: Boolean(!houseUnlocked),
-        status: houseCreated ?
-          `Needs ${formatRequirementSummary(houseRecipe.ingredients, inventory)}` :
-          houseUnlocked ?
-            null :
-            "Locked"
+        disabled: houseKitState.disabled,
+        status: houseKitState.status,
+        actionLabel: houseKitState.actionLabel
       });
     }
 
@@ -1145,7 +1266,7 @@ export function createGameplayInteractions({
     }
 
     if (!hasItems(inventory, recipe.ingredients)) {
-      pushNotice(`Faltando: ${formatRequirementSummary(recipe.ingredients, inventory)}`);
+      pushMissingRequirementNotice(recipe.ingredients, inventory);
       return false;
     }
 
@@ -1248,7 +1369,7 @@ export function createGameplayInteractions({
           });
           advanceQuest(
             storyState,
-            quest.resolveLine || "Tangrowth te apontou para o burrow e para a Aunty."
+            quest.resolveLine || `${SANDBOTS_BOT_NAMES.overseer} pointed you toward the colony hub and the Core Keeper Bot.`
           );
         };
 
@@ -1296,7 +1417,7 @@ export function createGameplayInteractions({
 
       pushNotice(
         npcProfile?.idleLine ||
-        "Tangrowth: keep moving. Aunty holds the home loop together."
+        `${SANDBOTS_BOT_NAMES.overseer}: keep moving. The Core Keeper Bot holds the home loop together.`
       );
       return false;
     }
@@ -1307,7 +1428,7 @@ export function createGameplayInteractions({
           type: QUEST_EVENT.TALK,
           targetId: npcId
         });
-        advanceQuest(storyState, quest.resolveLine || "Aunty marcou a ponte e liberou o Workbench.");
+        advanceQuest(storyState, quest.resolveLine || "Core Keeper Bot marked the bridge route and authorized the Workbench.");
         return true;
       }
 
@@ -1317,13 +1438,13 @@ export function createGameplayInteractions({
           type: QUEST_EVENT.TALK,
           targetId: npcId
         });
-        advanceQuest(storyState, quest.resolveLine || "Grand Dinner concluido. Free-roam liberado.");
+        advanceQuest(storyState, quest.resolveLine || "Final hub check complete. Free roam unlocked.");
         return true;
       }
 
       pushNotice(
         npcProfile?.idleLine ||
-        "Aunty: siga a rota ativa e volte quando o proximo marco estiver pronto."
+        "Core Keeper Bot: follow the active route and return when the next milestone is ready."
       );
       return false;
     }
@@ -1334,11 +1455,11 @@ export function createGameplayInteractions({
           type: QUEST_EVENT.TALK,
           targetId: npcId
         });
-        advanceQuest(storyState, quest.resolveLine || "Bufo quer um Marsh Pie antes de liberar o blueprint.");
+        advanceQuest(storyState, quest.resolveLine || "Route Survey Bot needs a Marsh Ration before releasing the blueprint.");
         return true;
       }
 
-      pushNotice(npcProfile?.idleLine || "Bufo: sem o pie certo, o progresso para por aqui.");
+      pushNotice(npcProfile?.idleLine || "Route Survey Bot: without the right ration, progress stops here.");
       return false;
     }
 
@@ -1350,12 +1471,12 @@ export function createGameplayInteractions({
         });
         advanceQuest(
           storyState,
-          quest.resolveLine || "Willow marcou o repair kit final para o velho burrow."
+          quest.resolveLine || "Willow marked the final repair kit for the Old Colony Hub."
         );
         return true;
       }
 
-      pushNotice(npcProfile?.idleLine || "Willow: abra a trilha final e volte com o repair kit.");
+      pushNotice(npcProfile?.idleLine || "Willow: open the final trail and bring back the repair kit.");
       return false;
     }
 
@@ -1379,7 +1500,7 @@ export function createGameplayInteractions({
       }
 
       if (quest.id !== "findPokemon") {
-        pushNotice("O Pokemon ferido nao e a prioridade atual.");
+        pushNotice("The damaged bot is not the active priority right now.");
         return false;
       }
 
@@ -1393,7 +1514,7 @@ export function createGameplayInteractions({
         unlockPokedexReward();
         advanceQuest(
           storyState,
-          quest.resolveLine || "Voce encontrou o Pokemon que Tangrowth ouviu."
+          quest.resolveLine || `You found the bot ${SANDBOTS_BOT_NAMES.overseer} detected.`
         );
       };
 
@@ -1416,68 +1537,68 @@ export function createGameplayInteractions({
 
     if (targetId === "bridge") {
       if (quest.id !== "repairBridge") {
-        pushNotice("A ponte ainda nao e a prioridade atual.");
+        pushNotice("The bridge is not the active priority yet.");
         return false;
       }
 
       if (!consumeItems(inventory, quest.delivery)) {
-        pushNotice(`Faltando: ${formatRequirementSummary(quest.delivery, inventory)}`);
+        pushMissingRequirementNotice(quest.delivery, inventory);
         return false;
       }
 
       storyState.flags.bridgeRepaired = true;
       syncInventoryUi(inventory);
-      advanceQuest(storyState, "Ponte reparada. O sul agora leva ate Bufo.");
+      advanceQuest(storyState, "Bridge repaired. The south route now reaches Route Survey Bot.");
       return true;
     }
 
     if (targetId === "bufo") {
       if (quest.id !== "feedBufo") {
-        pushNotice("Bufo ainda espera outra etapa antes da entrega.");
+        pushNotice("Route Survey Bot is waiting for another step before delivery.");
         return false;
       }
 
       if (!consumeItems(inventory, quest.delivery)) {
-        pushNotice(`Faltando: ${formatRequirementSummary(quest.delivery, inventory)}`);
+        pushMissingRequirementNotice(quest.delivery, inventory);
         return false;
       }
 
       storyState.flags.bufoFed = true;
       syncInventoryUi(inventory);
-      advanceQuest(storyState, "Bufo liberou o blueprint da Granite Pickaxe.");
+      advanceQuest(storyState, "Route Survey Bot released the Granite Pickaxe blueprint.");
       return true;
     }
 
     if (targetId === "graniteGate") {
       if (quest.id !== "breakGate") {
-        pushNotice("O granite gate ainda nao e o objetivo ativo.");
+        pushNotice("The Granite Gate is not the active objective yet.");
         return false;
       }
 
       if ((inventory.granitePickaxe || 0) <= 0) {
-        pushNotice("Sem Granite Pickaxe, o gate continua fechado.");
+        pushNotice("Without the Granite Pickaxe, the gate stays shut.");
         return false;
       }
 
       storyState.flags.graniteGateOpened = true;
-      advanceQuest(storyState, "Granite gate quebrado. Willow ficou acessivel.");
+      advanceQuest(storyState, "Granite Gate opened. Willow is reachable now.");
       return true;
     }
 
     if (targetId === "burrowSite") {
       if (quest.id !== "repairBurrow") {
-        pushNotice("O velho burrow ainda nao pode ser reparado.");
+        pushNotice("The Old Colony Hub cannot be repaired yet.");
         return false;
       }
 
       if (!consumeItems(inventory, quest.delivery)) {
-        pushNotice(`Faltando: ${formatRequirementSummary(quest.delivery, inventory)}`);
+        pushMissingRequirementNotice(quest.delivery, inventory);
         return false;
       }
 
       storyState.flags.burrowFixed = true;
       syncInventoryUi(inventory);
-      advanceQuest(storyState, "Burrow reparado. Volte para Aunty e feche a campanha.");
+      advanceQuest(storyState, "Old Colony Hub repaired. Return to the Core Keeper Bot to close the campaign route.");
       return true;
     }
 
@@ -1550,8 +1671,9 @@ export function createGameplayInteractions({
       storyState?.flags?.leafDenKitSelected &&
       (inventory?.[LEAF_DEN_KIT_ITEM_ID] || 0) > 0
     ) {
+      const placementReadiness = getHouseKitPlacementReadiness({ storyState, inventory });
       return {
-        leafDenKitPlacement: true,
+        leafDenKitPlacement: placementReadiness,
         distance: 0
       };
     }
@@ -1792,6 +1914,10 @@ export function createGameplayInteractions({
     }
 
     if (target.kind === "grassEncounter") {
+      if (!storyState.flags.chopperBulbasaurRepairBoxIntroComplete) {
+        return false;
+      }
+
       if (!storyState.flags.bulbasaurRevealed) {
         storyState.flags.bulbasaurRevealed = true;
         markPokemonFollowing(storyState, "bulbasaur");
@@ -1879,9 +2005,9 @@ export function createGameplayInteractions({
 
         if (collected > 0) {
           syncInventoryUi(inventory);
-          pushNotice(`+${collected} Leppa Berry`);
+          pushNotice(`+${collected} Pulse Berry`);
         } else {
-          pushNotice("A Leppa Berry fell from the tree.");
+          pushNotice("A Pulse Berry fell from the tree.");
         }
 
         return true;
@@ -1898,7 +2024,7 @@ export function createGameplayInteractions({
       }
 
       if (!dropAndCollectLeppaBerry()) {
-        pushNotice("The tree has already dropped its Leppa Berry.");
+        pushNotice("The tree has already dropped its Pulse Berry.");
         return false;
       }
 
@@ -1985,7 +2111,7 @@ export function createGameplayInteractions({
         return true;
       }
 
-      pushNotice(`${POKEMON_FOLLOW_NAMES[target.id] || target.label || "Pokemon"} is following you.`);
+      pushNotice(`${POKEMON_FOLLOW_NAMES[target.id] || target.label || "Bot"} is following you.`);
       return true;
     }
 
@@ -2012,6 +2138,12 @@ export function createGameplayInteractions({
 
     if (target.kind === "station") {
       return handleStationInteraction(target.id, storyState, inventory);
+    }
+
+    if (target.id === "colonyCache") {
+      notifyInteractionStart(target);
+      pushNotice(formatColonyCacheInteractionNotice(inventory));
+      return true;
     }
 
     if (target.id === "ruinedPokemonCenter") {
@@ -2092,7 +2224,7 @@ export function createGameplayInteractions({
           leppaTree
         )
       ) {
-        pushNotice("Water Gun can only restore dry tall grass right now.");
+        pushNotice(`${SANDBOTS_ITEM_NAMES.hydroTool} can only restore dry tall grass right now.`);
         return false;
       }
     }
@@ -2117,6 +2249,11 @@ export function createGameplayInteractions({
     }
 
     if (nearbyHarvestTarget?.leafDenKitPlacement) {
+      if (nearbyHarvestTarget.leafDenKitPlacement?.canPlace === false) {
+        pushNotice(nearbyHarvestTarget.leafDenKitPlacement.reason);
+        return false;
+      }
+
       onLeafDenKitPlacementRequested({
         playerPosition
       });
@@ -2151,10 +2288,12 @@ export function createGameplayInteractions({
       }
 
       if (wateredPalm.challengeComplete) {
-        pushNotice("First set of challenges complete. Talk to Bulbasaur.");
+        pushNotice(getColonyFeedbackNotice(COLONY_FEEDBACK_IDS.HABITAT_CHECK_COMPLETE, {
+          growBotName: SANDBOTS_BOT_NAMES.grow
+        }));
       } else if (wateredPalm.counted) {
         const wateredTreeCount = Math.min(5, Number(storyState.flags.wateredTreeCount || 0));
-        pushNotice(`Tree watered for Bulbasaur. ${wateredTreeCount}/5 trees watered.`);
+        pushNotice(`Tree watered for ${SANDBOTS_BOT_NAMES.grow}. ${wateredTreeCount}/5 trees watered.`);
       }
 
       return true;
@@ -2215,7 +2354,7 @@ export function createGameplayInteractions({
               return true;
             }
 
-            pushNotice("Leafage grew a flower.");
+            pushNotice(`${SANDBOTS_ITEM_NAMES.growTool} grew a flower.`);
             return true;
           }
 
@@ -2249,8 +2388,8 @@ export function createGameplayInteractions({
 
           pushNotice(
             leafagePatch.leafageObjectId === LEAFAGE_OBJECT_ID_GARDEN_1 ?
-              "Leafage grew a garden." :
-              "Leafage grew tall grass."
+              `${SANDBOTS_ITEM_NAMES.growTool} grew a garden.` :
+              `${SANDBOTS_ITEM_NAMES.growTool} grew tall grass.`
           );
           return true;
         }
@@ -2258,7 +2397,7 @@ export function createGameplayInteractions({
 
       const nearbyDryGroundCell = findNearbyGroundCell(playerPosition, groundDeadInstances);
       if (nearbyDryGroundCell?.groundCell) {
-        pushNotice("Leafage needs restored ground. Use Water Gun here first.");
+        pushNotice(`${SANDBOTS_ITEM_NAMES.growTool} needs restored ground. Use ${SANDBOTS_ITEM_NAMES.hydroTool} here first.`);
         return false;
       }
     }
@@ -2270,7 +2409,7 @@ export function createGameplayInteractions({
 
       if (fireGroundCell) {
         if (!canUseCharmanderFireWithCarbon({ storyState, inventory })) {
-          pushNotice("Charmander needs Carbon to use Fire.");
+          pushNotice(CHARMANDER_FIRE_COST.emptyNotice);
           return false;
         }
 
@@ -2282,7 +2421,7 @@ export function createGameplayInteractions({
 
         if (burned) {
           recordCharmanderFireCarbonUse({ storyState, inventory, syncInventoryUi });
-          pushNotice("Fire burned the white ground into dry ground.");
+          pushNotice(`${SANDBOTS_ITEM_NAMES.thermalTool} burned the white ground into dry ground.`);
           return true;
         }
       }
@@ -2299,7 +2438,7 @@ export function createGameplayInteractions({
         storyState,
         leppaTree
       )) {
-        pushNotice("Water Gun can only restore dry tall grass right now.");
+        pushNotice(`${SANDBOTS_ITEM_NAMES.hydroTool} can only restore dry tall grass right now.`);
         return false;
       }
 
@@ -2351,9 +2490,13 @@ export function createGameplayInteractions({
               actionId: FIRST_TAUGHT_ACTION_IDS.WATER_DRY_GRASS
             });
           }
-          questSystem?.emit?.({
-            type: QUEST_EVENT.BUILD,
-            targetId: "revived-grass"
+          emitColonyProgressQuestEvents({
+            questSystem,
+            eventType: COLONY_PROGRESS_EVENT.RESTORATION_APPLIED,
+            payload: {
+              targetId: "dry-grass",
+              toolId: "waterGun"
+            }
           });
           if (questSystem?.hasUnlocked?.("leafage")) {
             questSystem.emit({
@@ -2394,6 +2537,12 @@ export function createGameplayInteractions({
           groundFlowerPatches
         );
 
+        requestWaterGunImpactMotion({
+          groundCell: nearbyHarvestTarget.groundCell,
+          patch: revivedGrass || revivedFlower || null,
+          type: revivedGrass ? "grass" : revivedFlower ? "flower" : "ground"
+        });
+
         if (revivedFlower) {
           storyState.flags.restoredFlowerCount =
             (storyState.flags.restoredFlowerCount || 0) + 1;
@@ -2428,7 +2577,7 @@ export function createGameplayInteractions({
 
         if (revivedGrass && !storyState.flags.firstGrassRestored) {
           storyState.flags.firstGrassRestored = true;
-          pushNotice("You've restored a dead grass!");
+          pushNotice("Dry grass restored.");
           onFirstGrassRestored();
           return true;
         }
@@ -2450,7 +2599,7 @@ export function createGameplayInteractions({
           return true;
         }
 
-        pushNotice("Chao purificado.");
+        pushNotice("Ground restored.");
         return true;
       }
 

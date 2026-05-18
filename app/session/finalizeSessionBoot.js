@@ -52,7 +52,7 @@ export function finalizeSessionBoot(
   syncHudInstructions(storyState);
   renderMissionCards(storyState, inventory);
 
-  setStatus("Campanha placeholder online. Fale com Tangrowth para iniciar.");
+  setStatus("Colony systems online. Follow the first task marker.");
 
   if (initialSceneId === GAME_FLOW.START && startScreen.isActive?.()) {
     startScreen.start();

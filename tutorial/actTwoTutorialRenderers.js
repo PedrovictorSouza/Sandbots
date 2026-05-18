@@ -1,3 +1,8 @@
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES
+} from "../app/story/sandbotsLexicon.js";
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -16,7 +21,7 @@ function renderApproachPanel(playerNearMonster) {
         ${
           playerNearMonster
             ? 'You are close enough. Press <span>Space</span> to talk.'
-            : 'Use <span>W</span><span>A</span><span>S</span><span>D</span> to run toward the creature, then press <span>Space</span> to talk.'
+            : 'Use <span>W</span><span>A</span><span>S</span><span>D</span> to run toward the helper bot, then press <span>Space</span> to talk.'
         }
       </p>
     </aside>
@@ -36,8 +41,8 @@ function renderSquirtleHintPanel(playerNearSquirtleTalk) {
     return `
       <aside class="act-two-tutorial__panel" data-ready="true">
         <span class="act-two-tutorial__eyebrow">Interact</span>
-        <strong class="act-two-tutorial__title">Talk to Squirtle</strong>
-        <p class="act-two-tutorial__copy">You are close enough. Press <span>E</span> to talk to Squirtle.</p>
+        <strong class="act-two-tutorial__title">Talk to ${SANDBOTS_BOT_NAMES.hydro}</strong>
+        <p class="act-two-tutorial__copy">You are close enough. Press <span>E</span> to talk to ${SANDBOTS_BOT_NAMES.hydro}.</p>
       </aside>
     `;
   }
@@ -47,9 +52,9 @@ function renderSquirtleHintPanel(playerNearSquirtleTalk) {
       <span class="act-two-tutorial__eyebrow">Hint</span>
       <strong class="act-two-tutorial__title">Speech Bubbles</strong>
       <div class="act-two-tutorial__copy-group">
-        <p class="act-two-tutorial__copy">Did you notice the speech bubble that popped up over Squirtle's head?</p>
-        <p class="act-two-tutorial__copy">When a Pokemon wants to tell you something, a speech bubble will appear above them.</p>
-        <p class="act-two-tutorial__copy">It looks like Squirtle may have a pretty serious problem- you should try talking to them!</p>
+        <p class="act-two-tutorial__copy">Did you notice the speech bubble that popped up over ${SANDBOTS_BOT_NAMES.hydro}'s head?</p>
+        <p class="act-two-tutorial__copy">When a bot wants to tell you something, a speech bubble will appear above them.</p>
+        <p class="act-two-tutorial__copy">It looks like ${SANDBOTS_BOT_NAMES.hydro} has a serious system fault. Try talking to the bot.</p>
       </div>
     </aside>
   `;
@@ -58,13 +63,13 @@ function renderSquirtleHintPanel(playerNearSquirtleTalk) {
 function renderWaterGunPanel(playerNearSquirtleTalk) {
   return `
     <aside class="act-two-tutorial__panel" data-ready="${playerNearSquirtleTalk ? "true" : "false"}">
-      <span class="act-two-tutorial__eyebrow">Ability</span>
-      <strong class="act-two-tutorial__title">Use Water Gun</strong>
+      <span class="act-two-tutorial__eyebrow">Function</span>
+      <strong class="act-two-tutorial__title">Use ${SANDBOTS_ITEM_NAMES.hydroTool}</strong>
       <p class="act-two-tutorial__copy">
         ${
           playerNearSquirtleTalk
-            ? 'Squirtle is close enough. Press <span>E</span> to use Water Gun.'
-            : 'Move close to Squirtle and press <span>E</span> to use Water Gun.'
+            ? `${SANDBOTS_BOT_NAMES.hydro} is close enough. Press <span>E</span> to use ${SANDBOTS_ITEM_NAMES.hydroTool}.`
+            : `Move close to ${SANDBOTS_BOT_NAMES.hydro} and press <span>E</span> to use ${SANDBOTS_ITEM_NAMES.hydroTool}.`
         }
       </p>
     </aside>

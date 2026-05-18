@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createIntroSequence } from "../intro/index.js";
+import { INTRO_STEPS } from "../intro/introSteps.js";
 
 function click(element) {
   if (!element) {
@@ -47,16 +48,25 @@ describe("createIntroSequence integration", () => {
 
     expect(sequence.isActive()).toBe(true);
     expect(uiLayer.dataset.mode).toBe("intro");
+    expect(root.querySelector("[data-intro-dialogue-text]")?.dataset.introDialogueText).toContain("Impact confirmed");
+    expect(INTRO_STEPS.findIndex((step) => step.type === "gender")).toBeLessThanOrEqual(2);
 
-    for (let index = 0; index < 10; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       pressSpace(sequence);
     }
 
     click(root.querySelector('[data-intro-action="gender"][data-intro-value="feminino"]'));
-    expect(root.querySelector(".intro-confirm-card__copy span")?.textContent).toBe("Feminino");
+    const confirmDialog = root.querySelector(".intro-confirm-card");
+    expect(confirmDialog?.getAttribute("role")).toBe("dialog");
+    expect(confirmDialog?.getAttribute("aria-modal")).toBe("true");
+    expect(confirmDialog?.getAttribute("aria-labelledby")).toBe("intro-confirm-frame-label intro-confirm-title");
+    expect(root.querySelector("#intro-confirm-frame-label")?.textContent).toBe("Builder B");
+    expect(confirmDialog?.textContent).toContain("Start as this Builder");
+    expect(confirmDialog?.textContent).toContain("Choose another look");
 
     click(root.querySelector('[data-intro-action="confirm"][data-intro-value="yes"]'));
-    expect(root.querySelector(".trainer-editor__gender-chip")?.textContent).toBe("Feminino");
+    expect(root.querySelector(".trainer-editor__gender-chip")?.textContent).toBe("Builder B");
+    expect(root.querySelector('[data-intro-action="finish"]')?.textContent).toBe("Start mission");
 
     const summaryText = root.querySelector(".trainer-editor__summary")?.textContent || "";
     expect(summaryText).toContain("Twin Puff");

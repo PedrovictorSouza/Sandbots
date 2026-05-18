@@ -1,3 +1,8 @@
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES
+} from "../../story/sandbotsLexicon.js";
+
 export const COMPANION_ABILITY_STATUS = Object.freeze({
   ACTIVE: "active",
   PARTIAL: "partial",
@@ -8,6 +13,25 @@ export const COMPANION_ABILITY_KIND = Object.freeze({
   FIELD_MOVE: "field-move",
   HELPER_EVENT: "helper-event"
 });
+
+export const COMPANION_ABILITY_DESIGN_FIELDS = Object.freeze([
+  "benefit",
+  "limit",
+  "validTarget",
+  "firstSafeUse",
+  "feedback",
+  "synergy"
+]);
+
+export const COMPANION_ABILITY_FIRST_USE_FIELDS = Object.freeze([
+  "validTarget",
+  "prompt",
+  "firstSafeUse",
+  "safeFailure",
+  "feedback",
+  "reward",
+  "nextHook"
+]);
 
 function deepFreeze(value) {
   if (!value || typeof value !== "object") {
@@ -23,11 +47,11 @@ export const COMPANION_ABILITIES = deepFreeze([
   {
     id: "squirtle-water-gun",
     companionId: "squirtle",
-    companionName: "Squirtle",
+    companionName: SANDBOTS_BOT_NAMES.hydro,
     element: "water",
     abilityId: "waterGun",
     moveId: "water-gun",
-    label: "Water Gun",
+    label: SANDBOTS_ITEM_NAMES.hydroTool,
     status: COMPANION_ABILITY_STATUS.ACTIVE,
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
@@ -37,7 +61,7 @@ export const COMPANION_ABILITIES = deepFreeze([
         type: "UNLOCK",
         targetId: "waterGun"
       },
-      when: "After Squirtle is discovered and the Pokedex reward flow completes."
+      when: `After ${SANDBOTS_BOT_NAMES.hydro} is discovered and the Colony Codex reward flow completes.`
     },
     runtime: {
       skillDefId: "waterGun",
@@ -54,17 +78,29 @@ export const COMPANION_ABILITIES = deepFreeze([
       "revitalizes dried up terrain",
       "waters crops"
     ],
-    notes: "First formal companion field move. It teaches the player that Pokemon powers change terrain.",
+    design: {
+      benefit: "Restores drought-damaged terrain and plants into usable colony ground.",
+      limit: "Requires a valid dry target and visible Hydro Bot travel/prep time.",
+      validTarget: "Dry ground, dry tall grass, thirsty trees, palms, and future crop targets.",
+      prompt: "Aim Hydro Jet at dry ground or thirsty plants.",
+      firstSafeUse: "A nearby dry patch in the opening field with clear target feedback.",
+      safeFailure: "Already-restored or invalid targets keep the charge and show a short no-target hint.",
+      feedback: "Water identity, helper movement, ground-state change, and restoration notice.",
+      reward: "The dry tile visibly restores into usable colony ground.",
+      nextHook: "Restored ground can support Grow Bot's Bio-Grow.",
+      synergy: "Creates restored ground that Grow Bot can later turn into habitat."
+    },
+    notes: "First formal field tool. It teaches the player that bot tools can change terrain.",
     narrativePurpose: "Shows that care can reverse drought and make damaged ground useful again."
   },
   {
     id: "bulbasaur-leafage",
     companionId: "bulbasaur",
-    companionName: "Bulbasaur",
+    companionName: SANDBOTS_BOT_NAMES.grow,
     element: "grass",
     abilityId: "leafage",
     moveId: "leafage",
-    label: "Leafage",
+    label: SANDBOTS_ITEM_NAMES.growTool,
     status: COMPANION_ABILITY_STATUS.ACTIVE,
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
@@ -75,7 +111,7 @@ export const COMPANION_ABILITIES = deepFreeze([
         type: "TALK",
         targetId: "leaf-helper"
       },
-      when: "After the player waters Bulbasaur's dry grass request and returns to Bulbasaur."
+      when: `After the player waters ${SANDBOTS_BOT_NAMES.grow}'s dry grass request and returns to it.`
     },
     runtime: {
       skillDefId: "leafage",
@@ -87,13 +123,25 @@ export const COMPANION_ABILITIES = deepFreeze([
     worldEffects: [
       "creates patches of tall grass"
     ],
+    design: {
+      benefit: "Turns restored ground into habitat growth and colony-zone clues.",
+      limit: "Only works on restored ground; dry or unstable terrain must be repaired first.",
+      validTarget: "Restored ground patches that can support tall grass or small habitat growth.",
+      prompt: "Use Bio-Grow on restored ground.",
+      firstSafeUse: "A ground patch recently restored with Hydro Jet.",
+      safeFailure: "Dry or unstable ground points back to Hydro Jet before growth is allowed.",
+      feedback: "Green growth identity, tile outline, plant spawn, rustle, and habitat hint.",
+      reward: "Tall grass grows as a visible habitat clue.",
+      nextHook: "The new habitat growth points toward shelter and colony social progression.",
+      synergy: "Uses Hydro Bot's restored soil to reveal social/habitat progression."
+    },
     notes: "Second formal companion field move. It turns restored terrain into habitat.",
     narrativePurpose: "Turns restored ground into a social invitation for habitats and companions."
   },
   {
     id: "scyther-cut",
     companionId: "scyther",
-    companionName: "Scyther",
+    companionName: "Cutter Bot",
     element: "bug",
     abilityId: "cut",
     moveId: "cut",
@@ -102,7 +150,7 @@ export const COMPANION_ABILITIES = deepFreeze([
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
       source: "planned-skill",
-      when: "Scyther teaches Cut when its quest chain is designed."
+      when: "Cutter Bot teaches Cut when its quest chain is designed."
     },
     runtime: {
       skillDefId: null,
@@ -124,7 +172,7 @@ export const COMPANION_ABILITIES = deepFreeze([
   {
     id: "hitmonchan-rock-smash",
     companionId: "hitmonchan",
-    companionName: "Hitmonchan",
+    companionName: "Impact Bot",
     element: "fighting",
     abilityId: "rockSmash",
     moveId: "rock-smash",
@@ -133,7 +181,7 @@ export const COMPANION_ABILITIES = deepFreeze([
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
       source: "planned-skill",
-      when: "Hitmonchan teaches Rock Smash when its quest chain is designed."
+      when: "Impact Bot teaches Rock Smash when its quest chain is designed."
     },
     runtime: {
       skillDefId: null,
@@ -153,7 +201,7 @@ export const COMPANION_ABILITIES = deepFreeze([
   {
     id: "drilbur-rototiller",
     companionId: "drilbur",
-    companionName: "Drilbur",
+    companionName: "Drill Bot",
     element: "ground",
     abilityId: "rototiller",
     moveId: "rototiller",
@@ -162,7 +210,7 @@ export const COMPANION_ABILITIES = deepFreeze([
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
       source: "planned-skill",
-      when: "Drilbur teaches Rototiller when its farming quest chain is designed."
+      when: "Drill Bot teaches Rototiller when its farming quest chain is designed."
     },
     runtime: {
       skillDefId: null,
@@ -184,7 +232,7 @@ export const COMPANION_ABILITIES = deepFreeze([
   {
     id: "magikarp-jump",
     companionId: "magikarp",
-    companionName: "Magikarp",
+    companionName: "Ferry Bot",
     element: "water",
     abilityId: "jump",
     moveId: "jump",
@@ -193,7 +241,7 @@ export const COMPANION_ABILITIES = deepFreeze([
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
       source: "planned-skill",
-      when: "Magikarp teaches Jump when island and mountain traversal is designed."
+      when: "Ferry Bot teaches Jump when island and mountain traversal is designed."
     },
     runtime: {
       skillDefId: null,
@@ -215,7 +263,7 @@ export const COMPANION_ABILITIES = deepFreeze([
   {
     id: "machoke-strength",
     companionId: "machoke",
-    companionName: "Machoke",
+    companionName: "Hauler Bot",
     element: "fighting",
     abilityId: "strength",
     moveId: "strength",
@@ -224,7 +272,7 @@ export const COMPANION_ABILITIES = deepFreeze([
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
       source: "planned-skill",
-      when: "Machoke teaches Strength when heavy object puzzles are designed."
+      when: "Hauler Bot teaches Strength when heavy object puzzles are designed."
     },
     runtime: {
       skillDefId: null,
@@ -246,7 +294,7 @@ export const COMPANION_ABILITIES = deepFreeze([
   {
     id: "paldean-wooper-suck",
     companionId: "paldean-wooper",
-    companionName: "Paldean Wooper",
+    companionName: "Mud Bot",
     element: "poison-ground",
     abilityId: "suck",
     moveId: "suck",
@@ -255,7 +303,7 @@ export const COMPANION_ABILITIES = deepFreeze([
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
       source: "planned-skill",
-      when: "Paldean Wooper teaches Suck when liquid relocation puzzles are designed."
+      when: "Mud Bot teaches Suck when liquid relocation puzzles are designed."
     },
     runtime: {
       skillDefId: null,
@@ -278,11 +326,11 @@ export const COMPANION_ABILITIES = deepFreeze([
   {
     id: "charmander-fire",
     companionId: "charmander",
-    companionName: "Charmander",
+    companionName: SANDBOTS_BOT_NAMES.thermal,
     element: "fire",
     abilityId: "fire",
     moveId: "fire",
-    label: "Fire",
+    label: SANDBOTS_ITEM_NAMES.thermalTool,
     status: COMPANION_ABILITY_STATUS.PARTIAL,
     kind: COMPANION_ABILITY_KIND.FIELD_MOVE,
     unlock: {
@@ -292,12 +340,12 @@ export const COMPANION_ABILITIES = deepFreeze([
         type: "UNLOCK",
         targetId: "fire"
       },
-      when: "Charmander is discovered in the Leafage tall grass habitat."
+      when: `${SANDBOTS_BOT_NAMES.thermal} is discovered in the ${SANDBOTS_ITEM_NAMES.growTool} tall grass habitat.`
     },
     currentRuntime: {
       storyBeatId: "charmander-campfire-lit",
       storyFlag: "charmanderCampfireLit",
-      behavior: "Charmander can be selected as a field move companion and can move into the Train House."
+      behavior: `${SANDBOTS_BOT_NAMES.thermal} can be selected as a field tool helper and can move into the ${SANDBOTS_ITEM_NAMES.thermalCabin}.`
     },
     runtime: {
       skillDefId: "fire",
@@ -308,10 +356,22 @@ export const COMPANION_ABILITIES = deepFreeze([
       "white-ground"
     ],
     worldEffects: [
-      "turns the Train House into Charmander's home",
-      "turns white ground into dry ground for Water Gun restoration"
+      `turns the ${SANDBOTS_ITEM_NAMES.thermalCabin} into ${SANDBOTS_BOT_NAMES.thermal}'s home`,
+      `turns white ground into dry ground for ${SANDBOTS_ITEM_NAMES.hydroTool} restoration`
     ],
-    notes: "Field move: selectable after Charmander discovery; supports Charmander's home and terrain burn interactions.",
+    design: {
+      benefit: "Adds heat, shelter, and terrain preparation to the restoration chain.",
+      limit: "Needs Carbon charge and only affects heat-compatible targets.",
+      validTarget: "Thermal Cabin, white ground, and future cold or heat-starved systems.",
+      prompt: "Use Thermal Torch on a shelter or heat-starved ground.",
+      firstSafeUse: "A clear shelter or white-ground target near the early restored route.",
+      safeFailure: "Wet, healthy, or non-thermal targets keep the charge and explain they do not need heat.",
+      feedback: "Warm light, ember/spark identity, target conversion, and comfort notice.",
+      reward: "The target warms up or becomes ready for Hydro Jet restoration.",
+      nextHook: "Heat can prepare terrain that water could not restore by itself.",
+      synergy: "Prepares white ground so Hydro Jet can restore it instead of solving drought alone."
+    },
+    notes: `Field tool: selectable after ${SANDBOTS_BOT_NAMES.thermal} discovery; supports its home and terrain burn interactions.`,
     narrativePurpose: "Uses warmth to turn shelter and gathering places into emotional recovery beats."
   }
 ]);
@@ -326,4 +386,28 @@ export function getCompanionAbilityByCompanion(companionId) {
 
 export function getCompanionAbilityByAbilityId(abilityId) {
   return COMPANION_ABILITIES.find((ability) => ability.abilityId === abilityId) || null;
+}
+
+export function getCompanionAbilityDesignGaps(abilities = COMPANION_ABILITIES) {
+  return abilities
+    .filter((ability) => ability.kind === COMPANION_ABILITY_KIND.FIELD_MOVE)
+    .filter((ability) => ability.status !== COMPANION_ABILITY_STATUS.PLANNED)
+    .map((ability) => ({
+      abilityId: ability.abilityId,
+      companionName: ability.companionName,
+      missing: COMPANION_ABILITY_DESIGN_FIELDS.filter((field) => !ability.design?.[field])
+    }))
+    .filter((entry) => entry.missing.length > 0);
+}
+
+export function getCompanionAbilityFirstUseGaps(abilities = COMPANION_ABILITIES) {
+  return abilities
+    .filter((ability) => ability.kind === COMPANION_ABILITY_KIND.FIELD_MOVE)
+    .filter((ability) => ability.status !== COMPANION_ABILITY_STATUS.PLANNED)
+    .map((ability) => ({
+      abilityId: ability.abilityId,
+      companionName: ability.companionName,
+      missing: COMPANION_ABILITY_FIRST_USE_FIELDS.filter((field) => !ability.design?.[field])
+    }))
+    .filter((entry) => entry.missing.length > 0);
 }

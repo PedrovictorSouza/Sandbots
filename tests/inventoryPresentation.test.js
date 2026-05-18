@@ -5,7 +5,7 @@ import {
 } from "../app/ui/inventoryPresentation.js";
 
 describe("inventoryPresentation", () => {
-  it("prioritizes field-use items before passive resources", () => {
+  it("prioritizes field-use items before passive resources and hides legacy logs", () => {
     const inventory = {
       waterGunTotem: 1,
       wood: 5,
@@ -19,14 +19,13 @@ describe("inventoryPresentation", () => {
       wood: { slotRole: "material" },
       leppaBerry: { slotRole: "gift" },
       campfire: { slotRole: "placeable" },
-      lifeCoins: { slotRole: "currency" }
+      lifeCoins: { slotRole: "key", hiddenFromInventory: true }
     };
 
     expect(getInventoryPresentationOrder(inventory, inventoryOrder, itemDefs)).toEqual([
       "campfire",
       "wood",
       "leppaBerry",
-      "lifeCoins",
       "waterGunTotem"
     ]);
   });
@@ -69,7 +68,7 @@ describe("inventoryPresentation", () => {
     const itemDefs = {
       waterGunTotem: { slotRole: "key" },
       simpleWoodenDiyRecipes: { slotRole: "recipe" },
-      lifeCoins: { slotRole: "currency" },
+      lifeCoins: { slotRole: "key", hiddenFromInventory: true },
       wood: { slotRole: "material" },
       leaves: { slotRole: "material" }
     };
@@ -87,5 +86,11 @@ describe("inventoryPresentation", () => {
       slotRole: "placeable",
       slotRoleLabel: "Repair"
     })).toBe("Repair");
+  });
+
+  it("labels recipe-role items as colony plans", () => {
+    expect(getInventorySlotRoleLabel({
+      slotRole: "recipe"
+    })).toBe("Plan");
   });
 });

@@ -20,12 +20,12 @@ describe("createPokedexOverlay integration", () => {
 
   beforeEach(() => {
     document.body.innerHTML = `
-      <section class="pokedex-overlay" id="pokedex-overlay" hidden aria-label="Pokedex entry">
+      <section class="pokedex-overlay" id="pokedex-overlay" hidden aria-label="Colony Codex entry">
         <article class="pokedex-entry">
           <div class="pokedex-entry__details">
             <header class="pokedex-entry__heading">
               <span>No. 007</span>
-              <strong>Squirtle</strong>
+              <strong>Hydro Bot</strong>
             </header>
             <div class="pokedex-entry__tabs">
               <button type="button" data-pokedex-action="prev">L</button>
@@ -48,7 +48,7 @@ describe("createPokedexOverlay integration", () => {
     onClose = vi.fn();
   });
 
-  it("cycles through the three Squirtle pages and only closes when the user asks", () => {
+  it("cycles through Colony Codex pages and only closes when the user asks", () => {
     const overlay = createPokedexOverlay({ root, onClose });
 
     overlay.setOpen(true);
@@ -56,6 +56,8 @@ describe("createPokedexOverlay integration", () => {
     expect(root.hidden).toBe(false);
     expect(overlay.getPage()).toBe("details");
     expect(root.textContent).toContain("Details");
+    expect(root.textContent).toContain("Hydro Bot");
+    expect(root.textContent).not.toContain("Squirtle");
 
     const right = pressKey(overlay.handleKeydown, { code: "ArrowRight", key: "ArrowRight" });
     expect(right.handled).toBe(true);

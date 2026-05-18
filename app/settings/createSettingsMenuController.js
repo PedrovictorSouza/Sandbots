@@ -1,27 +1,42 @@
 import { SETTINGS_SCHEMA, createDefaultSettingsState } from "./settingsState.js";
 import {
+  assignKeyboardControl,
+  createDefaultKeyboardControls,
+  formatKeyboardCodeLabel,
+  KEYBOARD_CONTROL_ACTIONS,
+  normalizeKeyboardControls
+} from "../../input/gameInputBindings.js";
+import {
   getInventoryPresentationOrder,
   getInventorySlotRole,
   getInventorySlotRoleLabel
 } from "../ui/inventoryPresentation.js";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES
+} from "../story/sandbotsLexicon.js";
 
 const SETTINGS_MENU_TITLE = "Bag";
-const SETTINGS_MENU_HINT = "LB / RB Tabs | A Select | B Close";
-const MENU_TABS = Object.freeze(["bag", "pokemons", "settings"]);
+const SETTINGS_MENU_HINT = "Colony log online. LB/RB or Left/Right tabs | A/Enter Select | B/Esc Close";
+const MENU_TABS = Object.freeze(["bag", "pokemons", "controls", "settings"]);
 const MENU_TAB_LABELS = Object.freeze({
   bag: "Bag",
-  pokemons: "Pokemons",
+  pokemons: "Bots",
+  controls: "Controls",
   settings: "Settings"
 });
 const SELECTED_POKEMON_OVERLAY_URL = new URL("../ui/images/selected.png", import.meta.url).href;
 const RESTART_NAVIGATION_ITEM_ID = "__restartGame";
+const SETTINGS_MENU_PANEL_ID = "settings-menu-panel";
+const SETTINGS_MENU_HINT_ID = "settings-menu-hint";
+const SETTINGS_MENU_STATUS_ID = "settings-menu-status";
 const POKEMON_ROSTER = Object.freeze([
   {
     id: "squirtle",
-    name: "Squirtle",
-    element: "Water",
-    ability: "Water Gun",
-    abilityDescription: "Water Gun restores dry ground, revives thirsty trees, and turns dead ground green again.",
+    name: SANDBOTS_BOT_NAMES.hydro,
+    element: "Hydro",
+    ability: SANDBOTS_ITEM_NAMES.hydroTool,
+    abilityDescription: `${SANDBOTS_ITEM_NAMES.hydroTool} restores dry ground, revives thirsty trees, and turns dead ground green again.`,
     imageUrl: new URL("../ui/images/Robot-1-thumb.png", import.meta.url).href,
     color: "#75c6ee",
     ink: "#10253a",
@@ -30,10 +45,10 @@ const POKEMON_ROSTER = Object.freeze([
   },
   {
     id: "bulbasaur",
-    name: "Bulbasaur",
-    element: "Leaf",
-    ability: "Leafage",
-    abilityDescription: "Leafage places Bulbasaur's selected plant kit on valid ground, such as tall grass or Garden-1.",
+    name: SANDBOTS_BOT_NAMES.grow,
+    element: "Growth",
+    ability: SANDBOTS_ITEM_NAMES.growTool,
+    abilityDescription: `${SANDBOTS_ITEM_NAMES.growTool} places ${SANDBOTS_BOT_NAMES.grow}'s selected plant kit on valid ground, such as tall grass or Garden-1.`,
     imageUrl: new URL("../ui/images/Robot-2-thumb.png", import.meta.url).href,
     color: "#7ed36d",
     ink: "#0b2610",
@@ -42,10 +57,10 @@ const POKEMON_ROSTER = Object.freeze([
   },
   {
     id: "charmander",
-    name: "Charmander",
-    element: "Fire",
-    ability: "Fire",
-    abilityDescription: "Fire spends Carbon charges to burn white ground into dead ground so Water Gun can restore it later.",
+    name: SANDBOTS_BOT_NAMES.thermal,
+    element: "Thermal",
+    ability: SANDBOTS_ITEM_NAMES.thermalTool,
+    abilityDescription: `${SANDBOTS_ITEM_NAMES.thermalTool} spends Carbon charges to burn white ground into dead ground so ${SANDBOTS_ITEM_NAMES.hydroTool} can restore it later.`,
     imageUrl: new URL("../ui/images/Robot-3-thumb.png", import.meta.url).href,
     color: "#ff8a3d",
     ink: "#2a1005",
@@ -54,10 +69,10 @@ const POKEMON_ROSTER = Object.freeze([
   },
   {
     id: "timburr",
-    name: "Timburr",
+    name: SANDBOTS_BOT_NAMES.builder,
     element: "Build",
     ability: "Construction",
-    abilityDescription: "Construction lets Timburr help finish building kits that need a creature with the build specialty.",
+    abilityDescription: `Construction lets ${SANDBOTS_BOT_NAMES.builder} help finish building kits that need heavy support.`,
     color: "#c5945d",
     ink: "#241407",
     glyph: "T",
@@ -219,8 +234,8 @@ function renderPokemonCard(pokemon, storyState = {}, { selected = false } = {}) 
             type="button"
             data-pokemon-move-in="${escapeHtml(pokemon.id)}"
             data-home-id="leafDen"
-            aria-label="Move ${escapeHtml(pokemon.name)} into House"
-            title="Move In"
+            aria-label="Assign ${escapeHtml(pokemon.name)} to the House"
+            title="Assign to House"
             style="width:28px;height:18px;border:2px solid #9fdcff;background:#0d2c45;cursor:pointer;"
           ></button>
         ` : ""}
@@ -229,8 +244,8 @@ function renderPokemonCard(pokemon, storyState = {}, { selected = false } = {}) 
             class="settings-menu__pokemon-dismiss"
             type="button"
             data-pokemon-dismiss="${escapeHtml(pokemon.id)}"
-            aria-label="Dismiss ${escapeHtml(pokemon.name)}"
-            title="Dismiss"
+            aria-label="Ask ${escapeHtml(pokemon.name)} to stop following"
+            title="Stop following"
             style="width:28px;height:18px;border:2px solid #ff7777;background:#321012;cursor:pointer;"
           ></button>
         ` : ""}
@@ -266,9 +281,17 @@ export function createSettingsMenuController({
   let pokemonEmptyState = null;
   let pokemonAbilityPanel = null;
   let pokemonPanel = null;
+  let controlsPanel = null;
+  let keyboardControlsGrid = null;
   let selectedPokemonId = null;
+  let pendingKeyboardActionId = null;
   let settingsPanel = null;
   let restartButton = null;
+  let restartConfirmDialog = null;
+  let restartConfirmButton = null;
+  let restartCancelButton = null;
+  let statusElement = null;
+  let restartConfirmOpen = false;
   const tabButtons = new Map();
   const groupPanels = new Map();
   const groupButtons = new Map();
@@ -302,6 +325,9 @@ export function createSettingsMenuController({
     if (pokemonPanel) {
       pokemonPanel.hidden = activeTabId !== "pokemons";
     }
+    if (controlsPanel) {
+      controlsPanel.hidden = activeTabId !== "controls";
+    }
     if (settingsPanel) {
       settingsPanel.hidden = activeTabId !== "settings";
     }
@@ -309,9 +335,60 @@ export function createSettingsMenuController({
       const active = tabId === activeTabId;
       button.dataset.active = active ? "true" : "false";
       button.setAttribute("aria-selected", active ? "true" : "false");
+      button.tabIndex = active ? 0 : -1;
       button.style.background = active ? "rgba(255, 204, 170, 0.28)" : "rgba(255, 255, 255, 0.1)";
       button.style.borderColor = active ? "#ffccaa" : "rgba(255, 255, 255, 0.55)";
     }
+    syncNavigationStatus();
+  }
+
+  function syncNavigationStatus() {
+    if (!statusElement) {
+      return;
+    }
+
+    statusElement.textContent = `${MENU_TAB_LABELS[activeTabId] || SETTINGS_MENU_TITLE} tab selected. ${SETTINGS_MENU_HINT}`;
+  }
+
+  function syncRestartConfirmationState() {
+    if (restartConfirmDialog) {
+      restartConfirmDialog.hidden = !restartConfirmOpen;
+      restartConfirmDialog.dataset.open = restartConfirmOpen ? "true" : "false";
+    }
+    if (restartButton) {
+      restartButton.setAttribute("aria-expanded", restartConfirmOpen ? "true" : "false");
+    }
+  }
+
+  function setRestartConfirmationOpen(nextOpen, { focus = false } = {}) {
+    restartConfirmOpen = Boolean(nextOpen);
+    syncRestartConfirmationState();
+
+    if (!focus) {
+      return restartConfirmOpen;
+    }
+
+    if (restartConfirmOpen) {
+      focusElement(restartConfirmButton);
+    } else {
+      focusElement(restartButton);
+    }
+
+    return restartConfirmOpen;
+  }
+
+  function confirmRestartGame() {
+    const shouldClose = onRestartGame?.();
+    restartConfirmOpen = false;
+    syncRestartConfirmationState();
+
+    if (shouldClose !== false) {
+      close();
+      return true;
+    }
+
+    focusElement(restartButton);
+    return true;
   }
 
   function syncBagGrid() {
@@ -353,7 +430,7 @@ export function createSettingsMenuController({
 
     pokemonAbilityPanel.hidden = false;
     pokemonAbilityPanel.innerHTML = `
-      <span style="font-size:12px;line-height:1;color:#ffccaa;text-transform:uppercase;">Ability</span>
+      <span style="font-size:12px;line-height:1;color:#ffccaa;text-transform:uppercase;">Function</span>
       <strong style="font-size:18px;line-height:1;color:#fff1e8;">${escapeHtml(selectedPokemon.name)} · ${escapeHtml(selectedPokemon.ability)}</strong>
       <p style="margin:0;color:#ffffff;font-size:14px;line-height:1.25;text-transform:none;">${escapeHtml(selectedPokemon.abilityDescription || "")}</p>
     `;
@@ -381,7 +458,17 @@ export function createSettingsMenuController({
     syncPokemonAbilityPanel(capturedPokemon);
   }
 
-  function selectPokemon(pokemonId) {
+  function focusSelectedPokemon() {
+    if (!selectedPokemonId || !pokemonGrid) {
+      return false;
+    }
+
+    const selectedCard = pokemonGrid.querySelector(`[data-pokemon-id="${selectedPokemonId}"]`);
+    focusElement(selectedCard);
+    return Boolean(selectedCard);
+  }
+
+  function selectPokemon(pokemonId, { focus = false } = {}) {
     const capturedPokemon = getCapturedPokemon();
     if (!capturedPokemon.some((pokemon) => pokemon.id === pokemonId)) {
       return false;
@@ -389,6 +476,9 @@ export function createSettingsMenuController({
 
     selectedPokemonId = pokemonId;
     syncPokemonGrid();
+    if (focus) {
+      focusSelectedPokemon();
+    }
     return true;
   }
 
@@ -400,7 +490,7 @@ export function createSettingsMenuController({
 
     const currentIndex = Math.max(0, capturedPokemon.findIndex((pokemon) => pokemon.id === selectedPokemonId));
     const nextIndex = (currentIndex + direction + capturedPokemon.length) % capturedPokemon.length;
-    return selectPokemon(capturedPokemon[nextIndex].id);
+    return selectPokemon(capturedPokemon[nextIndex].id, { focus: true });
   }
 
   function dismissPokemonFollower(pokemonId) {
@@ -447,6 +537,81 @@ export function createSettingsMenuController({
       }
     });
     syncPokemonGrid();
+    return true;
+  }
+
+  function getKeyboardControlsState() {
+    settingsState.controls ||= {};
+    settingsState.controls.keyboard = normalizeKeyboardControls(settingsState.controls.keyboard);
+    return settingsState.controls.keyboard;
+  }
+
+  function syncKeyboardControlsGrid() {
+    if (!keyboardControlsGrid) {
+      return;
+    }
+
+    const keyboardControls = getKeyboardControlsState();
+    keyboardControlsGrid.innerHTML = KEYBOARD_CONTROL_ACTIONS.map((action) => {
+      const waiting = pendingKeyboardActionId === action.id;
+      const keyLabel = waiting ? "Press a key" : formatKeyboardCodeLabel(keyboardControls[action.id]);
+
+      return `
+        <button
+          class="settings-menu__control-binding"
+          type="button"
+          data-settings-control-binding="${escapeHtml(action.id)}"
+          data-capturing="${waiting ? "true" : "false"}"
+          aria-label="Change ${escapeHtml(action.label)} control"
+          style="display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,auto);align-items:center;gap:10px;min-height:42px;padding:8px 10px;border:2px solid ${waiting ? "#ffccaa" : "rgba(255,255,255,.55)"};background:${waiting ? "rgba(255,204,170,.22)" : "rgba(255,255,255,.08)"};color:#ffffff;font:inherit;text-align:left;cursor:pointer;"
+        >
+          <span>${escapeHtml(action.label)}</span>
+          <strong style="justify-self:end;color:#ffccaa;">${escapeHtml(keyLabel)}</strong>
+        </button>
+      `;
+    }).join("");
+  }
+
+  function commitKeyboardControl(actionId, keyboardCode) {
+    settingsState.controls ||= {};
+    settingsState.controls.keyboard = assignKeyboardControl(
+      settingsState.controls.keyboard,
+      actionId,
+      keyboardCode
+    );
+    pendingKeyboardActionId = null;
+    onChange(settingsState, {
+      groupId: "controls",
+      settingId: `keyboard.${actionId}`,
+      value: settingsState.controls.keyboard[actionId]
+    });
+    syncKeyboardControlsGrid();
+    return true;
+  }
+
+  function resetKeyboardControls() {
+    settingsState.controls ||= {};
+    settingsState.controls.keyboard = createDefaultKeyboardControls();
+    pendingKeyboardActionId = null;
+    onChange(settingsState, {
+      groupId: "controls",
+      settingId: "keyboard",
+      value: { ...settingsState.controls.keyboard }
+    });
+    syncKeyboardControlsGrid();
+    return true;
+  }
+
+  function startKeyboardControlCapture(actionId) {
+    if (!KEYBOARD_CONTROL_ACTIONS.some((action) => action.id === actionId)) {
+      return false;
+    }
+
+    pendingKeyboardActionId = actionId;
+    syncKeyboardControlsGrid();
+    const button = [...(keyboardControlsGrid?.querySelectorAll?.("[data-settings-control-binding]") || [])]
+      .find((candidate) => candidate.dataset.settingsControlBinding === actionId);
+    focusElement(button);
     return true;
   }
 
@@ -591,22 +756,77 @@ export function createSettingsMenuController({
     return true;
   }
 
+  function getControlsNavigationItems() {
+    if (!controlsPanel) {
+      return [];
+    }
+
+    return [
+      ...controlsPanel.querySelectorAll("[data-settings-control-binding], [data-settings-controls-reset]")
+    ];
+  }
+
+  function focusControlsItem(index = 0) {
+    const items = getControlsNavigationItems();
+    if (!items.length) {
+      return false;
+    }
+
+    focusElement(items[Math.max(0, Math.min(items.length - 1, index))]);
+    return true;
+  }
+
+  function focusActiveTabContent() {
+    if (activeTabId === "settings") {
+      return focusGroupButton(activeGroupId);
+    }
+
+    if (activeTabId === "controls") {
+      return focusControlsItem();
+    }
+
+    if (activeTabId === "pokemons") {
+      return focusSelectedPokemon();
+    }
+
+    return focusTabButton(activeTabId);
+  }
+
+  function moveFocusedControlsItem(direction) {
+    const items = getControlsNavigationItems();
+    if (!items.length) {
+      return false;
+    }
+
+    const currentIndex = Math.max(0, items.indexOf(documentRef.activeElement));
+    const nextIndex = (currentIndex + direction + items.length) % items.length;
+    focusElement(items[nextIndex]);
+    return true;
+  }
+
   function setActiveTab(tabId, { focus = false } = {}) {
     if (!MENU_TABS.includes(tabId)) {
       return false;
     }
 
     activeTabId = tabId;
+    if (activeTabId !== "settings" && restartConfirmOpen) {
+      setRestartConfirmationOpen(false);
+    }
     if (activeTabId === "bag") {
       syncBagGrid();
     } else if (activeTabId === "pokemons") {
       syncPokemonGrid();
+    } else if (activeTabId === "controls") {
+      syncKeyboardControlsGrid();
     }
     syncTabState();
 
     if (focus) {
       if (activeTabId === "settings") {
         focusGroupButton(activeGroupId);
+      } else if (activeTabId === "controls") {
+        focusControlsItem();
       } else {
         focusTabButton(activeTabId);
       }
@@ -619,6 +839,16 @@ export function createSettingsMenuController({
     const currentIndex = Math.max(0, MENU_TABS.indexOf(activeTabId));
     const nextIndex = (currentIndex + direction + MENU_TABS.length) % MENU_TABS.length;
     return setActiveTab(MENU_TABS[nextIndex], { focus: true });
+  }
+
+  function getFocusedTabId() {
+    const activeElement = documentRef.activeElement;
+    if (!activeElement || !root?.contains(activeElement)) {
+      return null;
+    }
+
+    const tabId = activeElement.dataset?.settingsTab;
+    return MENU_TABS.includes(tabId) ? tabId : null;
   }
 
   function setActiveGroup(groupId, { focus = false } = {}) {
@@ -681,6 +911,41 @@ export function createSettingsMenuController({
     }
 
     activeElement.click();
+    return true;
+  }
+
+  function isHiddenFromMenuNavigation(element) {
+    return Boolean(
+      element.hidden ||
+      element.closest?.("[hidden]") ||
+      element.getAttribute?.("aria-hidden") === "true"
+    );
+  }
+
+  function getFocusableMenuElements() {
+    if (!root) {
+      return [];
+    }
+
+    return [...root.querySelectorAll([
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[href]",
+      "[tabindex]:not([tabindex='-1'])"
+    ].join(", "))].filter((element) => !isHiddenFromMenuNavigation(element));
+  }
+
+  function moveFocusWithinMenu(direction) {
+    const focusableElements = getFocusableMenuElements();
+    if (!focusableElements.length) {
+      return false;
+    }
+
+    const currentIndex = Math.max(0, focusableElements.indexOf(documentRef.activeElement));
+    const nextIndex = (currentIndex + direction + focusableElements.length) % focusableElements.length;
+    focusElement(focusableElements[nextIndex]);
     return true;
   }
 
@@ -776,7 +1041,11 @@ export function createSettingsMenuController({
 
     root = createElement(documentRef, "section", "settings-menu");
     root.dataset.settingsMenu = "true";
+    root.id = SETTINGS_MENU_PANEL_ID;
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", SETTINGS_MENU_TITLE);
+    root.setAttribute("aria-describedby", SETTINGS_MENU_HINT_ID);
     root.hidden = true;
 
     Object.assign(root.style, {
@@ -793,9 +1062,10 @@ export function createSettingsMenuController({
       width: "min(760px, calc(100% - 64px))",
       maxHeight: "calc(100% - 96px)",
       overflow: "auto",
-      padding: "22px",
-      border: "4px solid #ffffff",
-      background: "rgba(17, 17, 27, 0.92)",
+      padding: "24px",
+      border: "3px solid rgba(255, 241, 232, 0.86)",
+      borderRadius: "8px",
+      background: "rgba(13, 16, 28, 0.94)",
       color: "#ffffff",
       fontFamily: "var(--game-ui-font, monospace)",
       textShadow: "2px 2px 0 #11111b"
@@ -805,6 +1075,7 @@ export function createSettingsMenuController({
     const title = createElement(documentRef, "strong", "settings-menu__title", SETTINGS_MENU_TITLE);
     titleElement = title;
     const hint = createElement(documentRef, "span", "settings-menu__hint", SETTINGS_MENU_HINT);
+    hint.id = SETTINGS_MENU_HINT_ID;
     const closeButton = createElement(documentRef, "button", "settings-menu__close", "Close");
     closeButton.type = "button";
     closeButton.dataset.settingsAction = "close";
@@ -816,6 +1087,7 @@ export function createSettingsMenuController({
 
     const tabs = createElement(documentRef, "nav", "settings-menu__tabs");
     tabs.setAttribute("aria-label", "Menu tabs");
+    tabs.setAttribute("role", "tablist");
     Object.assign(tabs.style, {
       display: "grid",
       gridTemplateColumns: `repeat(${MENU_TABS.length}, minmax(0, 1fr))`,
@@ -826,7 +1098,9 @@ export function createSettingsMenuController({
       const tabButton = createElement(documentRef, "button", "settings-menu__tab", MENU_TAB_LABELS[tabId]);
       tabButton.type = "button";
       tabButton.dataset.settingsTab = tabId;
+      tabButton.id = `settings-menu-tab-${tabId}`;
       tabButton.setAttribute("role", "tab");
+      tabButton.setAttribute("aria-controls", `settings-menu-panel-${tabId}`);
       Object.assign(tabButton.style, {
         padding: "10px 12px",
         border: "2px solid rgba(255, 255, 255, 0.55)",
@@ -844,8 +1118,10 @@ export function createSettingsMenuController({
     panel.append(tabs);
 
     bagPanel = createElement(documentRef, "section", "settings-menu__tab-panel settings-menu__tab-panel--bag");
+    bagPanel.id = "settings-menu-panel-bag";
     bagPanel.dataset.settingsTabPanel = "bag";
     bagPanel.setAttribute("role", "tabpanel");
+    bagPanel.setAttribute("aria-labelledby", "settings-menu-tab-bag");
     bagEmptyState = createElement(documentRef, "p", "settings-menu__bag-empty", "Bag empty");
     bagGrid = createElement(documentRef, "div", "inventory-grid settings-menu__bag-grid");
     bagGrid.dataset.settingsBagGrid = "true";
@@ -857,13 +1133,15 @@ export function createSettingsMenuController({
     panel.append(bagPanel);
 
     pokemonPanel = createElement(documentRef, "section", "settings-menu__tab-panel settings-menu__tab-panel--pokemons");
+    pokemonPanel.id = "settings-menu-panel-pokemons";
     pokemonPanel.dataset.settingsTabPanel = "pokemons";
     pokemonPanel.setAttribute("role", "tabpanel");
+    pokemonPanel.setAttribute("aria-labelledby", "settings-menu-tab-pokemons");
     pokemonEmptyState = createElement(
       documentRef,
       "p",
       "settings-menu__pokemon-empty",
-      "No captured Pokemon yet"
+      "No helper bots online yet"
     );
     pokemonGrid = createElement(documentRef, "div", "settings-menu__pokemon-grid");
     pokemonGrid.dataset.settingsPokemonGrid = "true";
@@ -907,9 +1185,63 @@ export function createSettingsMenuController({
     pokemonPanel.append(pokemonEmptyState, pokemonGrid, pokemonAbilityPanel);
     panel.append(pokemonPanel);
 
+    controlsPanel = createElement(documentRef, "section", "settings-menu__tab-panel settings-menu__tab-panel--controls");
+    controlsPanel.id = "settings-menu-panel-controls";
+    controlsPanel.dataset.settingsTabPanel = "controls";
+    controlsPanel.setAttribute("role", "tabpanel");
+    controlsPanel.setAttribute("aria-labelledby", "settings-menu-tab-controls");
+    const controlsIntro = createElement(
+      documentRef,
+      "p",
+      "settings-menu__controls-intro",
+      "Rewire the pilot console: select an action, press a key, and the old action using that key becomes unassigned."
+    );
+    Object.assign(controlsIntro.style, {
+      margin: "0 0 12px",
+      color: "#d8f0ff",
+      fontSize: "13px",
+      lineHeight: "1.25"
+    });
+    keyboardControlsGrid = createElement(documentRef, "div", "settings-menu__controls-grid");
+    keyboardControlsGrid.dataset.settingsControlsGrid = "true";
+    Object.assign(keyboardControlsGrid.style, {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+      gap: "8px"
+    });
+    keyboardControlsGrid.addEventListener("click", (event) => {
+      const button = event.target?.closest?.("[data-settings-control-binding]");
+      if (!button || !keyboardControlsGrid.contains(button)) {
+        return;
+      }
+
+      startKeyboardControlCapture(button.dataset.settingsControlBinding);
+    });
+    const controlsActions = createElement(documentRef, "footer", "settings-menu__controls-actions");
+    Object.assign(controlsActions.style, {
+      marginTop: "14px"
+    });
+    const resetControlsButton = createElement(
+      documentRef,
+      "button",
+      "settings-menu__controls-reset",
+      "Reset Controls"
+    );
+    resetControlsButton.type = "button";
+    resetControlsButton.dataset.settingsControlsReset = "true";
+    resetControlsButton.addEventListener("click", () => {
+      resetKeyboardControls();
+      focusElement(resetControlsButton);
+    });
+    controlsActions.append(resetControlsButton);
+    controlsPanel.append(controlsIntro, keyboardControlsGrid, controlsActions);
+    panel.append(controlsPanel);
+
     settingsPanel = createElement(documentRef, "section", "settings-menu__tab-panel settings-menu__tab-panel--settings");
+    settingsPanel.id = "settings-menu-panel-settings";
     settingsPanel.dataset.settingsTabPanel = "settings";
     settingsPanel.setAttribute("role", "tabpanel");
+    settingsPanel.setAttribute("aria-labelledby", "settings-menu-tab-settings");
     panel.append(settingsPanel);
 
     for (const group of schema) {
@@ -917,11 +1249,13 @@ export function createSettingsMenuController({
       const groupButton = createElement(documentRef, "button", "settings-menu__group-button", group.label);
       groupButton.type = "button";
       groupButton.dataset.settingsGroupButton = group.id;
+      groupButton.setAttribute("aria-controls", `settings-menu-group-${group.id}`);
       groupButton.addEventListener("click", () => {
         setActiveGroup(group.id, { focus: true });
       });
 
       const groupPanel = createElement(documentRef, "div", "settings-menu__group-panel");
+      groupPanel.id = `settings-menu-group-${group.id}`;
       groupPanel.dataset.settingsGroupPanel = group.id;
       for (const setting of group.settings) {
         groupPanel.append(renderSetting(group, setting));
@@ -943,20 +1277,89 @@ export function createSettingsMenuController({
       );
       restartButton.type = "button";
       restartButton.dataset.settingsAction = "restart-game";
+      restartButton.setAttribute("aria-haspopup", "dialog");
+      restartButton.setAttribute("aria-expanded", "false");
       restartButton.addEventListener("click", () => {
-        const shouldClose = onRestartGame();
-        if (shouldClose !== false) {
-          close();
-        }
+        setRestartConfirmationOpen(true, { focus: true });
       });
+
+      restartConfirmDialog = createElement(documentRef, "section", "settings-menu__restart-confirm");
+      restartConfirmDialog.dataset.settingsRestartConfirm = "true";
+      restartConfirmDialog.setAttribute("role", "dialog");
+      restartConfirmDialog.setAttribute("aria-label", "Confirm restart game");
+      restartConfirmDialog.hidden = true;
+      Object.assign(restartConfirmDialog.style, {
+        display: "grid",
+        gap: "10px",
+        marginTop: "12px",
+        padding: "12px",
+        border: "3px solid #ffccaa",
+        background: "rgba(40, 16, 18, 0.92)",
+        color: "#fff1e8"
+      });
+      const restartConfirmTitle = createElement(
+        documentRef,
+        "strong",
+        "settings-menu__restart-confirm-title",
+        "Restart game?"
+      );
+      const restartConfirmCopy = createElement(
+        documentRef,
+        "p",
+        "settings-menu__restart-confirm-copy",
+        "This clears saved progress and reloads the game."
+      );
+      Object.assign(restartConfirmCopy.style, {
+        margin: "0",
+        fontSize: "13px",
+        lineHeight: "1.25",
+        color: "#ffffff"
+      });
+      const restartConfirmActions = createElement(documentRef, "div", "settings-menu__restart-confirm-actions");
+      Object.assign(restartConfirmActions.style, {
+        display: "flex",
+        gap: "10px",
+        flexWrap: "wrap"
+      });
+      restartConfirmButton = createElement(
+        documentRef,
+        "button",
+        "settings-menu__restart-confirm-button",
+        "Restart"
+      );
+      restartConfirmButton.type = "button";
+      restartConfirmButton.dataset.settingsRestartConfirmAction = "confirm";
+      restartConfirmButton.addEventListener("click", () => {
+        confirmRestartGame();
+      });
+      restartCancelButton = createElement(
+        documentRef,
+        "button",
+        "settings-menu__restart-cancel-button",
+        "Cancel"
+      );
+      restartCancelButton.type = "button";
+      restartCancelButton.dataset.settingsRestartConfirmAction = "cancel";
+      restartCancelButton.addEventListener("click", () => {
+        setRestartConfirmationOpen(false, { focus: true });
+      });
+      restartConfirmActions.append(restartConfirmButton, restartCancelButton);
+      restartConfirmDialog.append(restartConfirmTitle, restartConfirmCopy, restartConfirmActions);
       actions.append(restartButton);
+      actions.append(restartConfirmDialog);
       settingsPanel.append(actions);
     }
+
+    statusElement = createElement(documentRef, "span", "settings-menu__sr-only");
+    statusElement.id = SETTINGS_MENU_STATUS_ID;
+    statusElement.setAttribute("aria-live", "polite");
+    panel.append(statusElement);
 
     root.append(panel);
     mount.append(root);
     syncBagGrid();
     syncPokemonGrid();
+    syncKeyboardControlsGrid();
     syncTabState();
     syncExpandedState();
     syncOpenState();
@@ -965,6 +1368,7 @@ export function createSettingsMenuController({
 
   function show() {
     ensureRoot();
+    setRestartConfirmationOpen(false);
     setActiveTab("bag");
     syncBagGrid();
     syncPokemonGrid();
@@ -979,6 +1383,7 @@ export function createSettingsMenuController({
     }
 
     open = false;
+    setRestartConfirmationOpen(false);
     syncOpenState();
     onClose();
     return true;
@@ -987,6 +1392,49 @@ export function createSettingsMenuController({
   function handleKeydown(event) {
     if (!open) {
       return false;
+    }
+
+    if (pendingKeyboardActionId) {
+      if (event.code === "Escape") {
+        pendingKeyboardActionId = null;
+        syncKeyboardControlsGrid();
+        event.preventDefault?.();
+        return true;
+      }
+
+      commitKeyboardControl(pendingKeyboardActionId, event.code);
+      event.preventDefault?.();
+      return true;
+    }
+
+    if (event.code === "Tab") {
+      moveFocusWithinMenu(event.shiftKey ? -1 : 1);
+      event.preventDefault?.();
+      return true;
+    }
+
+    if (restartConfirmOpen) {
+      if (event.code === "KeyB" || event.code === "Escape") {
+        setRestartConfirmationOpen(false, { focus: true });
+        event.preventDefault?.();
+        return true;
+      }
+
+      if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "ArrowUp" || event.code === "ArrowDown") {
+        const focusedConfirm = documentRef.activeElement === restartConfirmButton;
+        focusElement(focusedConfirm ? restartCancelButton : restartConfirmButton);
+        event.preventDefault?.();
+        return true;
+      }
+
+      if (event.code === "Enter" || event.code === "Space") {
+        activateFocusedElement();
+        event.preventDefault?.();
+        return true;
+      }
+
+      event.preventDefault?.();
+      return true;
     }
 
     if (event.code === "KeyX" || event.code === "KeyB" || event.code === "Escape") {
@@ -1007,11 +1455,58 @@ export function createSettingsMenuController({
       return true;
     }
 
+    const focusedTabId = getFocusedTabId();
+    if (focusedTabId) {
+      if (event.code === "ArrowLeft") {
+        moveActiveTab(-1);
+        event.preventDefault?.();
+        return true;
+      }
+
+      if (event.code === "ArrowRight") {
+        moveActiveTab(1);
+        event.preventDefault?.();
+        return true;
+      }
+
+      if (event.code === "Home") {
+        setActiveTab(MENU_TABS[0], { focus: true });
+        event.preventDefault?.();
+        return true;
+      }
+
+      if (event.code === "End") {
+        setActiveTab(MENU_TABS[MENU_TABS.length - 1], { focus: true });
+        event.preventDefault?.();
+        return true;
+      }
+
+      if (event.code === "ArrowDown") {
+        focusActiveTabContent();
+        event.preventDefault?.();
+        return true;
+      }
+    }
+
     if (activeTabId === "pokemons") {
       if (event.code === "ArrowLeft" || event.code === "ArrowUp") {
         moveSelectedPokemon(-1);
       } else if (event.code === "ArrowRight" || event.code === "ArrowDown") {
         moveSelectedPokemon(1);
+      } else if (event.code === "Enter" || event.code === "Space") {
+        activateFocusedElement();
+      }
+      event.preventDefault?.();
+      return true;
+    }
+
+    if (activeTabId === "controls") {
+      if (event.code === "ArrowUp" || event.code === "ArrowLeft") {
+        moveFocusedControlsItem(-1);
+      } else if (event.code === "ArrowDown" || event.code === "ArrowRight") {
+        moveFocusedControlsItem(1);
+      } else if (event.code === "Enter" || event.code === "Space") {
+        activateFocusedElement();
       }
       event.preventDefault?.();
       return true;

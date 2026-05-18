@@ -2,6 +2,10 @@ import {
   COMPANION_ABILITY_KIND,
   listCompanionAbilities
 } from "../gameplay/content/companionAbilities.js";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES
+} from "../story/sandbotsLexicon.js";
 
 export const MOVE_STATUS = Object.freeze({
   ACTIVE: "active",
@@ -21,15 +25,15 @@ const FIELD_MOVE_PRESENTATION = Object.freeze({
     inputHint: "RT / Enter near target",
     design: {
       benefit: "Restores dry ground, dry plants, and future crop targets.",
-      limit: "Requires a marked valid target and Squirtle travel time.",
-      feedback: "Target prompt, Squirtle movement, restored tile state, and restoration notice.",
+      limit: `Requires a marked valid target and ${SANDBOTS_BOT_NAMES.hydro} travel time.`,
+      feedback: `Target prompt, ${SANDBOTS_BOT_NAMES.hydro} movement, restored tile state, and restoration notice.`,
       firstSafeUse: "A nearby dry grass or dry ground patch in the opening field."
     },
-    activeGuidance: "USE LT TO MARK THE GROUND",
-    firstUseGuidance: "Water Gun: mark dry ground; Squirtle will move over and restore it.",
+    activeGuidance: `${SANDBOTS_ITEM_NAMES.hydroTool}: mark dry ground for ${SANDBOTS_BOT_NAMES.hydro}.`,
+    firstUseGuidance: `${SANDBOTS_ITEM_NAMES.hydroTool}: mark dry ground; ${SANDBOTS_BOT_NAMES.hydro} will move over and restore it.`,
     firstUseCompleteFlags: ["firstGrassRestored"],
     targetPrompts: {
-      ground: "[Enter] Mark dry ground for Squirtle"
+      ground: `[Enter] Mark dry ground for ${SANDBOTS_BOT_NAMES.hydro}`
     }
   },
   leafage: {
@@ -37,16 +41,16 @@ const FIELD_MOVE_PRESENTATION = Object.freeze({
     effects: ["create-tall-grass", "create-leafy-home-patch"],
     inputHint: "RT / Enter near target",
     design: {
-      benefit: "Creates tall grass patches for habitats and Pokemon gathering.",
+      benefit: "Creates tall grass patches for colony zones and bot gathering.",
       limit: "Only works on restored ground, never on still-dry terrain.",
-      feedback: "Tile outline, Bulbasaur action, tall grass spawn, and habitat rustle.",
-      firstSafeUse: "A restored ground patch created with Water Gun."
+      feedback: `Tile outline, ${SANDBOTS_BOT_NAMES.grow} action, tall grass spawn, and habitat rustle.`,
+      firstSafeUse: `A restored ground patch created with ${SANDBOTS_ITEM_NAMES.hydroTool}.`
     },
-    activeGuidance: "Leafage: grow tall grass on restored ground.",
-    firstUseGuidance: "Leafage: use it on restored ground to grow tall grass.",
+    activeGuidance: `${SANDBOTS_ITEM_NAMES.growTool}: grow tall grass on restored ground.`,
+    firstUseGuidance: `${SANDBOTS_ITEM_NAMES.growTool}: use it on restored ground to grow tall grass.`,
     firstUseCompleteFlags: ["leafageTallGrassCount", "leafageTallGrassHabitatCreated"],
     targetPrompts: {
-      ground: "[Enter] Use Leafage to grow tall grass"
+      ground: `[Enter] Use ${SANDBOTS_ITEM_NAMES.growTool} to grow tall grass`
     }
   },
   fire: {
@@ -54,16 +58,16 @@ const FIELD_MOVE_PRESENTATION = Object.freeze({
     effects: ["burn-white-ground", "prepare-dry-ground"],
     inputHint: "RT / Enter near target",
     design: {
-      benefit: "Turns white ground into dry ground so Water Gun can restore it later.",
+      benefit: `Turns white ground into dry ground so ${SANDBOTS_ITEM_NAMES.hydroTool} can restore it later.`,
       limit: "Only works on white ground, and still needs the terrain action wiring.",
-      feedback: "Charmander selection and target prompt first; terrain conversion feedback comes with the action implementation.",
+      feedback: `${SANDBOTS_BOT_NAMES.thermal} selection and target prompt first; terrain conversion feedback comes with the action implementation.`,
       firstSafeUse: "A white ground tile near the restored habitat route."
     },
-    activeGuidance: "Fire: burn white ground into dry ground.",
-    firstUseGuidance: "Fire: use it on white ground, then swap to Water Gun.",
+    activeGuidance: `${SANDBOTS_ITEM_NAMES.thermalTool}: burn white ground into dry ground.`,
+    firstUseGuidance: `${SANDBOTS_ITEM_NAMES.thermalTool}: use it on white ground, then swap to ${SANDBOTS_ITEM_NAMES.hydroTool}.`,
     firstUseCompleteFlags: ["fireWhiteGroundBurned"],
     targetPrompts: {
-      ground: "[Enter] Use Fire on white ground"
+      ground: `[Enter] Use ${SANDBOTS_ITEM_NAMES.thermalTool} on white ground`
     }
   },
   cut: {
@@ -119,6 +123,8 @@ function buildRegularMoveFromAbility(ability) {
     status: ability.status,
     learnedFromNpcId: presentation.learnedFromNpcId || ability.companionId,
     unlockId: ability.runtime?.skillDefId || ability.abilityId,
+    requiredBot: ability.companionName,
+    requiredBotId: ability.companionId,
     requiredPokemon: ability.companionName,
     requiredPokemonId: ability.companionId,
     effects: presentation.effects || [],
@@ -144,6 +150,8 @@ const TRANSFORMATION_MOVES = [
     category: MOVE_CATEGORY.TRANSFORMATION,
     status: MOVE_STATUS.PLANNED,
     abilityId: "surf",
+    requiredBot: null,
+    requiredBotId: null,
     requiredPokemon: null,
     requiredPokemonId: null,
     learnedFromNpcId: "ferry-helper",
@@ -158,6 +166,8 @@ const TRANSFORMATION_MOVES = [
     category: MOVE_CATEGORY.TRANSFORMATION,
     status: MOVE_STATUS.PLANNED,
     abilityId: "waterfall",
+    requiredBot: null,
+    requiredBotId: null,
     requiredPokemon: null,
     requiredPokemonId: null,
     learnedFromNpcId: "cascade-helper",
@@ -172,6 +182,8 @@ const TRANSFORMATION_MOVES = [
     category: MOVE_CATEGORY.TRANSFORMATION,
     status: MOVE_STATUS.PLANNED,
     abilityId: "camouflage",
+    requiredBot: null,
+    requiredBotId: null,
     requiredPokemon: null,
     requiredPokemonId: null,
     learnedFromNpcId: "mimic-helper",
@@ -186,6 +198,8 @@ const TRANSFORMATION_MOVES = [
     category: MOVE_CATEGORY.TRANSFORMATION,
     status: MOVE_STATUS.PLANNED,
     abilityId: "rollout",
+    requiredBot: null,
+    requiredBotId: null,
     requiredPokemon: null,
     requiredPokemonId: null,
     learnedFromNpcId: "rolling-stone-helper",
@@ -200,6 +214,8 @@ const TRANSFORMATION_MOVES = [
     category: MOVE_CATEGORY.TRANSFORMATION,
     status: MOVE_STATUS.PLANNED,
     abilityId: "glide",
+    requiredBot: null,
+    requiredBotId: null,
     requiredPokemon: null,
     requiredPokemonId: null,
     learnedFromNpcId: "sky-helper",
@@ -214,6 +230,8 @@ const TRANSFORMATION_MOVES = [
     category: MOVE_CATEGORY.TRANSFORMATION,
     status: MOVE_STATUS.PLANNED,
     abilityId: "magnetRise",
+    requiredBot: null,
+    requiredBotId: null,
     requiredPokemon: null,
     requiredPokemonId: null,
     learnedFromNpcId: "magnet-helper",
@@ -256,7 +274,7 @@ export function formatActiveMoveGuidanceByAbilityId(abilityId, {
   }
 
   if (abilityId === "waterGun" && pendingWaterGunCount > 0) {
-    return `${move.label}: ${move.requiredPokemon} has ${pendingWaterGunCount} tile${pendingWaterGunCount === 1 ? "" : "s"} queued.`;
+    return `${move.label}: ${move.requiredBot || move.requiredPokemon} has ${pendingWaterGunCount} tile${pendingWaterGunCount === 1 ? "" : "s"} queued.`;
   }
 
   if (

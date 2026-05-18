@@ -2,6 +2,15 @@ import {
   FIELD_TASK_IDS,
   SMALL_ISLAND_FIELD_TASKS
 } from "../story/storyBeatData.js";
+import {
+  getCharmanderDerivedTaskId,
+  shouldHideTrackedTaskForProgressionPrerequisite
+} from "../story/progressionContracts.js";
+import {
+  getErrandQuestHudText,
+  getErrandQuestInstructionText
+} from "../quest/errandQuestDesign.js";
+import { SANDBOTS_ITEM_NAMES } from "../story/sandbotsLexicon.js";
 
 function escapeHtml(value) {
   return String(value)
@@ -33,7 +42,7 @@ function formatObjectiveLabel(objective) {
     wood: "Wood",
     "revived-habitat": "Restored patch",
     "first-memory": "Memory photo",
-    waterGun: "Water Gun",
+    waterGun: SANDBOTS_ITEM_NAMES.hydroTool,
     "revived-grass": "Dry Tall Grass",
     "leaf-helper": "Leaf helper",
     "leafy-home-patch": "Leafy home patch"
@@ -43,7 +52,25 @@ function formatObjectiveLabel(objective) {
 }
 
 function formatQuestSummary(quest) {
-  return `${quest.title}. ${quest.description}`;
+  return `${quest.title}. ${getQuestSummaryCopy(quest)}`;
+}
+
+function getQuestSummaryCopy(quest) {
+  return quest?.errandQuest ?
+    getErrandQuestInstructionText(quest) || getErrandQuestHudText(quest) :
+    quest?.description || "";
+}
+
+function getQuestSubtitleCopy(quest) {
+  if (!quest) {
+    return "";
+  }
+
+  if (quest.errandQuest) {
+    return quest.errandQuest.hudSubtitle || quest.errandQuest.subtitle || "";
+  }
+
+  return quest.description || "";
 }
 
 function renderQuestSummaryHtml(quest) {
@@ -54,9 +81,11 @@ function renderQuestSummaryHtml(quest) {
     `;
   }
 
+  const subtitle = getQuestSubtitleCopy(quest);
+
   return `
     <div class="hud-task-title">${escapeHtml(quest.title)}</div>
-    <div class="hud-task-subtitle">${escapeHtml(quest.description)}</div>
+    ${subtitle ? `<div class="hud-task-subtitle">${escapeHtml(subtitle)}</div>` : ""}
   `;
 }
 
@@ -78,6 +107,62 @@ function renderObjectiveHintHtml(objective) {
 
 function getHudObjectives(quest) {
   return (quest?.objectives || []).filter((objective) => !objective.hiddenFromHud);
+}
+
+function isQuestObjectiveComplete(quest) {
+  return (quest?.objectives || []).every((objective) => (
+    Number(objective.current || 0) >= Number(objective.required || 1)
+  ));
+}
+
+function renderErrandHudChecklistHtml(quest) {
+  if (!quest?.errandQuest?.hudText) {
+    return "";
+  }
+
+  return `
+    <div
+      class="hud-checklist__item"
+      data-done="${isQuestObjectiveComplete(quest) ? "true" : "false"}"
+      data-objective-type="ERRAND"
+    >
+      <span class="hud-checklist__box" aria-hidden="true"></span>
+      <span class="hud-checklist__content">
+        ${escapeHtml(getErrandQuestHudText(quest))}
+      </span>
+    </div>
+  `;
+}
+
+function renderErrandChoiceMetaHtml(quest) {
+  if (!Array.isArray(quest?.errandQuest?.approachChoices)) {
+    return "";
+  }
+
+  return quest.errandQuest.approachChoices.map((choice) => {
+    const tradeoff = choice.tradeoff || choice.description || "";
+    const copy = tradeoff ? `Approach: ${choice.label}: ${tradeoff}` : `Approach: ${choice.label}`;
+    return `<span>${escapeHtml(copy)}</span>`;
+  }).join("");
+}
+
+function renderErrandRewardMetaHtml(quest) {
+  const reward = quest?.errandQuest?.visibleReward;
+  const rewardCopy = reward?.hudText || reward?.description || "";
+  return rewardCopy ? `<span>${escapeHtml(`Reward: ${rewardCopy}`)}</span>` : "";
+}
+
+function renderErrandNextHookMetaHtml(quest) {
+  const nextHook = quest?.errandQuest?.nextHook || "";
+  return nextHook ? `<span>${escapeHtml(`Next signal: ${nextHook}`)}</span>` : "";
+}
+
+function renderErrandQuestMetaHtml(quest) {
+  return [
+    renderErrandChoiceMetaHtml(quest),
+    renderErrandRewardMetaHtml(quest),
+    renderErrandNextHookMetaHtml(quest)
+  ].filter(Boolean).join("");
 }
 
 function getDerivedTrackedTaskIds(storyState = {}) {
@@ -128,6 +213,11 @@ function getDerivedTrackedTaskIds(storyState = {}) {
     derivedTaskIds.push(FIELD_TASK_IDS.GIVE_LEPPA_BERRY);
   }
 
+  const charmanderTaskId = getCharmanderDerivedTaskId(storyState);
+  if (charmanderTaskId) {
+    derivedTaskIds.push(charmanderTaskId);
+  }
+
   return derivedTaskIds;
 }
 
@@ -135,7 +225,10 @@ function getTrackedTaskEntries(storyState = {}) {
   const taskIds = Array.isArray(storyState.flags?.trackedTaskIds) ?
     storyState.flags.trackedTaskIds :
     [];
-  const trackedTaskIds = [...taskIds];
+  const flags = storyState.flags || {};
+  const trackedTaskIds = taskIds.filter((taskId) => (
+    !shouldHideTrackedTaskForProgressionPrerequisite(taskId, flags)
+  ));
 
   for (const taskId of getDerivedTrackedTaskIds(storyState)) {
     if (!trackedTaskIds.includes(taskId)) {
@@ -282,12 +375,15 @@ function renderTrackedTaskChecklistHtml(storyState = {}, options = {}) {
 }
 
 function renderMissionCardHtml({ eyebrow, title, copy, metaHtml = "", done = false, taskId = "", flashing = false }) {
+  const statusCopy = done ? "Complete" : eyebrow;
+  const ariaLabel = [statusCopy, title, copy].filter(Boolean).join(": ");
   return `
     <article
       class="mission-card"
       data-task-done="${done ? "true" : "false"}"
       data-task-flashing="${flashing ? "true" : "false"}"
       ${taskId ? `data-task-id="${escapeHtml(taskId)}"` : ""}
+      aria-label="${escapeHtml(ariaLabel)}"
     >
       <div class="mission-card__eyebrow">${escapeHtml(eyebrow)}</div>
       <div class="mission-card__header">
@@ -302,6 +398,9 @@ function renderMissionCardHtml({ eyebrow, title, copy, metaHtml = "", done = fal
 
 function renderQuestMissionCardHtml(quest) {
   const done = quest.status === "completed";
+  const objectiveMetaHtml = getHudObjectives(quest).map((objective) => `
+    <span>${escapeHtml(formatObjectiveLabel(objective))} ${escapeHtml(formatQuestObjective(objective))}</span>
+  `).join("");
 
   return renderMissionCardHtml({
     eyebrow: quest.status,
@@ -309,9 +408,7 @@ function renderQuestMissionCardHtml(quest) {
     copy: formatQuestSummary(quest),
     done,
     taskId: quest.id,
-    metaHtml: getHudObjectives(quest).map((objective) => `
-      <span>${escapeHtml(formatObjectiveLabel(objective))} ${escapeHtml(formatQuestObjective(objective))}</span>
-    `).join("")
+    metaHtml: objectiveMetaHtml || renderErrandQuestMetaHtml(quest)
   });
 }
 
@@ -360,7 +457,8 @@ export function createQuestLog({
 
   function renderChecklistHtml(storyState = {}, options = {}) {
     const quest = getActiveQuest();
-    const activeQuestHtml = quest ? getHudObjectives(quest).map((objective) => {
+    const hudObjectives = getHudObjectives(quest);
+    const activeQuestHtml = quest && hudObjectives.length > 0 ? hudObjectives.map((objective) => {
       const done = (objective.current || 0) >= objective.required;
       return `
         <div
@@ -375,7 +473,7 @@ export function createQuestLog({
           </span>
         </div>
       `;
-    }).join("") : "";
+    }).join("") : renderErrandHudChecklistHtml(quest);
 
     return `${activeQuestHtml}${renderTrackedTaskChecklistHtml(storyState, options)}`;
   }

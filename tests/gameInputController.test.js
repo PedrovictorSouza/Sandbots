@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { GAMEPAD_BUTTONS } from "../input/gameInputBindings.js";
+import {
+  createDefaultKeyboardControls,
+  GAMEPAD_BUTTONS
+} from "../input/gameInputBindings.js";
 import { createGameInputController } from "../input/gameInputController.js";
+import {
+  GAMEPAD_LAYOUT,
+  INPUT_DEVICE
+} from "../input/inputModality.js";
 
 const GAMEPAD_LB = 4;
 const GAMEPAD_RB = 5;
@@ -76,6 +83,72 @@ function createGamepad(overrides = {}) {
 }
 
 describe("createGameInputController", () => {
+  it("captures cinematic skip keys without opening gameplay UI during a gameplay cinematic", () => {
+    const clearGameFlowInput = vi.fn();
+    const { controller, inspectBag } = createController({
+      clearGameFlowInput,
+      isGameplayCinematicInputActive: () => true
+    });
+    const keydown = createKeyboardEvent("KeyX");
+    keydown.key = "x";
+
+    controller.handleKeydown(keydown);
+
+    expect(keydown.preventDefault).toHaveBeenCalledTimes(1);
+    expect(clearGameFlowInput).toHaveBeenCalledTimes(1);
+    expect(inspectBag).not.toHaveBeenCalled();
+    expect(controller.isCinematicSkipActionActive()).toBe(true);
+
+    const keyup = createKeyboardEvent("KeyX");
+    keyup.key = "x";
+    controller.handleKeyup(keyup);
+
+    expect(controller.isCinematicSkipActionActive()).toBe(false);
+  });
+
+  it("tracks keyboard, pointer, and gamepad modality without changing input routing", () => {
+    const gamepad = createGamepad({ id: "Nintendo Switch Pro Controller" });
+    const windowRef = {
+      navigator: {
+        getGamepads: () => [gamepad]
+      }
+    };
+    const { controller, requestPokedexOpen } = createController({ windowRef });
+
+    expect(controller.getInputModalityState()).toMatchObject({
+      device: INPUT_DEVICE.KEYBOARD_MOUSE,
+      gamepadLayout: GAMEPAD_LAYOUT.GENERIC
+    });
+
+    controller.handleKeydown(createKeyboardEvent("Tab"));
+
+    expect(requestPokedexOpen).toHaveBeenCalledTimes(1);
+    expect(controller.getInputModalityState()).toMatchObject({
+      device: INPUT_DEVICE.KEYBOARD_MOUSE
+    });
+
+    gamepad.buttons[GAMEPAD_BUTTONS.X] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+
+    expect(controller.getInputModalityState()).toMatchObject({
+      device: INPUT_DEVICE.GAMEPAD,
+      gamepadLayout: GAMEPAD_LAYOUT.NINTENDO,
+      gamepadId: "Nintendo Switch Pro Controller"
+    });
+
+    controller.handlePointerMove({
+      buttons: 0,
+      movementX: 4,
+      movementY: 0,
+      target: document.body
+    });
+
+    expect(controller.getInputModalityState()).toMatchObject({
+      device: INPUT_DEVICE.KEYBOARD_MOUSE,
+      gamepadLayout: GAMEPAD_LAYOUT.NINTENDO
+    });
+  });
+
   it("opens the Pokedesk with Tab", () => {
     const { controller, requestPokedexOpen } = createController();
     const event = createKeyboardEvent("Tab");
@@ -84,6 +157,23 @@ describe("createGameInputController", () => {
 
     expect(requestPokedexOpen).toHaveBeenCalledTimes(1);
     expect(event.preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses custom keyboard controls for gameplay actions", () => {
+    const keyboardControls = {
+      ...createDefaultKeyboardControls(),
+      bag: "KeyZ"
+    };
+    const { controller, inspectBag } = createController({
+      getKeyboardControls: () => keyboardControls
+    });
+
+    controller.handleKeydown(createKeyboardEvent("KeyX"));
+    expect(inspectBag).not.toHaveBeenCalled();
+
+    controller.handleKeydown(createKeyboardEvent("KeyZ"));
+    expect(inspectBag).toHaveBeenCalledTimes(1);
+    expect(controller.getInputModalityState().keyboardControls.bag).toBe("KeyZ");
   });
 
   it("opens Settings once per Select button press", () => {
@@ -141,6 +231,17 @@ describe("createGameInputController", () => {
     gamepad.buttons[GAMEPAD_BUTTONS.B] = { pressed: false, value: 0 };
     controller.updateGamepads(1 / 60);
     gamepad.buttons[GAMEPAD_BUTTONS.LT] = { pressed: true, value: 1 };
+    controller.updateGamepads(1 / 60);
+
+    expect(handleSettingsKeydown).toHaveBeenCalledWith(expect.objectContaining({
+      code: "Enter"
+    }));
+    expect(requestHarvest).not.toHaveBeenCalled();
+
+    handleSettingsKeydown.mockClear();
+    gamepad.buttons[GAMEPAD_BUTTONS.LT] = { pressed: false, value: 0 };
+    controller.updateGamepads(1 / 60);
+    gamepad.buttons[GAMEPAD_BUTTONS.A] = { pressed: true, value: 1 };
     controller.updateGamepads(1 / 60);
 
     expect(handleSettingsKeydown).toHaveBeenCalledWith(expect.objectContaining({

@@ -1,0 +1,10 @@
+[
+  {
+    "id": "tall-grass",
+    "kind": "textured-model",
+    "gltf": "./Trees/tall-grass/tall-grass.gltf",
+    "bin": "./Trees/tall-grass/tall-grass.bin",
+    "texture": "./Trees/tall-grass/tall-grass.png",
+    "normalizedSize": 1.34
+  }
+]

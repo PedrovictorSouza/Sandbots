@@ -11,6 +11,7 @@ import {
   GRID_BUILD_CATEGORIES,
   GRID_PLACEABLE_IDS
 } from "./gridBuildingSystem.js";
+import { RECIPE_DEFS } from "../../studies/typescript/recipes.ts";
 
 export const BUILDABLE_SOURCE_TYPES = Object.freeze({
   RECIPE: "recipe",
@@ -36,18 +37,7 @@ const WORKBENCH_BUILDABLE_DEFS = Object.freeze([
     gridPlaceableId: GRID_PLACEABLE_IDS.LEAF_DEN_KIT,
     completedGridPlaceableId: GRID_PLACEABLE_IDS.LEAF_DEN,
     sourceType: BUILDABLE_SOURCE_TYPES.BUILDING_KIT,
-    workbenchRecipe: Object.freeze({
-      id: LEAF_DEN_KIT_ITEM_ID,
-      title: "House",
-      stationId: "workbench",
-      ingredients: Object.freeze({
-        wood: 20
-      }),
-      output: Object.freeze({
-        [LEAF_DEN_KIT_ITEM_ID]: 1
-      }),
-      note: "A construction kit for a proper Pokemon home."
-    })
+    workbenchRecipe: RECIPE_DEFS.leafDenKit
   })
 ]);
 

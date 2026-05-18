@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createGameplayCameraDirector } from "../app/runtime/gameplayCameraDirector.js";
 import { GAMEPLAY_OPENING_SHIP_EVENTS } from "../app/session/gameplayOpeningShip.js";
+import { MOTION_IMPACT_PRESET_IDS } from "../app/motion/motionImpactPresets.js";
 import {
   ACT_TWO_GAMEPLAY_OPENING_CAMERA_HOLD,
   ACT_TWO_GAMEPLAY_OPENING_CAMERA_POSE,
@@ -17,6 +18,11 @@ import {
 
 describe("createGameplayCameraDirector", () => {
   it("holds Chopper alone, drops the ship, spawns the player, then releases to follow", () => {
+    expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_START).toBeLessThan(1);
+    expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND).toBeCloseTo(2.2);
+    expect(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START).toBeCloseTo(3.2);
+    expect(ACT_TWO_GAMEPLAY_OPENING_CAMERA_HOLD).toBeLessThan(7);
+
     const camera = {
       follow: vi.fn(),
       setPose: vi.fn()
@@ -33,7 +39,12 @@ describe("createGameplayCameraDirector", () => {
     };
     const spawnPlayer = vi.fn(() => playerPosition);
     const movePlayer = vi.fn();
-    const director = createGameplayCameraDirector({ camera, cameraOrbit });
+    const onCrashImpactMotionRequested = vi.fn();
+    const director = createGameplayCameraDirector({
+      camera,
+      cameraOrbit,
+      onCrashImpactMotionRequested
+    });
 
     expect(
       director.beginFrame({
@@ -102,6 +113,11 @@ describe("createGameplayCameraDirector", () => {
     expect(ship.events.map((event) => event.type)).toContain(
       GAMEPLAY_OPENING_SHIP_EVENTS.IMPACT
     );
+    expect(onCrashImpactMotionRequested).toHaveBeenCalledTimes(1);
+    expect(onCrashImpactMotionRequested).toHaveBeenCalledWith({
+      motionId: MOTION_IMPACT_PRESET_IDS.CRASH_IMPACT,
+      position: [...ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION]
+    });
     expect(camera.setPose.mock.calls.at(-1)[0].target).not.toEqual(
       ACT_TWO_GAMEPLAY_OPENING_CAMERA_POSE.target
     );
@@ -151,6 +167,7 @@ describe("createGameplayCameraDirector", () => {
     expect(ship.events.map((event) => event.type)).toContain(
       GAMEPLAY_OPENING_SHIP_EVENTS.SETTLED
     );
+    expect(onCrashImpactMotionRequested).toHaveBeenCalledTimes(1);
     expect(camera.setPose).toHaveBeenLastCalledWith({
       direction: ACT_TWO_PLAYER_CAMERA_DIRECTION,
       zoom: ACT_TWO_PLAYER_CAMERA_ZOOM,
@@ -178,5 +195,94 @@ describe("createGameplayCameraDirector", () => {
 
     expect(camera.setPose).not.toHaveBeenCalled();
     expect(camera.follow).toHaveBeenLastCalledWith(playerPosition);
+  });
+
+  it("skips an active gameplay opening to the post-impact follow state", () => {
+    const camera = {
+      follow: vi.fn(),
+      setPose: vi.fn()
+    };
+    const cameraOrbit = {
+      sync: vi.fn()
+    };
+    const ship = {
+      visible: false,
+      position: null,
+      dust: [],
+      smoke: []
+    };
+    const spawnPlayer = vi.fn(() => ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION);
+    const movePlayer = vi.fn();
+    const onCrashImpactMotionRequested = vi.fn();
+    const director = createGameplayCameraDirector({
+      camera,
+      cameraOrbit,
+      onCrashImpactMotionRequested
+    });
+
+    expect(director.skipOpening({
+      now: 1000,
+      gameplayActive: true,
+      playerPosition: null,
+      spawnPlayer,
+      movePlayer,
+      ship,
+      canFollow: true
+    })).toMatchObject({
+      skipped: false,
+      released: false
+    });
+
+    director.requestOpening();
+    director.beginFrame({
+      now: 1000,
+      gameplayActive: true
+    });
+
+    const frame = director.skipOpening({
+      now: 1200,
+      gameplayActive: true,
+      playerPosition: null,
+      spawnPlayer,
+      movePlayer,
+      ship,
+      canFollow: true
+    });
+
+    expect(frame).toMatchObject({
+      openingActive: false,
+      released: true,
+      skipped: true,
+      phase: "skipped"
+    });
+    expect(spawnPlayer).toHaveBeenCalledWith(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION);
+    expect(movePlayer).toHaveBeenLastCalledWith(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION);
+    expect(ship.visible).toBe(true);
+    expect(ship.position).toEqual(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION);
+    expect(ship.smoke.length).toBeGreaterThan(0);
+    expect(ship.events.map((event) => event.type)).toEqual(expect.arrayContaining([
+      GAMEPLAY_OPENING_SHIP_EVENTS.FALL_STARTED,
+      GAMEPLAY_OPENING_SHIP_EVENTS.IMPACT,
+      GAMEPLAY_OPENING_SHIP_EVENTS.SETTLED
+    ]));
+    expect(onCrashImpactMotionRequested).not.toHaveBeenCalled();
+    expect(camera.setPose).toHaveBeenLastCalledWith({
+      direction: ACT_TWO_PLAYER_CAMERA_DIRECTION,
+      zoom: ACT_TWO_PLAYER_CAMERA_ZOOM,
+      distance: ACT_TWO_PLAYER_CAMERA_DISTANCE
+    });
+    expect(cameraOrbit.sync).toHaveBeenLastCalledWith(ACT_TWO_PLAYER_CAMERA_DIRECTION);
+    expect(camera.follow).toHaveBeenLastCalledWith(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION);
+
+    expect(director.skipOpening({
+      now: 1300,
+      gameplayActive: true,
+      playerPosition: ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION,
+      ship
+    })).toMatchObject({
+      skipped: false,
+      released: false,
+      phase: "played"
+    });
   });
 });

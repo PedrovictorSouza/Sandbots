@@ -40,6 +40,7 @@ describe("createGroundCellHighlightController", () => {
     expect(layer.hidden).toBe(false);
     expect(layer.dataset.groundCellTargetState).toBe("invalid");
     expect(outline.getAttribute("stroke")).toBe("#ffd37a");
+    expect(outline.getAttribute("stroke-dasharray")).toBe("8 5");
   });
 
   it("keeps valid action targets in the existing cyan cue", () => {
@@ -56,9 +57,10 @@ describe("createGroundCellHighlightController", () => {
 
     expect(layer.dataset.groundCellTargetState).toBe("valid");
     expect(outline.getAttribute("stroke")).toBe("#9ef8ff");
+    expect(outline.getAttribute("stroke-dasharray")).toBeNull();
   });
 
-  it("renders Fire action targets with a red cue", () => {
+  it("renders ability action targets with distinct shape cues", () => {
     const mount = document.createElement("div");
     const controller = createGroundCellHighlightController({ mount });
 
@@ -72,5 +74,65 @@ describe("createGroundCellHighlightController", () => {
 
     expect(layer.dataset.groundCellTargetState).toBe("fire");
     expect(outline.getAttribute("stroke")).toBe("#ff5a36");
+    expect(outline.getAttribute("stroke-dasharray")).toBe("4 3");
+
+    controller.show({
+      groundCell: createGroundCell({ highlightAbilityId: "leafage" })
+    });
+    controller.update(createCamera(), 320, 180);
+
+    expect(layer.dataset.groundCellTargetState).toBe("leafage");
+    expect(outline.getAttribute("stroke")).toBe("#7effa5");
+    expect(outline.getAttribute("stroke-dasharray")).toBe("2 5");
+  });
+
+  it("reuses marked cell polygons instead of recreating them", () => {
+    const mount = document.createElement("div");
+    const controller = createGroundCellHighlightController({ mount });
+
+    controller.show({
+      markedGroundCells: [
+        createGroundCell({ offset: [0, 0, 0] }),
+        createGroundCell({ offset: [1, 0, 0] })
+      ]
+    });
+    controller.update(createCamera(), 320, 180);
+
+    const initialPolygons = Array.from(mount.querySelectorAll("svg > g > polygon"));
+    expect(initialPolygons).toHaveLength(4);
+
+    controller.show({
+      markedGroundCells: [
+        createGroundCell({ offset: [2, 0, 0] })
+      ]
+    });
+    controller.update(createCamera(), 320, 180);
+
+    const reusedPolygons = Array.from(mount.querySelectorAll("svg > g > polygon"));
+    expect(reusedPolygons).toHaveLength(4);
+    expect(reusedPolygons[0]).toBe(initialPolygons[0]);
+    expect(reusedPolygons[1]).toBe(initialPolygons[1]);
+    expect(reusedPolygons[2].getAttribute("display")).toBe("none");
+    expect(reusedPolygons[3].getAttribute("display")).toBe("none");
+  });
+
+  it("creates marked cell polygons from shared SVG prototypes", () => {
+    const mount = document.createElement("div");
+    const controller = createGroundCellHighlightController({ mount });
+
+    controller.show({
+      markedGroundCells: [
+        createGroundCell({ offset: [0, 0, 0] })
+      ]
+    });
+    controller.update(createCamera(), 320, 180);
+
+    const [fillPolygon, outlinePolygon] = mount.querySelectorAll("svg > g > polygon");
+    expect(fillPolygon.getAttribute("stroke-width")).toBe("5");
+    expect(fillPolygon.getAttribute("stroke-linejoin")).toBe("round");
+    expect(fillPolygon.getAttribute("vector-effect")).toBe("non-scaling-stroke");
+    expect(outlinePolygon.getAttribute("stroke-width")).toBe("2");
+    expect(outlinePolygon.getAttribute("stroke-linejoin")).toBe("round");
+    expect(outlinePolygon.getAttribute("vector-effect")).toBe("non-scaling-stroke");
   });
 });

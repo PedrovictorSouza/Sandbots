@@ -1,3 +1,5 @@
+import { toLegacyWorldPrompt } from "./worldPromptState.ts";
+
 function createFrameSnapshot() {
   return {
     hud: {
@@ -6,6 +8,7 @@ function createFrameSnapshot() {
       inventory: null,
       playerPosition: null,
       promptCopy: "",
+      inputModalityState: null,
       statusMessage: ""
     },
     worldSpeech: {
@@ -14,6 +17,7 @@ function createFrameSnapshot() {
       worldPosition: null
     },
     worldPrompt: {
+      state: null,
       visible: false,
       text: "",
       worldPosition: null
@@ -40,6 +44,7 @@ function createFrameSnapshot() {
       viewProjection: null,
       sceneObjects: null,
       skyTexture: null,
+      psxDistanceFog: null,
       grassBillboards: [],
       flowerBillboards: [],
       worldMarkers: null,
@@ -62,6 +67,7 @@ function resetFrameSnapshot(snapshot) {
   snapshot.hud.inventory = null;
   snapshot.hud.playerPosition = null;
   snapshot.hud.promptCopy = "";
+  snapshot.hud.inputModalityState = null;
   snapshot.hud.statusMessage = "";
 
   snapshot.worldSpeech.visible = false;
@@ -71,6 +77,7 @@ function resetFrameSnapshot(snapshot) {
   snapshot.worldPrompt.visible = false;
   snapshot.worldPrompt.text = "";
   snapshot.worldPrompt.worldPosition = null;
+  snapshot.worldPrompt.state = null;
 
   snapshot.taskPop.visible = false;
   snapshot.taskPop.text = "";
@@ -90,6 +97,7 @@ function resetFrameSnapshot(snapshot) {
   snapshot.render.viewProjection = null;
   snapshot.render.sceneObjects = null;
   snapshot.render.skyTexture = null;
+  snapshot.render.psxDistanceFog = null;
   snapshot.render.grassBillboards.length = 0;
   snapshot.render.flowerBillboards.length = 0;
   snapshot.render.worldMarkers = null;
@@ -116,7 +124,15 @@ function commitHud(hudController, snapshot) {
     snapshot.hud.inventory,
     snapshot.hud.playerPosition || [0, 0, 0]
   );
-  hudController.syncHudInstructions(snapshot.hud.storyState, snapshot.hud.promptCopy);
+  if (snapshot.hud.inputModalityState) {
+    hudController.syncHudInstructions(
+      snapshot.hud.storyState,
+      snapshot.hud.promptCopy,
+      snapshot.hud.inputModalityState
+    );
+  } else {
+    hudController.syncHudInstructions(snapshot.hud.storyState, snapshot.hud.promptCopy);
+  }
   hudController.renderMissionCards(
     snapshot.hud.storyState,
     snapshot.hud.inventory,
@@ -148,28 +164,54 @@ function commitWorldSpeech(worldSpeechController, snapshot, previousSnapshot) {
   worldSpeechController.setWorldPosition(snapshot.worldSpeech.worldPosition);
 }
 
+function getLegacyWorldPromptFrame(worldPrompt) {
+  if (worldPrompt.state) {
+    return toLegacyWorldPrompt(worldPrompt.state);
+  }
+
+  return {
+    visible: Boolean(worldPrompt.visible),
+    text: worldPrompt.text || "",
+    worldPosition: worldPrompt.worldPosition || null
+  };
+}
+
+export function setFrameWorldPrompt(snapshot, promptState) {
+  const legacyPrompt = toLegacyWorldPrompt(promptState);
+
+  snapshot.worldPrompt.state = promptState;
+  snapshot.worldPrompt.visible = legacyPrompt.visible;
+  snapshot.worldPrompt.text = legacyPrompt.text;
+  snapshot.worldPrompt.worldPosition = legacyPrompt.worldPosition;
+
+  return snapshot.worldPrompt;
+}
+
 function commitWorldPrompt(worldSpeechController, snapshot, previousSnapshot) {
-  if (!snapshot.worldPrompt.visible) {
-    if (previousSnapshot.worldPrompt.visible) {
+  const worldPrompt = getLegacyWorldPromptFrame(snapshot.worldPrompt);
+  const previousWorldPrompt = getLegacyWorldPromptFrame(previousSnapshot.worldPrompt);
+
+  if (!worldPrompt.visible) {
+    if (previousWorldPrompt.visible) {
       worldSpeechController.hidePrompt?.();
     }
     return;
   }
 
   const needsShow =
-    !previousSnapshot.worldPrompt.visible ||
-    previousSnapshot.worldPrompt.text !== snapshot.worldPrompt.text;
+    !previousWorldPrompt.visible ||
+    previousWorldPrompt.text !== worldPrompt.text;
 
   if (needsShow) {
     worldSpeechController.showPrompt?.({
-      text: snapshot.worldPrompt.text,
-      worldPosition: snapshot.worldPrompt.worldPosition,
+      text: worldPrompt.text,
+      worldPosition: worldPrompt.worldPosition,
       anchorHeight: 1.95
     });
     return;
   }
 
-  worldSpeechController.setPromptWorldPosition?.(snapshot.worldPrompt.worldPosition);
+  worldSpeechController.setPromptWorldPosition?.(worldPrompt.worldPosition);
 }
 
 function commitTaskPop(worldSpeechController, snapshot, previousSnapshot) {
@@ -265,8 +307,18 @@ function commitRender(worldRenderer, snapshot) {
     return;
   }
 
+  const sceneOptions = render.psxDistanceFog ?
+    { psxDistanceFog: render.psxDistanceFog } :
+    null;
+
   if (render.skyTexture) {
-    worldRenderer.drawScene(viewProjection, render.sceneObjects || [], render.skyTexture);
+    if (sceneOptions) {
+      worldRenderer.drawScene(viewProjection, render.sceneObjects || [], render.skyTexture, sceneOptions);
+    } else {
+      worldRenderer.drawScene(viewProjection, render.sceneObjects || [], render.skyTexture);
+    }
+  } else if (sceneOptions) {
+    worldRenderer.drawScene(viewProjection, render.sceneObjects || [], null, sceneOptions);
   } else {
     worldRenderer.drawScene(viewProjection, render.sceneObjects || []);
   }
@@ -329,7 +381,7 @@ function commitProjectedOverlays({
     worldSpeechController.update(camera, mount.clientWidth, mount.clientHeight);
   }
 
-  if (snapshot.worldPrompt.visible) {
+  if (getLegacyWorldPromptFrame(snapshot.worldPrompt).visible) {
     worldSpeechController.updatePrompt?.(camera, mount.clientWidth, mount.clientHeight);
   }
 

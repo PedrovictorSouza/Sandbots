@@ -13,11 +13,11 @@ const INVENTORY_SLOT_ROLE_PRIORITY = Object.freeze({
 const INVENTORY_SLOT_ROLE_LABELS = Object.freeze({
   placeable: "Place",
   tool: "Tool",
-  recipe: "Recipe",
+  recipe: "Plan",
   material: "Mat",
   gift: "Gift",
   food: "Food",
-  currency: "Coins",
+  currency: "Legacy",
   key: "Key",
   other: "Item"
 });
@@ -68,6 +68,7 @@ export function getInventoryPresentationOrder(
       const role = getInventorySlotRole(item);
       return (
         (inventory[itemId] || 0) > 0 &&
+        item.hiddenFromInventory !== true &&
         !excludedItemIds?.has(itemId) &&
         !excludedRoles?.has(role) &&
         !FOLLOWER_SUPPLY_EXCLUDED_ITEM_IDS.has(itemId) &&

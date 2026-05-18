@@ -4,8 +4,8 @@ import {
   resolveTrainHouseMusicVolume
 } from "../app/runtime/gameLoop.js";
 
-describe("Train House runtime effects", () => {
-  it("raises music volume as the player approaches the Train House", () => {
+describe("Thermal Cabin runtime effects", () => {
+  it("raises music volume as the player approaches the Thermal Cabin", () => {
     const trainHousePosition = [4, 0, 4];
 
     const farVolume = resolveTrainHouseMusicVolume({
@@ -32,7 +32,7 @@ describe("Train House runtime effects", () => {
     expect(closeVolume).toBeGreaterThan(midVolume);
   });
 
-  it("dances the Train House without moving its ground pivot", () => {
+  it("dances the Thermal Cabin without moving its ground pivot", () => {
     const instance = {
       offset: [0, 0.02, 0],
       scale: 3,

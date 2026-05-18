@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { assertImmutableFirstQuest, IMMUTABLE_FIRST_QUEST } from "../app/quest/questFlowGuards.js";
+import {
+  assertImmutableFirstQuest,
+  assertReachableQuestFlow,
+  getQuestFlowReachability,
+  IMMUTABLE_FIRST_QUEST
+} from "../app/quest/questFlowGuards.js";
 import { QUEST_EVENT, QUEST_STATUS, SMALL_ISLAND_QUESTS } from "../app/quest/questData.js";
 
 function cloneQuests() {
@@ -22,6 +27,7 @@ describe("questFlowGuards", () => {
       required: 1
     });
     expect(() => assertImmutableFirstQuest(SMALL_ISLAND_QUESTS)).not.toThrow();
+    expect(() => assertReachableQuestFlow(SMALL_ISLAND_QUESTS)).not.toThrow();
   });
 
   it("fails if any quest is moved before the movement task", () => {
@@ -49,6 +55,45 @@ describe("questFlowGuards", () => {
 
     expect(() => assertImmutableFirstQuest(quests)).toThrow(
       "learn-to-move must require moving the player exactly once."
+    );
+  });
+
+  it("keeps the converted errand quest reachable in the main quest chain", () => {
+    const reachability = getQuestFlowReachability(SMALL_ISLAND_QUESTS);
+
+    expect(reachability.reachableQuestIds).toEqual(expect.arrayContaining([
+      "learn-to-move",
+      "wake-guide",
+      "gather-first-supplies",
+      "water-dry-grass"
+    ]));
+    expect(reachability.detachedQuestIds).toEqual(expect.arrayContaining([
+      "shape-a-living-patch",
+      "record-a-memory",
+      "open-the-water-route"
+    ]));
+    expect(reachability.unreachableQuestIds).toEqual([]);
+  });
+
+  it("fails if a quest is orphaned without an explicit detached marker", () => {
+    const quests = cloneQuests();
+    const legacyQuest = quests.find((quest) => quest.id === "shape-a-living-patch");
+    delete legacyQuest.detached;
+
+    expect(() => assertReachableQuestFlow(quests)).toThrow(
+      "Unreachable quest(s) must be connected or marked detached: shape-a-living-patch"
+    );
+  });
+
+  it("fails if a quest points to a missing next quest", () => {
+    const quests = cloneQuests();
+    quests[1] = {
+      ...quests[1],
+      nextQuestId: "missing-quest"
+    };
+
+    expect(() => assertReachableQuestFlow(quests)).toThrow(
+      "Quest flow points to missing quest(s): wake-guide -> missing-quest."
     );
   });
 });

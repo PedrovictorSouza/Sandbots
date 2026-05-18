@@ -1,6 +1,6 @@
-# Small Island Game Design Principles
+# Sandbots Game Design Principles
 
-This document collects design principles for Small Island. It is a working reference for future tasks, not a fixed specification.
+This document collects design principles for Sandbots. It is a working reference for future tasks, not a fixed specification.
 
 ## How To Use This Document
 
@@ -12,7 +12,7 @@ This document collects design principles for Small Island. It is a working refer
 
 ## Current Direction
 
-Small Island is a cozy reconstruction game with light adventure structure. The player restores an island after a crash, guided by Chopper and companion robots.
+Sandbots is a cozy reconstruction game with light adventure structure. Helper bots restore a small devastated planet so it can support a future human colony.
 
 The game should feel practical, reactive, and playful:
 
@@ -21,6 +21,30 @@ The game should feel practical, reactive, and playful:
 - Robots have clear identities tied to abilities.
 - Important inputs should produce a response.
 - Progress should feel additive, not punitive.
+
+## Concept Lighthouse
+
+The core concept should stay visible throughout development: **bots restoring a damaged tiny planet for future humans**. Features can change, names can improve, and individual systems can be rebuilt, but the project should not drift away from repair, care, viability, helper bots, and colony preparation.
+
+Implementation rules:
+
+- Before adding a feature, ask how it supports planetary restoration or bot-led colony work.
+- Prefer improving the core loop over adding disconnected novelty.
+- When a borrowed reference enters the project, translate it into Sandbots language and mechanics.
+- Cut or defer work that does not strengthen restoration, building, exploration, bot identity, or colony readiness.
+- Treat this concept as the project lighthouse during long development, especially when fatigue makes every direction look equally valid.
+
+Good fit:
+
+- A bot ability that changes the terrain and teaches what the planet needs.
+- A colony protocol that unlocks construction after viability improves.
+- A UI line that frames inventory, controls, or quests as damaged colony systems coming back online.
+
+Poor fit:
+
+- Currency/shop loops that imply a functioning civilization.
+- Creature collection language that makes the bots feel like pets instead of workers.
+- Random content that adds noise without supporting restoration or colony preparation.
 
 ## 1. Tutorial In The World
 
@@ -36,8 +60,8 @@ Implementation rules:
 
 Examples:
 
-- Water Gun should have a clear dry tile or dead plant target.
-- Leafage should mark valid restored ground before use.
+- Hydro Jet should have a clear dry tile or dead plant target.
+- Bio-Grow should mark valid restored ground before use.
 - Workbench should be introduced through an immediate recipe/action.
 
 ## 2. Input Must Respond
@@ -112,14 +136,34 @@ Ability template:
 
 Current examples:
 
-- Water Gun: restores dry ground, but requires marking a target and waiting for Squirtle.
-- Leafage: creates tall grass, but only on valid restored ground.
+- Hydro Jet: restores dry ground, but requires marking a target and waiting for Hydro Bot.
+- Bio-Grow: creates tall grass, but only on valid restored ground.
 - Workbench crafting: creates useful objects, but requires materials and recipes.
 
 Design rule:
 
 - Do not create an ability that solves every nearby problem without choice.
 - Early risk should be low; mastery and constraints can grow later.
+
+## 5.1. Restorative Work Can Be Fun Without Risk
+
+Risk and return are useful, but they are not the only source of game feel. Sandbots can also be satisfying through calm, repeated work: cleaning, repairing, scanning, planting, sorting, powering, and watching a damaged place become usable again.
+
+Implementation rules:
+
+- Give repeated work a concrete real-world motif: repair a generator, wash dust off solar panels, clear dead brush, rebuild soil, route water, calibrate a habitat.
+- Make the end state readable before or during the work so the player can imagine what "done" looks like.
+- Replace money with useful yield: viability logged, power restored, water routed, soil stabilized, materials recovered, robot efficiency improved, habitat readiness increased.
+- Preserve the loop: work in the world -> get useful output -> unlock a tool, bot help, shortcut, or cleaner workflow -> do the next work with less friction.
+- Let low-risk tasks be tactile and quiet, but not empty. Every repeated action should show progress through sound, animation, changed ground, filled meters, bot comments, or object cleanup.
+- If a loop has no hard ending, make the next horizon far but legible: better tools, wider radius, faster helpers, new terrain response, or visible colony readiness.
+- Avoid turning calm work into busywork. If the task does not change the world, improve a tool, reveal information, or say something about the colony, cut or compress it.
+
+Sandbots examples:
+
+- Clearing dry brush should not only remove obstacles; it can reveal soil health, recover material, and make the planet look less abandoned.
+- Solar Station maintenance can become satisfying if dust, charge, light, and nearby habitat power visibly improve.
+- Helper bot upgrades should reduce repeated labor in a visible way: wider watering arc, faster scan, longer carry range, better cleanup radius.
 
 ## 6. Friendly Difficulty
 
@@ -175,6 +219,14 @@ Implementation rules:
 - Cosmetic particles can be random.
 - Resource variation can be light, but not required for progression.
 - Prefer seeded or bounded randomness for repeatable testing.
+- Inject random sources for effects that need tests or stable replay.
+- Never let luck decide whether a required tutorial or quest can complete.
+
+Small Island examples:
+
+- Restoration sparks may vary, but the restored tile itself must be deterministic.
+- A snowstorm can use seeded particles so it feels alive while remaining testable.
+- Resource spawns near the base should be authored or bounded, not pure luck.
 
 ## 10. Progress Should Feel Additive
 
@@ -202,6 +254,24 @@ Potential future metrics:
 - Robots awakened.
 - Homes built.
 - Plants revived.
+
+## 10.1. Care Economy / Planetary Viability
+
+Sandbots should not use money, shops, prices, or currency as the main progression language. The world is devastated, there is no local civilization, and the bots are there to restore conditions for a future human colony.
+
+Implementation rules:
+
+- Treat progress as planetary viability, not purchasing power.
+- The Colony Terminal validates restoration reports and unlocks protocols.
+- Rewards should feel like authorization, diagnostics, tools, materials, or construction readiness.
+- If legacy currency data exists in saves, keep it compatible but hidden from the player-facing flow.
+- Use material logistics for crafting, but avoid shop framing for required story progression.
+
+Example:
+
+- Completing a habitat check logs viability and authorizes a House Kit.
+- The House Kit is issued by colony protocol, not bought.
+- Materials are still gathered because construction needs matter, not because bots are trading.
 
 ## 11. Rewards Without Humiliation
 
@@ -236,8 +306,8 @@ Mechanics should match the identity of the robot or character that grants them.
 
 Implementation rules:
 
-- Squirtle / Robot-1 should feel tied to water and restoration.
-- Bulbasaur / Robot-2 should feel tied to plants and habitats.
+- Hydro Bot / Robot-1 should feel tied to water and restoration.
+- Grow Bot / Robot-2 should feel tied to plants and habitats.
 - Chopper should remain guide, comic relief, and technical mentor.
 - Future robots should have a clear material, verb, and personality.
 
@@ -281,8 +351,8 @@ Small Island examples:
 
 - Ship crash smoke should be large, dark, and persistent.
 - Impact dust should rise around the crashed module and fade/rotate out.
-- Water Gun particles can use billboards and staggered timing.
-- Leafage growth should have plant-scale particles, not explosion-scale particles.
+- Hydro Jet particles can use billboards and staggered timing.
+- Bio-Grow growth should have plant-scale particles, not explosion-scale particles.
 - Workbench/crafting feedback should be small but satisfying.
 
 ## 16. Trails And Impact Readability
@@ -292,15 +362,15 @@ Fast motion often needs a trail or flash to read well. Without it, the player ma
 Implementation rules:
 
 - Fast abilities can use short-lived trails, arcs, or afterimages.
-- Trails should match the identity of the ability: water arcs for Water Gun, leaf/green streaks for Leafage, sparks for metal/repair.
+- Trails should match the identity of the ability: water arcs for Hydro Jet, leaf/green streaks for Bio-Grow, sparks for metal/repair.
 - For very fast actions, a single billboard/quad flash can work better than trying to show every frame of motion.
 - Trails should not obscure the player or target.
 - Effects should be tuned with the camera distance used in actual gameplay.
 
 Potential tasks:
 
-- Water Gun spray arc polish.
-- Leafage cast trail/leaf burst.
+- Hydro Jet spray arc polish.
+- Bio-Grow cast trail/leaf burst.
 - Future Cut ability slash trail.
 - Crafting/repair spark burst.
 
@@ -381,7 +451,7 @@ Implementation rules:
 
 Examples:
 
-- Leafage should teach a valid tile first, then allow player choice on restored ground.
+- Bio-Grow should teach a valid tile first, then allow player choice on restored ground.
 - Habitat composition can require categories, but should allow flexible layout.
 - Workbench recipes can be fixed, while placed objects can be player-directed.
 
@@ -395,7 +465,7 @@ Implementation rules:
 - If something is strong, adjust cost, range, timing, setup, or recovery before removing its personality.
 - Prefer complementary abilities over universal abilities.
 - Let one robot solve problems another cannot.
-- Make synergies visible: Water Gun restores, Leafage grows, future Cut harvests or clears.
+- Make synergies visible: Hydro Jet restores, Bio-Grow grows, future Cut harvests or clears.
 
 Ability balancing levers:
 
@@ -540,7 +610,7 @@ Possible Small Island metrics:
 - Robots awakened.
 - Homes or stations built.
 - Pollution/dryness reduced.
-- Pokemon gathered or supported.
+- Bots gathered or supported.
 
 ## 29. Peaky Characters And Special Rules
 
@@ -556,8 +626,8 @@ Implementation rules:
 
 Examples:
 
-- Squirtle / Robot-1: restores dry ground and damaged plants through water.
-- Bulbasaur / Robot-2: grows plant life and habitat structure.
+- Hydro Bot / Robot-1: restores dry ground and damaged plants through water.
+- Grow Bot / Robot-2: grows plant life and habitat structure.
 - Chopper: guide, technician, comic narrator, and early-game anchor.
 
 ## 30. Color And Readability Accessibility
@@ -653,7 +723,7 @@ Implementation rules:
 
 Small Island examples:
 
-- First movement, first interaction, first Water Gun use, and first Leafage use should be generous.
+- First movement, first interaction, first Hydro Jet use, and first Bio-Grow use should be generous.
 - NPC prompts should appear for all dialogue-capable characters, not only Chopper.
 - Player input near valid targets should produce action or useful feedback.
 
@@ -710,8 +780,8 @@ Implementation rules:
 
 Small Island examples:
 
-- Water Gun first teaches marking dry ground, then later can ask for better tile choice.
-- Leafage first teaches valid restored ground, then later can support habitat planning.
+- Hydro Jet first teaches marking dry ground, then later can ask for better tile choice.
+- Bio-Grow first teaches valid restored ground, then later can support habitat planning.
 - Workbench first teaches one recipe, then later can expand into recipe choice.
 - Robot helpers can perform the complex part while the player learns the intent.
 
@@ -810,6 +880,60 @@ Small Island examples:
 - New robots should plug into existing ability/HUD/dialogue patterns, but still receive distinct behavior.
 - Future content plans should be tracked as backlog seeds until implementation is intentionally selected.
 
+## 43. Errands Need a Reason to Exist
+
+Collection, delivery, repair, scan, and activation tasks are allowed, but they must not feel like empty travel. A small errand should still create curiosity, show progress, and leave the world changed.
+
+Implementation rules:
+
+- Give every errand a hook: a contradiction, risk, joke, mystery, or useful promise.
+- Include at least three anti-busywork elements: visible reward, micro-event, player choice, fast resolution, or narrative hook.
+- Prefer radio completion, shortcut unlocks, fade returns, or immediate next beats over forcing a walk back through cleared space.
+- Let the Pokedesk, Chopper, helper bots, sound, inventory flyouts, or environmental reactions carry micro-rewards during the route.
+- Validate errand data in development so weak fetch quests warn before they become content debt.
+
+Small Island examples:
+
+- "Wake Up Hydro" completes when Hydro Jet is received; any warm wood/charge scan is setup flavor, not the completion condition.
+- A safe approach can scan deposits first; a fast approach can collect immediately and let Chopper interpret the odd readings.
+- Completion should show a base/system result and tease the next question instead of asking for a dead return trip.
+
+## 44. Every Line Must Work
+
+Games have fewer words per minute than film, television, or books because the player spends most of the time acting. Every prompt, bark, menu label, objective, and traversal line should either teach the action, reveal the world, show character, clarify relationships, move the plot, or be strong enough as a joke or image to justify itself.
+
+Implementation rules:
+
+- Avoid throwaway lines that only fill silence.
+- Instructional text should do double duty whenever possible.
+- Prompts can name the fiction of the system, not only the input.
+- Traversal dialogue should use the player's attention to reveal character or world state.
+- UI copy should reinforce Sandbots: helper bots, damaged colony systems, care, repair, viability, and planetary restoration.
+
+Small Island examples:
+
+- "Colony log online. LB/RB tabs" is better than a bare "LB/RB Tabs" because the menu becomes part of the world.
+- "Rewire the pilot console" gives the Controls tab a fiction, while still explaining remapping.
+- A placement notice should prefer "House Kit needs Solar Station power" over a generic "Blocked."
+
+## 45. Camera Target Is Not The Character
+
+The camera's look target should be treated as a design tool, not a point glued to the player. A character can remain centered horizontally while jumps, slopes, drifts, or action beats use reduced vertical tracking, lead, or offset to make motion readable.
+
+Implementation rules:
+
+- Do not blindly attach camera target Y to character Y.
+- Use reduced vertical follow when height should be felt.
+- Keep horizontal lead when it helps the player see where they are moving.
+- Preserve explicit camera poses for dialogue, cutaways, and scripted focus.
+- Test camera feel from the actual gameplay stage with HUD visible.
+
+Small Island examples:
+
+- Gameplay follow can track only part of the player's vertical offset so jumps or slopes read as motion.
+- Ability targets should remain visible ahead of the bot/player instead of hiding under a perfectly centered character.
+- Dialogue camera focus can still use exact scripted targets because it serves a different purpose.
+
 ## Current Priority List
 
 1. Finish input response polish.
@@ -817,7 +941,7 @@ Small Island examples:
 3. Improve attention without minimap.
 4. Add assistance without humiliation for wrong/early inputs.
 5. Add more satisfying world feedback for restoration/building.
-6. Audit effect scale for crash, Water Gun, Leafage, crafting, and habitat completion.
+6. Audit effect scale for crash, Hydro Jet, Bio-Grow, crafting, and habitat completion.
 7. Add safe motion variation to existing effects.
 8. Add readability checks for tile states, ability targets, and quest completion.
 9. Review opening pacing and cinematic skip behavior.
@@ -836,8 +960,8 @@ Small Island examples:
 - Interaction range regression tests.
 - Billboard particle helper for smoke/dust/spark effects.
 - Effect scale audit for world objects.
-- Water Gun spray arc polish.
-- Leafage trail and growth burst.
+- Hydro Jet spray arc polish.
+- Bio-Grow trail and growth burst.
 - Object-local flash helper for success/state changes.
 - Ability balance table with strengths, weaknesses, and synergy.
 - Optional challenge reward rules.

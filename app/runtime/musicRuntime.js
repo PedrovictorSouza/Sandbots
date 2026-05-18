@@ -22,6 +22,15 @@ function clampVolume(value) {
   return Math.max(0, Math.min(1, numericValue));
 }
 
+function clampRandomUnit(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(1, numericValue));
+}
+
 function createDefaultAudio(src) {
   if (typeof Audio !== "function") {
     return null;
@@ -160,8 +169,9 @@ export function createMusicRuntime({
       return null;
     }
 
-    const randomValue = typeof random === "function" ? Number(random()) : Math.random();
-    const safeRandomValue = Number.isFinite(randomValue) ? randomValue : 0;
+    const safeRandomValue = clampRandomUnit(
+      typeof random === "function" ? random() : Math.random()
+    );
     const index = Math.max(
       0,
       Math.min(

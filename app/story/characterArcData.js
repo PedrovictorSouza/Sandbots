@@ -44,12 +44,12 @@ export const SMALL_ISLAND_CHARACTER_ARCS = deepFreeze([
   },
   {
     id: CHARACTER_ARC_IDS.AUNTY,
-    targetName: "Aunty",
+    targetName: "Core Keeper Bot",
     macroBiomeId: MACRO_BIOME_IDS.ASH_WILDS,
     required: true,
-    role: "Hearth keeper.",
-    progressionContribution: "Anchors home, crafting, comfort and first hub repair.",
-    completionPayoff: "Turns the repaired starting hub into emotional proof of recovery."
+    role: "Habitat core keeper.",
+    progressionContribution: "Anchors the first safe work loop, construction protocols and hub repair.",
+    completionPayoff: "Turns the repaired starting hub into proof that humans could survive there."
   },
   {
     id: CHARACTER_ARC_IDS.SPRIG,

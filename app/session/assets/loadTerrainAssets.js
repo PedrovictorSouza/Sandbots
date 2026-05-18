@@ -4,6 +4,9 @@ import {
   loadTexturedModel
 } from "../../../rendering/worldAssets.js";
 
+import { fetchModelAssetDefinition } from "./modelAssetApi.ts";
+
+
 const WORKBENCH_MODEL_GLTF_PATH = new URL("../../buildings/workbench/workbench.gltf", import.meta.url).href;
 const WORKBENCH_MODEL_BIN_PATH = new URL("../../buildings/workbench/workbench.bin", import.meta.url).href;
 const WORKBENCH_MODEL_TEXTURE_PATH = new URL("../../buildings/workbench/workbench.png", import.meta.url).href;
@@ -142,6 +145,9 @@ function createCloudShadowModel(gl) {
 }
 
 export async function loadTerrainAssets({ gl, setStatus }) {
+
+  const tallGrassAsset = await fetchModelAssetDefinition("tall-grass");
+
   const [
     groundDeadModel,
     groundPurifiedModel,
@@ -198,10 +204,10 @@ export async function loadTerrainAssets({ gl, setStatus }) {
     }),
     loadTexturedModel({
       gl,
-      gltfPath: "./Trees/tall-grass/tall-grass.gltf",
-      binPath: "./Trees/tall-grass/tall-grass.bin",
-      texturePath: "./Trees/tall-grass/tall-grass.png",
-      normalizedSize: 1.34,
+      gltfPath: tallGrassAsset.gltfPath,
+      binPath: tallGrassAsset.binPath,
+      texturePath: tallGrassAsset.texturePath,
+      normalizedSize: tallGrassAsset.normalizedSize,
       onStatus: setStatus
     }),
     loadTexturedModel({

@@ -37,7 +37,8 @@ describe("createGuidePanel integration", () => {
     createGuidePanel({ root, onClose, onTrackRecipe });
 
     click(root.querySelector('[data-guide-view="database"]'));
-    expect(root.querySelector("#guide-title")?.textContent).toBe("Unified Recipe Index");
+    expect(root.querySelector("#guide-title")?.textContent).toBe("Unified Plan Index");
+    expect(root.querySelector('[data-guide-filter="crafting"]')?.textContent).toBe("Plans");
 
     click(root.querySelector('[data-guide-filter="cooking"]'));
     typeInto(root.querySelector("#guide-search-input"), "roasted chanterelle");
@@ -55,7 +56,7 @@ describe("createGuidePanel integration", () => {
       })
     );
     expect(root.querySelector("#guide-pinned strong")?.textContent).toBe("Roasted Chanterelle");
-    expect(root.querySelector('[data-track-recipe="roasted-chanterelle"]')?.textContent).toContain("Remover do HUD");
+    expect(root.querySelector('[data-track-recipe="roasted-chanterelle"]')?.textContent).toContain("Remove from HUD");
 
     click(root.querySelector('[data-track-recipe="roasted-chanterelle"]'));
     expect(onTrackRecipe).toHaveBeenLastCalledWith(null);
@@ -68,17 +69,21 @@ describe("createGuidePanel integration", () => {
     click(root.querySelector('[data-guide-view="articles"]'));
     expect(root.querySelector("#guide-title")?.textContent).toBe("Walkthroughs & Survival Reads");
     expect(root.querySelector(".detail-title")?.textContent).toBe(
-      "Winter Burrow Walkthrough - Complete Story Guide & Key Quests"
+      "Sandbots Walkthrough - Complete Story Guide & Key Quests"
     );
+    expect(root.textContent).toContain("Core Keeper Bot");
+    expect(root.textContent).toContain("Route Survey Bot");
+    expect(root.textContent).not.toContain("Aunty");
+    expect(root.textContent).not.toContain("Bufo");
 
     click(root.querySelector('[data-toolkit-action-type="guide"][data-toolkit-action-target="expedition-planner"]'));
-    expect(root.querySelector("#guide-title")?.textContent).toBe("Winter Burrow Guides");
+    expect(root.querySelector("#guide-title")?.textContent).toBe("Sandbots Guides");
     expect(root.querySelector(".detail-title")?.textContent).toBe("Optimal Expedition Planner");
 
     click(root.querySelector('[data-toolkit-action-type="article"][data-toolkit-action-target="complete-story-guide"]'));
     expect(root.querySelector("#guide-title")?.textContent).toBe("Walkthroughs & Survival Reads");
     expect(root.querySelector(".detail-title")?.textContent).toBe(
-      "Winter Burrow Walkthrough - Complete Story Guide & Key Quests"
+      "Sandbots Walkthrough - Complete Story Guide & Key Quests"
     );
   });
 });

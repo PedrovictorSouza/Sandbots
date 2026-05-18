@@ -3,6 +3,20 @@ const SPARK_DURATION = 0.9;
 const SPARK_EMIT_INTERVAL = 0.055;
 const MAX_SPARKS_PER_EFFECT = 42;
 
+function clamp01(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(1, numericValue));
+}
+
+function resolveRandom(random) {
+  const nextRandom = typeof random === "function" ? random : Math.random;
+  return () => clamp01(nextRandom());
+}
+
 function easeOutBack(value) {
   const clamped = Math.max(0, Math.min(1, value));
   const c1 = 1.70158;
@@ -10,29 +24,31 @@ function easeOutBack(value) {
   return 1 + c3 * Math.pow(clamped - 1, 3) + c1 * Math.pow(clamped - 1, 2);
 }
 
-function createSpark(position, radius) {
-  const angle = Math.random() * Math.PI * 2;
-  const distance = radius * (0.18 + Math.random() * 0.72);
+function createSpark(position, radius, random = Math.random) {
+  const nextRandom = resolveRandom(random);
+  const angle = nextRandom() * Math.PI * 2;
+  const distance = radius * (0.18 + nextRandom() * 0.72);
 
   return {
     age: 0,
-    duration: SPARK_DURATION * (0.75 + Math.random() * 0.35),
+    duration: SPARK_DURATION * (0.75 + nextRandom() * 0.35),
     position: [
       position[0] + Math.cos(angle) * distance,
-      position[1] + 0.08 + Math.random() * 0.1,
+      position[1] + 0.08 + nextRandom() * 0.1,
       position[2] + Math.sin(angle) * distance
     ],
     drift: [
       Math.cos(angle) * 0.08,
-      0.48 + Math.random() * 0.26,
+      0.48 + nextRandom() * 0.26,
       Math.sin(angle) * 0.08
     ],
-    size: 0.12 + Math.random() * 0.08
+    size: 0.12 + nextRandom() * 0.08
   };
 }
 
-export function createNatureRevivalEffectState() {
+export function createNatureRevivalEffectState({ random = Math.random } = {}) {
   return {
+    random: resolveRandom(random),
     effects: []
   };
 }
@@ -41,7 +57,8 @@ export function startNatureRevivalEffect(effectState, {
   patch,
   type = "grass",
   maxSparks = MAX_SPARKS_PER_EFFECT,
-  emitInterval = SPARK_EMIT_INTERVAL
+  emitInterval = SPARK_EMIT_INTERVAL,
+  scalePulse = 1
 } = {}) {
   if (!effectState || !patch) {
     return;
@@ -57,6 +74,7 @@ export function startNatureRevivalEffect(effectState, {
     duration: REVIVAL_DURATION,
     maxSparks,
     emitInterval,
+    scalePulse: Math.max(1, Number(scalePulse) || 1),
     radius,
     position: [...patch.position],
     sparks: []
@@ -93,7 +111,7 @@ export function updateNatureRevivalEffects(effectState, deltaTime = 0) {
 
       while (effect.emitTimer >= effectEmitInterval && effect.sparks.length < effectMaxSparks) {
         effect.emitTimer -= effectEmitInterval;
-        effect.sparks.push(createSpark(effect.position, effect.radius));
+        effect.sparks.push(createSpark(effect.position, effect.radius, effectState.random));
       }
     }
 
@@ -110,7 +128,10 @@ export function getNatureRevivalScale(effectState, patchId) {
     return 1;
   }
 
-  return Math.max(0.08, easeOutBack(effect.age / effect.duration));
+  const progress = Math.min(1, Math.max(0, effect.age / effect.duration));
+  const impactPulse = 1 + ((effect.scalePulse || 1) - 1) * (1 - progress);
+
+  return Math.max(0.08, easeOutBack(progress) * impactPulse);
 }
 
 export function getNatureRevivalBillboards(effectState, texture, uvRect = [0, 0, 1, 1]) {

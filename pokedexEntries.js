@@ -1,9 +1,15 @@
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES
+} from "./app/story/sandbotsLexicon.js";
+
 export const SQUIRTLE_POKEDEX_ENTRY_ID = "squirtle";
 export const BULBASAUR_POKEDEX_ENTRY_ID = "bulbasaur";
 export const CHARMANDER_POKEDEX_ENTRY_ID = "charmander";
 export const TIMBURR_POKEDEX_ENTRY_ID = "timburr";
 export const FLOWER_BED_POKEDEX_ENTRY_ID = "prettyFlowerBed";
 export const TALL_GRASS_POKEDEX_ENTRY_ID = "tallGrass";
+export const THERMAL_GENERATOR_POKEDEX_ENTRY_ID = "thermalGeneratorDiagnostic";
 
 function createPokedexToken(label, variant, glyph) {
   return `<span class="pokedex-entry__where-token pokedex-entry__where-token--${variant}" aria-label="${label}" title="${label}">${glyph}</span>`;
@@ -32,19 +38,19 @@ function createTallGrassWherePreview() {
 export const POKEDEX_ENTRIES = {
   [SQUIRTLE_POKEDEX_ENTRY_ID]: {
     id: SQUIRTLE_POKEDEX_ENTRY_ID,
-    number: "No. 007",
-    name: "Squirtle",
-    theme: "water",
-    artVariant: "squirtle",
-    details: {
-      eyebrow: "Details",
-      species: "Tiny Turtle Pokemon",
-      descriptionHtml:
-        "Shoots water at prey while in the water. Withdraws into its shell when in danger.",
+    number: "Bot H-01",
+    name: SANDBOTS_BOT_NAMES.hydro,
+      theme: "water",
+      artVariant: "squirtle",
+      details: {
+        eyebrow: "Details",
+        species: "Hydro Utility Bot",
+        descriptionHtml:
+        `Compact field helper calibrated for ${SANDBOTS_ITEM_NAMES.hydroTool} pressure, tree revival, and emergency hydration work.`,
       stats: [
-        { label: "Height", value: "1'8\"" },
-        { label: "Weight", value: "19.8 lbs." },
-        { label: "Type", badgeIcon: "\u{1F4A7}", badgeLabel: "Water" }
+        { label: "Build", value: "Compact" },
+        { label: "Mass", value: "Light" },
+        { label: "Role", badgeIcon: "\u{1F4A7}", badgeLabel: "Hydro" }
       ]
     },
     whereToFind: {
@@ -58,18 +64,18 @@ export const POKEDEX_ENTRIES = {
       ]
     },
     specialties: {
-      eyebrow: "Specialties & Likes",
-      specialtyTitle: "Specialties",
+      eyebrow: "Functions & Care",
+      specialtyTitle: "Function",
       specialtyIcon: "\u{1F4A7}",
-      specialtyLabel: "Water",
-      favoritesTitle: "Favorites",
+      specialtyLabel: "Hydro recovery",
+      favoritesTitle: "Care Notes",
       favorites: [
-        "Lots of water",
-        "Cleanliness",
-        "Healing",
-        "Cute stuff",
-        "Group activities",
-        "Sweet flavors"
+        "Clean tanks",
+        "Clear channels",
+        "Hydrated soil",
+        "Light maintenance",
+        "Group routines",
+        "Low grit intake"
       ],
       habitatTitle: "Ideal Habitat",
       habitatCopy: "Humid"
@@ -83,19 +89,19 @@ export const POKEDEX_ENTRIES = {
   },
   [BULBASAUR_POKEDEX_ENTRY_ID]: {
     id: BULBASAUR_POKEDEX_ENTRY_ID,
-    number: "No. 001",
-    name: "Bulbasaur",
+    number: "Bot G-01",
+    name: SANDBOTS_BOT_NAMES.grow,
     theme: "forest",
     artVariant: "bulbasaur",
     details: {
       eyebrow: "Details",
-      species: "Seed Pokemon",
+      species: "Bio-Growth Utility Bot",
       descriptionHtml:
-        "It carries a seed on its back right from birth. As its body grows larger, the seed does too.",
+        `Maintains seed tanks, soil routines, and ${SANDBOTS_ITEM_NAMES.growTool} patterns for early habitat recovery.`,
       stats: [
-        { label: "Height", value: "2'4\"" },
-        { label: "Weight", value: "15.2 lbs." },
-        { label: "Type", badgeIcon: "\u273F", badgeLabel: "Grass / Poison" }
+        { label: "Build", value: "Field" },
+        { label: "Mass", value: "Medium" },
+        { label: "Role", badgeIcon: "\u273F", badgeLabel: "Growth" }
       ]
     },
     whereToFind: {
@@ -127,18 +133,18 @@ export const POKEDEX_ENTRIES = {
       ]
     },
     specialties: {
-      eyebrow: "Specialties & Likes",
-      specialtyTitle: "Specialties",
+      eyebrow: "Functions & Care",
+      specialtyTitle: "Function",
       specialtyIcon: "\uD83C\uDF31",
-      specialtyLabel: "Grow",
-      favoritesTitle: "Favorites",
+      specialtyLabel: "Habitat growth",
+      favoritesTitle: "Care Notes",
       favorites: [
-        "Lots of nature",
-        "Soft stuff",
-        "Cute stuff",
-        "Lots of water",
-        "Group activities",
-        "Sweet flavors"
+        "Restored soil",
+        "Soft ground",
+        "Seed trays",
+        "Steady water",
+        "Group routines",
+        "Morning light"
       ],
       habitatTitle: "Ideal Habitat",
       habitatCopy: "Bright"
@@ -152,19 +158,19 @@ export const POKEDEX_ENTRIES = {
   },
   [CHARMANDER_POKEDEX_ENTRY_ID]: {
     id: CHARMANDER_POKEDEX_ENTRY_ID,
-    number: "No. 004",
-    name: "Charmander",
+    number: "Bot T-01",
+    name: SANDBOTS_BOT_NAMES.thermal,
     theme: "ember",
     artVariant: "charmander",
-    details: {
-      eyebrow: "Details",
-      species: "Lizard Pokemon",
-      descriptionHtml:
-        "The flame on its tail shows the strength of its life-force. It helps bring warmth back to restored habitats.",
+      details: {
+        eyebrow: "Details",
+        species: "Thermal Utility Bot",
+        descriptionHtml:
+        "A recovered thermal helper that keeps small shelters warm and marks cold zones that still need power.",
       stats: [
-        { label: "Height", value: "2'0\"" },
-        { label: "Weight", value: "18.7 lbs." },
-        { label: "Type", badgeIcon: "\u{1F525}", badgeLabel: "Fire" }
+        { label: "Build", value: "Thermal" },
+        { label: "Mass", value: "Light" },
+        { label: "Role", badgeIcon: "\u{1F525}", badgeLabel: "Heat" }
       ]
     },
     whereToFind: {
@@ -179,16 +185,16 @@ export const POKEDEX_ENTRIES = {
       ]
     },
     specialties: {
-      eyebrow: "Specialties & Likes",
-      specialtyTitle: "Specialties",
+      eyebrow: "Functions & Care",
+      specialtyTitle: "Function",
       specialtyIcon: "\u{1F525}",
-      specialtyLabel: "Fire",
-      favoritesTitle: "Favorites",
+      specialtyLabel: "Shelter stability",
+      favoritesTitle: "Care Notes",
       favorites: [
-        "Campfires",
-        "Warm places",
+        "Thermal cabins",
+        "Warm shelters",
         "Fresh tall grass",
-        "Dry wood",
+        "Dry fuel",
         "Brave helpers",
         "Cozy habitats"
       ],
@@ -204,19 +210,19 @@ export const POKEDEX_ENTRIES = {
   },
   [TIMBURR_POKEDEX_ENTRY_ID]: {
     id: TIMBURR_POKEDEX_ENTRY_ID,
-    number: "No. 532",
-    name: "Timburr",
+    number: "Bot B-01",
+    name: SANDBOTS_BOT_NAMES.builder,
     theme: "stone",
     artVariant: "timburr",
-    details: {
-      eyebrow: "Details",
-      species: "Muscular Pokemon",
-      descriptionHtml:
-        "It loves sturdy places and trains by carrying heavy timber. Boulder shade and tall grass make it feel ready to help.",
+      details: {
+        eyebrow: "Details",
+        species: "Builder Utility Bot",
+        descriptionHtml:
+        "A heavy-materials helper. Boulder shade and tall grass make it steady enough to wake.",
       stats: [
-        { label: "Height", value: "2'0\"" },
-        { label: "Weight", value: "27.6 lbs." },
-        { label: "Type", badgeIcon: "\u25C6", badgeLabel: "Fighting" }
+        { label: "Build", value: "Carrier" },
+        { label: "Mass", value: "Heavy" },
+        { label: "Role", badgeIcon: "\u25C6", badgeLabel: "Build" }
       ]
     },
     whereToFind: {
@@ -231,11 +237,11 @@ export const POKEDEX_ENTRIES = {
       ]
     },
     specialties: {
-      eyebrow: "Specialties & Likes",
-      specialtyTitle: "Specialties",
+      eyebrow: "Functions & Care",
+      specialtyTitle: "Function",
       specialtyIcon: "\u25C6",
-      specialtyLabel: "Build",
-      favoritesTitle: "Favorites",
+      specialtyLabel: "Heavy construction",
+      favoritesTitle: "Care Notes",
       favorites: [
         "Boulders",
         "Tall grass",
@@ -282,11 +288,11 @@ export const POKEDEX_ENTRIES = {
       ]
     },
     specialties: {
-      eyebrow: "Specialties & Likes",
-      specialtyTitle: "Specialties",
+      eyebrow: "Habitat Notes",
+      specialtyTitle: "Function",
       specialtyIcon: "\u273F",
       specialtyLabel: "Bloom",
-      favoritesTitle: "Favors",
+      favoritesTitle: "Care Inputs",
       favorites: [
         "Purified soil",
         "Morning light",
@@ -319,7 +325,7 @@ export const POKEDEX_ENTRIES = {
       eyebrow: "Details",
       species: "Restored Habitat Plot",
       descriptionHtml:
-        "Four tufts of tall grass bunched together in a plot.<br />A perfect hiding place for small Pok\u00e9mon.",
+        "Four tufts of tall grass bunched together in a plot.<br />A useful shelter marker for small maintenance bots.",
       stats: [
         { label: "Patch Size", value: "4 tufts" },
         { label: "Rarity", value: "Common" },
@@ -337,11 +343,11 @@ export const POKEDEX_ENTRIES = {
       ]
     },
     specialties: {
-      eyebrow: "Specialties & Likes",
-      specialtyTitle: "Specialties",
+      eyebrow: "Habitat Notes",
+      specialtyTitle: "Function",
       specialtyIcon: "\u273F",
       specialtyLabel: "Cover",
-      favoritesTitle: "Favors",
+      favoritesTitle: "Care Inputs",
       favorites: [
         "Purified soil",
         "Clustered growth",
@@ -357,6 +363,57 @@ export const POKEDEX_ENTRIES = {
       title: "???",
       time: "Day",
       rarity: "Common"
+    },
+    drawer: null
+  },
+  [THERMAL_GENERATOR_POKEDEX_ENTRY_ID]: {
+    id: THERMAL_GENERATOR_POKEDEX_ENTRY_ID,
+    number: "Diag. 001",
+    name: "Hydro Wake Diagnostic",
+    theme: "water",
+    artVariant: "tall-grass",
+    details: {
+      eyebrow: "Diagnostic",
+      species: "Colony System Log",
+      descriptionHtml:
+        "Hydro Bot answered a weak wake pulse near the starter grove. Direct field contact brought water circulation back online.",
+      stats: [
+        { label: "Status", value: "Wake sequence" },
+        { label: "Signal", value: "Wake pulse" },
+        { label: "Type", badgeIcon: "\u{1F4A7}", badgeLabel: "Hydro" }
+      ]
+    },
+    whereToFind: {
+      eyebrow: "Logged At",
+      pin: "Starter Base",
+      island: "GEN",
+      count: "1/1",
+      stats: [
+        { label: "Trigger", value: "Hydro contact" },
+        { label: "Outcome", value: "Hydro Jet unlocked" }
+      ]
+    },
+    specialties: {
+      eyebrow: "Colony Use",
+      specialtyTitle: "Function",
+      specialtyIcon: "\u{1F525}",
+      specialtyLabel: "Power",
+      favoritesTitle: "Care Notes",
+      favorites: [
+        "Stable fuel",
+        "Low heat spikes",
+        "Short radio checks",
+        "Dry storage",
+        `${SANDBOTS_BOT_NAMES.scout} supervision`,
+        "Do not ignore humming"
+      ],
+      habitatTitle: "Next Question",
+      habitatCopy: "Why did the water loop fail?"
+    },
+    artCard: {
+      title: "System Log",
+      time: "Emergency",
+      rarity: "Diagnostic"
     },
     drawer: null
   }

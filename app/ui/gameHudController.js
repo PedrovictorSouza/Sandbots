@@ -8,6 +8,12 @@ import {
   formatActiveMoveGuidanceByAbilityId,
   getSmallIslandMoveByAbilityId
 } from "../sandbox/moveData.js";
+import { getErrandQuestInstructionText } from "../quest/errandQuestDesign.js";
+import { createColonyCacheState } from "../gameplay/colonyCacheContract.js";
+import { resolveGameHudInitialStatus } from "./gameHudControllerConfig.ts";
+import { createColonyStatusModel } from "./colonyStatusModel.js";
+import { resolveInitialHudGuide } from "./inputPromptResolver.js";
+import { renderInventoryCountHtml } from "./uiTextValue.ts";
 
 const ACTIVE_COMPANION_THUMBNAILS = Object.freeze({
   squirtle: new URL("./images/Robot-1-thumb.png", import.meta.url).href,
@@ -28,7 +34,22 @@ const SUPPLY_HUD_EXCLUDED_SLOT_ROLES = Object.freeze([
 ]);
 const MISSION_COMPLETE_SFX_URL = new URL("../soundFx/mission-complete.mp3", import.meta.url).href;
 const MISSION_COMPLETE_SFX_VOLUME = 0.792;
+const TALK_ACTION_TERMS = Object.freeze([
+  "chopper",
+  "grow bot",
+  "thermal bot",
+  "builder bot",
+  "overseer bot",
+  "bulbasaur"
+]);
 const SUPPLY_PICKUP_FLY_DURATION_MS = 1000;
+const COLONY_STATUS_STATE_LABELS = Object.freeze({
+  offline: "offline",
+  available: "available",
+  ready: "ready",
+  active: "online",
+  complete: "stable"
+});
 
 function clamp01(value) {
   return Math.min(1, Math.max(0, value));
@@ -38,6 +59,44 @@ function easeOutBack(value) {
   const progress = clamp01(value);
   const overshoot = 1.70158;
   return 1 + (overshoot + 1) * Math.pow(progress - 1, 3) + overshoot * Math.pow(progress - 1, 2);
+}
+
+function formatColonyStatusSystem(system) {
+  if (!system?.label) {
+    return "";
+  }
+
+  const progressMatch = String(system.detail || "").match(/\b\d+\/\d+\b/);
+  if (progressMatch) {
+    return `${system.label} ${progressMatch[0]}`;
+  }
+
+  return `${system.label} ${COLONY_STATUS_STATE_LABELS[system.state] || system.state || "unknown"}`;
+}
+
+export function formatColonyStatusHudText(colonyStatus) {
+  const systems = Array.isArray(colonyStatus?.systems) ? colonyStatus.systems : [];
+  const toolText = colonyStatus?.activeTool ? `Tool ${colonyStatus.activeTool}` : "";
+  const systemText = systems
+    .map(formatColonyStatusSystem)
+    .filter(Boolean)
+    .join(" • ");
+
+  return [toolText, systemText].filter(Boolean).join(" • ");
+}
+
+export function formatColonyCacheHudText(colonyCache) {
+  const totalItems = Number(colonyCache?.totalItems || 0);
+
+  if (totalItems <= 0) {
+    return "";
+  }
+
+  const materialCount = Number(colonyCache?.groupCounts?.materials || 0);
+  const cacheState = materialCount >= 3 ? "build-ready" : "stocked";
+  return materialCount > 0 ?
+    `Cache ${cacheState}: ${totalItems} supplies, ${materialCount} materials` :
+    `Cache ${cacheState}: ${totalItems} supplies`;
 }
 
 export function createGameHudController({
@@ -65,27 +124,25 @@ export function createGameHudController({
   resourceHarvestPrompt,
   interactPrompt,
   questSystem = null,
-  initialStatus = "Inicializando cena..."
+  initialStatus
 }) {
   const MAX_VISIBLE_INVENTORY_SLOTS = 5;
   const TRACKED_TASK_COMPLETION_FLASH_MS = 3000;
-  const INITIAL_GAMEPLAY_GUIDE =
-    "Use WASD ou o analogico esquerdo para falar com Chopper. Ele te orientara no que fazer.";
   const HUD_GUIDE_BY_QUEST_ID = Object.freeze({
-    findPokemon: "Fale com Squirtle",
-    makingHabitats: "Making habitats: arrange plantas, pedras e objetos para criar habitats."
+    findPokemon: "Talk to Hydro Bot",
+    makingHabitats: "Making habitats: arrange plants, rocks, and objects to create habitats."
   });
   const QUEST_CHECKLIST_LABELS = Object.freeze({
-    meetTangrowth: ["Falar com Chopper"],
-    findPokemon: ["Falar com Squirtle"],
+    meetTangrowth: ["Talk to Chopper"],
+    findPokemon: ["Talk to Hydro Bot"],
     makingHabitats: [
-      "Usar Water Gun em um objeto seco",
-      "Encontrar um habitat restaurado",
-      "Observar a pista no Pokedex"
+      "Use Hydro Jet on a dry object",
+      "Find a restored habitat",
+      "Check the Colony Codex clue"
     ]
   });
   const statusState = {
-    runtime: initialStatus,
+    runtime: resolveGameHudInitialStatus({ initialStatus }),
     error: false,
     trackedRecipe: null
   };
@@ -93,6 +150,7 @@ export function createGameHudController({
     message: "",
     timer: 0
   };
+  const transientNoticeQueue = [];
   const missionCompleteAudioPool = [];
   const supplyPickupFlyQueue = [];
   let supplyPickupFlyAnimating = false;
@@ -543,7 +601,7 @@ export function createGameHudController({
     companionHudElement.dataset.element = activeAbility.element;
     companionHudElement.setAttribute(
       "aria-label",
-      `${activeAbility.companionName}: ${activeAbility.label} selecionado${activeGuidance ? `. ${activeGuidance}` : ""}`
+      `${activeAbility.companionName}: ${activeAbility.label} selected${activeGuidance ? `. ${activeGuidance}` : ""}`
     );
 
     const nextHtml = `
@@ -682,8 +740,7 @@ export function createGameHudController({
       normalizedCopy.includes("talk") ||
       normalizedCopy.includes("fale") ||
       normalizedCopy.includes("[a / e]") ||
-      normalizedCopy.includes("chopper") ||
-      normalizedCopy.includes("bulbasaur")
+      TALK_ACTION_TERMS.some((term) => normalizedCopy.includes(term))
     ) {
       return "talk";
     }
@@ -717,7 +774,7 @@ export function createGameHudController({
       .map((entry) => `${entry.amount} ${entry.name}`)
       .join(", ");
 
-    return `Receita: ${recipe.name} | ${summary}`;
+    return `Plan: ${recipe.name} | ${summary}`;
   }
 
   function renderStatus() {
@@ -805,7 +862,7 @@ export function createGameHudController({
     }
   }
 
-  function pushNotice(message, duration = 2.8) {
+  function activateNotice(message, duration = 2.8) {
     transientNotice.message = message;
     transientNotice.timer = duration;
 
@@ -814,15 +871,44 @@ export function createGameHudController({
     }
   }
 
+  function pushNotice(message, duration = 2.8) {
+    if (!message) {
+      return;
+    }
+
+    if (transientNotice.timer <= 0) {
+      activateNotice(message, duration);
+      return;
+    }
+
+    if (transientNotice.message === message) {
+      transientNotice.timer = Math.max(transientNotice.timer, duration);
+      return;
+    }
+
+    transientNoticeQueue.push({ message, duration });
+    if (transientNoticeQueue.length > 4) {
+      transientNoticeQueue.shift();
+    }
+  }
+
   function updateTransientNotice(deltaTime) {
     if (transientNotice.timer <= 0) {
       transientNotice.timer = 0;
+      if (transientNoticeQueue.length > 0) {
+        const nextNotice = transientNoticeQueue.shift();
+        activateNotice(nextNotice.message, nextNotice.duration);
+      }
       return;
     }
 
     transientNotice.timer = Math.max(0, transientNotice.timer - deltaTime);
     if (transientNotice.timer === 0) {
       transientNotice.message = "";
+      if (transientNoticeQueue.length > 0) {
+        const nextNotice = transientNoticeQueue.shift();
+        activateNotice(nextNotice.message, nextNotice.duration);
+      }
     }
   }
 
@@ -858,7 +944,7 @@ export function createGameHudController({
           >
             ${renderInventorySlotIconHtml(itemId, item)}
           </div>
-          <span class="inventory-count">${count}</span>
+          ${renderInventoryCountHtml({ value: count })}
         </div>
       `;
     }).join("");
@@ -944,8 +1030,8 @@ export function createGameHudController({
     const trackedRecipe = statusState.trackedRecipe;
     const leadProfile = quest.leadNpcId ? npcProfiles[quest.leadNpcId] : null;
     const controlCopy = trackedRecipe ?
-      `Rastreada: ${trackedRecipe.name}` :
-      "Abra o handbook com M para rastrear receitas e consultar rotas.";
+      `Tracked: ${trackedRecipe.name}` :
+      "Open the handbook with M to track plans and route hints.";
     const progressCopy = recipe ?
       formatRequirementSummary(recipe.ingredients, inventory) :
       buildQuestProgressCopy(getQuestProgressDescriptor(quest), inventory);
@@ -959,12 +1045,12 @@ export function createGameHudController({
         <div class="mission-card__title">${quest.title}</div>
         <div class="mission-card__copy">${quest.body} ${quest.storyBeat}</div>
         <div class="mission-card__meta">
-          <span>Recompensa: ${quest.reward}</span>
+          <span>Reward: ${quest.reward}</span>
           <span>${formatDifficulty(quest)}</span>
         </div>
       </article>
       <article class="mission-card">
-        <div class="mission-card__eyebrow">${recipe ? "Cadencia" : "Progressao"}</div>
+        <div class="mission-card__eyebrow">${recipe ? "Plan" : "Progress"}</div>
         <div class="mission-card__title">${recipe ? recipe.title : "Onboarding"}</div>
         <div class="mission-card__copy">
           ${quest.onboarding} ${progressCopy ? `Progress: ${progressCopy}.` : ""}
@@ -1009,15 +1095,15 @@ export function createGameHudController({
     if (activeQuest.id === "makingHabitats") {
       return [
         {
-          label: "Usar Water Gun em um objeto seco",
+          label: "Use Hydro Jet on a dry object",
           done: Boolean(storyState.flags?.firstGrassRestored)
         },
         {
-          label: "Encontrar um habitat restaurado",
+          label: "Find a restored habitat",
           done: uiCache.nearbyHabitats.length > 0
         },
         {
-          label: "Descobrir pista de tall grass",
+          label: "Discover the tall grass clue",
           done: Boolean(storyState.flags?.tallGrassDiscovered)
         }
       ];
@@ -1234,8 +1320,8 @@ export function createGameHudController({
     const displayQuest = showingCompletion ?
       {
         id: recentCompletion.questId,
-        title: "Task concluida",
-        body: "O objetivo foi resolvido. O proximo aviso ja esta ativo."
+        title: "Task complete",
+        body: "The objective is resolved. The next signal is already active."
       } :
       activeQuest;
     const habitatCopy = uiCache.nearbyHabitats ?
@@ -1258,7 +1344,8 @@ export function createGameHudController({
   }
 
   function setNearbyHabitats(habitatLabels = []) {
-    const nextValue = habitatLabels.filter(Boolean).join(" • ");
+    const safeHabitatLabels = Array.isArray(habitatLabels) ? habitatLabels : [];
+    const nextValue = safeHabitatLabels.filter(Boolean).join(" • ");
 
     if (uiCache.nearbyHabitats === nextValue) {
       return;
@@ -1275,7 +1362,20 @@ export function createGameHudController({
       return;
     }
 
-    const nextText = "";
+    const colonyStatus = createColonyStatusModel({
+      storyState,
+      inventory,
+      playerSkills: latestSkillsState || {},
+      activeMoveId: latestActiveSkillId
+    });
+    const colonyCache = createColonyCacheState({
+      inventory,
+      itemDefs
+    });
+    const nextText = [
+      formatColonyStatusHudText(colonyStatus),
+      formatColonyCacheHudText(colonyCache)
+    ].filter(Boolean).join(" • ");
 
     if (uiCache.hudMeta === nextText) {
       return;
@@ -1283,10 +1383,11 @@ export function createGameHudController({
 
     uiCache.hudMeta = nextText;
     hudMetaElement.textContent = nextText;
+    hudMetaElement.dataset.colonyStatus = nextText ? "visible" : "hidden";
     flashHudBoard();
   }
 
-  function syncHudInstructions(storyState, promptCopy = "") {
+  function syncHudInstructions(storyState, promptCopy = "", inputModalityState = null) {
     rememberStoryState(storyState);
     refreshActiveCompanionHudFromCache();
 
@@ -1296,9 +1397,9 @@ export function createGameHudController({
 
     if (questSystem?.getActiveQuest) {
       const activeQuest = questSystem.getActiveQuest();
+      const questGuide = getErrandQuestInstructionText(activeQuest);
       const nextText = promptCopy ||
-        activeQuest?.guidance ||
-        activeQuest?.description ||
+        questGuide ||
         "Explore freely, restore habitats, and check in with helpers.";
       const questChanged = activeQuest?.id && uiCache.hudQuestId !== activeQuest.id;
       uiCache.hudQuestId = activeQuest?.id || uiCache.hudQuestId;
@@ -1322,7 +1423,9 @@ export function createGameHudController({
     }
 
     const activeQuest = getActiveQuest(storyState);
-    const nextText = promptCopy || HUD_GUIDE_BY_QUEST_ID[activeQuest?.id] || INITIAL_GAMEPLAY_GUIDE;
+    const nextText = promptCopy ||
+      HUD_GUIDE_BY_QUEST_ID[activeQuest?.id] ||
+      resolveInitialHudGuide(inputModalityState);
     const questChanged = activeQuest?.id && uiCache.hudQuestId !== activeQuest.id;
     uiCache.hudQuestId = activeQuest?.id || uiCache.hudQuestId;
     syncHudActionKind(nextText);

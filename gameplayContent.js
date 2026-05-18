@@ -1,5 +1,13 @@
 import { ACT_TWO_MONSTER_POSITION } from "./actTwoSceneConfig.js";
 import { ACT_TWO_SQUIRTLE_POSITION } from "./rendering/worldAssets.js";
+import { CRAFTED_ITEM_DEFS } from "./studies/typescript/crafted-items.ts";
+import { MATERIAL_DEFS } from "./studies/typescript/materials.ts";
+import { RECIPE_DEFS } from "./studies/typescript/recipes.ts";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES,
+  SANDBOTS_WORLD_TERMS
+} from "./app/story/sandbotsLexicon.js";
 
 export const WATER_GUN_POWER_ITEM_ID = "waterGunTotem";
 export const LEPPA_BERRY_ITEM_ID = "leppaBerry";
@@ -9,6 +17,9 @@ export const CAMPFIRE_ITEM_ID = "campfire";
 export const LIFE_COINS_ITEM_ID = "lifeCoins";
 export const LEAVES_ITEM_ID = "leaves";
 export const CARBON_ITEM_ID = "carbon";
+export const NITROGEN_ITEM_ID = "nitrogen";
+export const PHOSPHORUS_ITEM_ID = "phosphorus";
+export const POTASSIUM_ITEM_ID = "potassium";
 export const STRAW_BED_RECIPE_ITEM_ID = "strawBedRecipe";
 export const STRAW_BED_ITEM_ID = "strawBed";
 export const LEAF_DEN_KIT_ITEM_ID = "leafDenKit";
@@ -28,21 +39,21 @@ export const CREATURE_SPECIALTY = Object.freeze({
 export const CREATURE_DEFS = Object.freeze({
   squirtle: Object.freeze({
     id: "squirtle",
-    label: "Squirtle",
+    label: SANDBOTS_BOT_NAMES.hydro,
     currentHomeId: null,
     idealHabitat: "waterside",
     specialties: Object.freeze([])
   }),
   bulbasaur: Object.freeze({
     id: "bulbasaur",
-    label: "Bulbasaur",
+    label: SANDBOTS_BOT_NAMES.grow,
     currentHomeId: null,
     idealHabitat: "leafy",
     specialties: Object.freeze([])
   }),
   charmander: Object.freeze({
     id: "charmander",
-    label: "Charmander",
+    label: SANDBOTS_BOT_NAMES.thermal,
     currentHomeId: null,
     idealHabitat: "warm",
     specialties: Object.freeze([
@@ -51,7 +62,7 @@ export const CREATURE_DEFS = Object.freeze({
   }),
   timburr: Object.freeze({
     id: "timburr",
-    label: "Timburr",
+    label: SANDBOTS_BOT_NAMES.builder,
     currentHomeId: null,
     idealHabitat: "workshop",
     specialties: Object.freeze([
@@ -91,19 +102,17 @@ export function getHomeById(homeId) {
 export const ITEM_DEFS = {
   [WATER_GUN_POWER_ITEM_ID]: {
     id: WATER_GUN_POWER_ITEM_ID,
-    label: "Water Gun Totem",
-    bagLabel: "Water Gun Totem",
+    label: SANDBOTS_ITEM_NAMES.hydroTotem,
+    bagLabel: SANDBOTS_ITEM_NAMES.hydroTotem,
     shortLabel: "Totem",
     glyph: "T",
     color: "#65c7ff",
     ink: "#081f33",
     slotRole: "key",
-    description: "A strange relic that resonates with the water power Squirtle shared with you."
+    description: `A compact tool core that resonates with the water systems ${SANDBOTS_BOT_NAMES.hydro} restored.`
   },
   wood: {
-    id: "wood",
-    label: "Wood",
-    bagLabel: "Sturdy stick",
+    ...MATERIAL_DEFS.wood,
     bagDetailsEligible: true,
     shortLabel: "Wood",
     glyph: "W",
@@ -114,15 +123,15 @@ export const ITEM_DEFS = {
   },
   [LEPPA_BERRY_ITEM_ID]: {
     id: LEPPA_BERRY_ITEM_ID,
-    label: "Leppa Berry",
-    bagLabel: "Leppa Berry",
+    label: "Pulse Berry",
+    bagLabel: "Pulse Berry",
     bagDetailsEligible: true,
-    shortLabel: "Leppa",
+    shortLabel: "Pulse",
     glyph: "L",
     color: "#e85e50",
     ink: "#fff7de",
     slotRole: "gift",
-    description: "A vivid red berry with a warm, restorative scent. Bulbasaur keeps glancing at it."
+    description: `A vivid red berry with a warm, restorative scent. ${SANDBOTS_BOT_NAMES.grow} keeps scanning it.`
   },
   [LOG_CHAIR_ITEM_ID]: {
     id: LOG_CHAIR_ITEM_ID,
@@ -138,43 +147,40 @@ export const ITEM_DEFS = {
   },
   [SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID]: {
     id: SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID,
-    label: "Simple Wooden DIY Recipes",
-    bagLabel: "Wooden DIY recipes",
+    label: "Starter Wood Plans",
+    bagLabel: "Wood plans",
     bagDetailsEligible: true,
-    shortLabel: "DIY",
+    shortLabel: "Plan",
     glyph: "D",
     color: "#d2a36a",
     ink: "#2a1809",
     slotRole: "recipe",
-    description: "A starter bundle of wooden DIY plans. The Train House recipe is circled in the corner."
+    description: `A starter bundle of Workbench instructions. The ${SANDBOTS_ITEM_NAMES.thermalCabin} plan is circled in the corner.`
   },
   [CAMPFIRE_ITEM_ID]: {
-    id: CAMPFIRE_ITEM_ID,
-    label: "Train House",
-    bagLabel: "Train House",
+    ...CRAFTED_ITEM_DEFS[CAMPFIRE_ITEM_ID],
     bagDetailsEligible: true,
     shortLabel: "Home",
     glyph: "H",
     color: "#f07d38",
     ink: "#2a1205",
     slotRole: "placeable",
-    description: "Charmander's train-shaped house. It gives the habitat a warm place to gather."
+    description: `${SANDBOTS_BOT_NAMES.thermal}'s compact shelter. It gives the work zone a warm place to gather.`
   },
   [LIFE_COINS_ITEM_ID]: {
     id: LIFE_COINS_ITEM_ID,
-    label: "Life Coins",
-    bagLabel: "Life Coins",
-    shortLabel: "Coins",
-    glyph: "$",
-    color: "#ffd45c",
-    ink: "#392406",
-    slotRole: "currency",
-    description: "Challenge reward coins from the old Pokemon Center PC."
+    label: "Legacy Viability Log",
+    bagLabel: "Viability log",
+    shortLabel: "Log",
+    glyph: "V",
+    color: "#7bc7ff",
+    ink: "#0b1f32",
+    slotRole: "key",
+    hiddenFromInventory: true,
+    description: `Legacy save data for habitat viability reports recorded by the ${SANDBOTS_WORLD_TERMS.terminal}.`
   },
   [LEAVES_ITEM_ID]: {
-    id: LEAVES_ITEM_ID,
-    label: "Leaves",
-    bagLabel: "Leaves",
+    ...MATERIAL_DEFS[LEAVES_ITEM_ID],
     bagDetailsEligible: true,
     shortLabel: "Leaf",
     glyph: "L",
@@ -184,33 +190,59 @@ export const ITEM_DEFS = {
     description: "Fresh leaves gathered near restored tall grass. Useful for simple habitat projects."
   },
   [CARBON_ITEM_ID]: {
-    id: CARBON_ITEM_ID,
-    label: "Carbon",
-    bagLabel: "Carbon ore",
+    ...MATERIAL_DEFS[CARBON_ITEM_ID],
     bagDetailsEligible: true,
     shortLabel: "Carbon",
     glyph: "C",
     color: "#2f343d",
     ink: "#f2f7ff",
     slotRole: "material",
-    description: "A dark mineral Charmander burns to use Fire."
+    description: `A dark mineral ${SANDBOTS_BOT_NAMES.thermal} burns to power the ${SANDBOTS_ITEM_NAMES.thermalTool}.`
+  },
+  [NITROGEN_ITEM_ID]: {
+    ...MATERIAL_DEFS[NITROGEN_ITEM_ID],
+    bagDetailsEligible: true,
+    shortLabel: "Nitrogen",
+    glyph: "N",
+    color: "#87d9ff",
+    ink: "#092134",
+    slotRole: "material",
+    description: `A soil nutrient ${SANDBOTS_WORLD_TERMS.bots} can process to help restore water flow and plant growth.`
+  },
+  [PHOSPHORUS_ITEM_ID]: {
+    ...MATERIAL_DEFS[PHOSPHORUS_ITEM_ID],
+    bagDetailsEligible: true,
+    shortLabel: "Phosphorus",
+    glyph: "P",
+    color: "#d8a8ff",
+    ink: "#251038",
+    slotRole: "material",
+    description: `A reactive nutrient used by bot tools that revive weakened soil.`
+  },
+  [POTASSIUM_ITEM_ID]: {
+    ...MATERIAL_DEFS[POTASSIUM_ITEM_ID],
+    bagDetailsEligible: true,
+    shortLabel: "Potassium",
+    glyph: "K",
+    color: "#ffd76a",
+    ink: "#352808",
+    slotRole: "material",
+    description: `A mineral nutrient that helps ${SANDBOTS_WORLD_TERMS.bots} sustain soil-restoration tools.`
   },
   [STRAW_BED_RECIPE_ITEM_ID]: {
     id: STRAW_BED_RECIPE_ITEM_ID,
-    label: "Solar Station Recipe",
-    bagLabel: "Solar Station recipe",
+    label: "Solar Station Plans",
+    bagLabel: "Solar Station plans",
     bagDetailsEligible: true,
-    shortLabel: "Recipe",
+    shortLabel: "Plan",
     glyph: "R",
     color: "#f0cf77",
     ink: "#342309",
     slotRole: "recipe",
-    description: "Bulbasaur's notes for assembling a compact Solar Station from leaves and plant fiber."
+    description: `${SANDBOTS_BOT_NAMES.grow}'s notes for assembling a compact ${SANDBOTS_ITEM_NAMES.solarStation} from leaves and plant fiber.`
   },
   [STRAW_BED_ITEM_ID]: {
-    id: STRAW_BED_ITEM_ID,
-    label: "Solar Station",
-    bagLabel: "Solar Station",
+    ...CRAFTED_ITEM_DEFS[STRAW_BED_ITEM_ID],
     bagDetailsEligible: true,
     shortLabel: "Station",
     glyph: "S",
@@ -220,9 +252,7 @@ export const ITEM_DEFS = {
     description: "A compact Solar Station that helps grassy habitats feel more alive."
   },
   [LEAF_DEN_KIT_ITEM_ID]: {
-    id: LEAF_DEN_KIT_ITEM_ID,
-    label: "House Kit",
-    bagLabel: "House Kit",
+    ...CRAFTED_ITEM_DEFS[LEAF_DEN_KIT_ITEM_ID],
     bagDetailsEligible: true,
     shortLabel: "House",
     glyph: "D",
@@ -231,24 +261,22 @@ export const ITEM_DEFS = {
     slotRole: "placeable",
     itemKind: BUILDING_KIT_ITEM_KIND,
     buildingKitId: LEAF_DEN_KIT_ITEM_ID,
-    description: "A leafy house kit from the Pokemon Center PC Shop. Professor Tangrowth says it is the first step toward proper homes."
+    description: `A leafy habitat kit prepared at the ${SANDBOTS_WORLD_TERMS.terminal}. ${SANDBOTS_BOT_NAMES.overseer} says it is the first step toward proper human homes.`
   },
   [DITTO_FLAG_ITEM_ID]: {
     id: DITTO_FLAG_ITEM_ID,
-    label: "Ditto Flag",
-    bagLabel: "Ditto Flag",
+    label: SANDBOTS_ITEM_NAMES.colonyFlag,
+    bagLabel: SANDBOTS_ITEM_NAMES.colonyFlag,
     bagDetailsEligible: true,
     shortLabel: "Flag",
     glyph: "F",
     color: "#d98bd8",
     ink: "#2b1230",
     slotRole: "placeable",
-    description: "A celebratory flag from Professor Tangrowth. It marks the first home brought back to life on the island."
+    description: `A celebratory flag from ${SANDBOTS_BOT_NAMES.overseer}. It marks the first home prepared for the future colony.`
   },
   flaxFiber: {
-    id: "flaxFiber",
-    label: "Flax Fiber",
-    bagLabel: "Flax fiber",
+    ...MATERIAL_DEFS.flaxFiber,
     bagDetailsEligible: true,
     shortLabel: "Flax",
     glyph: "F",
@@ -291,12 +319,10 @@ export const ITEM_DEFS = {
     color: "#5b3f88",
     ink: "#fff1e8",
     slotRole: "food",
-    description: "A cluster of deep berries that stains your hands. Tangrowth says Pokemon used to love these."
+    description: `A cluster of deep berries that stains your hands. ${SANDBOTS_BOT_NAMES.overseer} says older field bots logged them as high-value rations.`
   },
   granite: {
-    id: "granite",
-    label: "Granite",
-    bagLabel: "Stone",
+    ...MATERIAL_DEFS.granite,
     bagDetailsEligible: true,
     shortLabel: "Granite",
     glyph: "G",
@@ -306,9 +332,7 @@ export const ITEM_DEFS = {
     description: "Just a normal stone you can find anywhere. It can be used as a material for a lot of different things."
   },
   woolYarn: {
-    id: "woolYarn",
-    label: "Wool Yarn",
-    bagLabel: "Wool yarn",
+    ...MATERIAL_DEFS.woolYarn,
     bagDetailsEligible: true,
     shortLabel: "Wool",
     glyph: "Y",
@@ -318,9 +342,7 @@ export const ITEM_DEFS = {
     description: "A warm roll of yarn spun from wool. Good for soft repairs and village crafts."
   },
   silkYarn: {
-    id: "silkYarn",
-    label: "Silk Yarn",
-    bagLabel: "Silk yarn",
+    ...MATERIAL_DEFS.silkYarn,
     bagDetailsEligible: true,
     shortLabel: "Silk",
     glyph: "S",
@@ -330,9 +352,7 @@ export const ITEM_DEFS = {
     description: "A glossy thread bundle with a light shimmer. Rare, delicate, and surprisingly strong."
   },
   bridgeKit: {
-    id: "bridgeKit",
-    label: "Bridge Repair Kit",
-    bagLabel: "Bridge kit",
+    ...CRAFTED_ITEM_DEFS.bridgeKit,
     shortLabel: "Bridge",
     glyph: "K",
     color: "#c89c66",
@@ -342,20 +362,18 @@ export const ITEM_DEFS = {
     description: "A compact repair kit packed for mending old crossings and broken supports."
   },
   marshPie: {
-    id: "marshPie",
-    label: "Marsh Pie",
-    bagLabel: "Marsh pie",
-    shortLabel: "Pie",
+    ...CRAFTED_ITEM_DEFS.marshPie,
+    label: "Marsh Ration",
+    bagLabel: "Marsh ration",
+    shortLabel: "Ration",
     glyph: "P",
     color: "#d58a52",
     ink: "#281108",
     slotRole: "food",
-    description: "A hand-baked pie with a rich marsh aroma. Comfort food with enough heft for a long hike."
+    description: "A compact field ration made from marsh berries. Dense enough to support a long survey route."
   },
   granitePickaxe: {
-    id: "granitePickaxe",
-    label: "Granite Pickaxe",
-    bagLabel: "Granite pickaxe",
+    ...CRAFTED_ITEM_DEFS.granitePickaxe,
     shortLabel: "Pickaxe",
     glyph: "T",
     color: "#7398b7",
@@ -364,16 +382,16 @@ export const ITEM_DEFS = {
     description: "A sturdy pickaxe fitted for breaking hard stone and old barriers."
   },
   burrowRepairKit: {
-    id: "burrowRepairKit",
-    label: "Burrow Repair Kit",
-    bagLabel: "Repair kit",
+    ...CRAFTED_ITEM_DEFS.burrowRepairKit,
+    label: "Hub Repair Kit",
+    bagLabel: "Hub repair kit",
     shortLabel: "Repair",
     glyph: "H",
     color: "#9b7c55",
     ink: "#18120c",
     slotRole: "placeable",
     slotRoleLabel: "Repair",
-    description: "A field kit with everything needed to patch the old burrow back together."
+    description: "A field kit with everything needed to patch the old colony hub back together."
   },
 };
 
@@ -384,9 +402,11 @@ export const INVENTORY_ORDER = [
   LOG_CHAIR_ITEM_ID,
   SIMPLE_WOODEN_DIY_RECIPES_ITEM_ID,
   CAMPFIRE_ITEM_ID,
-  LIFE_COINS_ITEM_ID,
   LEAVES_ITEM_ID,
   CARBON_ITEM_ID,
+  NITROGEN_ITEM_ID,
+  PHOSPHORUS_ITEM_ID,
+  POTASSIUM_ITEM_ID,
   STRAW_BED_RECIPE_ITEM_ID,
   STRAW_BED_ITEM_ID,
   LEAF_DEN_KIT_ITEM_ID,
@@ -513,6 +533,7 @@ export const LEPPA_TREE_POSITION = [29.6, 0.02, -10.8];
 export const LEPPA_TREE_DROP_OFFSET = [0.82, 0.02, 0.48];
 export const WORKBENCH_POSITION = [38.0, 0.02, -17.0];
 export const WORKBENCH_INTERACT_DISTANCE = 5.4;
+export const COLONY_CACHE_POSITION = [34.6, 0.02, -14.0];
 export const TANGROWTH_CAMPFIRE_ANCHOR_POSITION = [12.4, 0.02, -8.4];
 export const TANGROWTH_CAMPFIRE_ANCHOR_READY_DISTANCE = 0.42;
 export const POKEMON_TALK_INTERACT_DISTANCE = 3.1;
@@ -520,13 +541,14 @@ export const RUINED_POKEMON_CENTER_POSITION = [25.4, 0, 12.6];
 export const RUINED_POKEMON_CENTER_INTERACT_DISTANCE = 5.4;
 export const RUINED_POKEMON_CENTER_GUIDE_POSITION = [20.95, 0.02, 10.2];
 export const POKEMON_CENTER_PC_POSITION = [30.35, 0.02, 13.65];
+export const COLONY_TERMINAL_INTERACT_DISTANCE = 4.4;
 export const BOULDER_SHADED_TALL_GRASS_BOULDER_POSITION = [32.3, 0.02, 9.98];
 export const BOULDER_SHADED_TALL_GRASS_RADIUS = 4.6;
 
 export const WORLD_REGIONS = [
   {
     id: "hearth-hollow",
-    label: "Hearth Hollow",
+    label: "Core Hollow",
     minX: -18,
     maxX: 18,
     minZ: -18,
@@ -574,7 +596,7 @@ export const WORLD_REGIONS = [
   },
   {
     id: "old-burrow-ruins",
-    label: "Old Burrow Ruins",
+    label: "Old Colony Hub Ruins",
     minX: -72,
     maxX: -40,
     minZ: 30,
@@ -761,30 +783,30 @@ export const RUINED_POKEMON_CENTER_LAYOUT = [
 export const NPC_PROFILES = {
   tangrowth: {
     id: "tangrowth",
-    label: "Tangrowth",
-    role: "Onboarding Guide",
+    label: SANDBOTS_BOT_NAMES.overseer,
+    role: "Colony Overseer",
     summary:
-      "Tangrowth is the first living sign that the island still has momentum. He catches the player at the end of the cinematic and redirects the run toward Aunty and the repair loop.",
+      "The Overseer Bot is the first sign that the small planet's colony program is still alive. It catches the player at the end of the cinematic and redirects the run toward the Core Keeper and the repair loop.",
     idleLine:
-      "Tangrowth: hohohoh! Stay sharp. Aunty keeps the burrow steady while the rest of us scout.",
+      `${SANDBOTS_BOT_NAMES.overseer}: stay sharp. The Core Keeper keeps the hub steady while the rest of us scout.`,
   },
   aunty: {
     id: "aunty",
-    label: "Aunty",
-    role: "Caretaker",
+    label: "Core Keeper Bot",
+    role: "Habitat Core Keeper",
     summary:
-      "Aunty kept the hearth alive while the island routes collapsed. She gives the run its emotional center and teaches the repair cadence.",
+      "The Core Keeper Bot kept the first hub alive while the island routes collapsed. It gives the run its repair cadence and keeps the colony logic grounded.",
     idleLine:
-      "Aunty: home first. Every safe loop starts and ends with a warm fire.",
+      "Core Keeper Bot: hub first. Every safe loop starts and ends with stable systems.",
   },
   bufo: {
     id: "bufo",
-    label: "Bufo",
-    role: "Marsh Broker",
+    label: "Route Survey Bot",
+    role: "Marsh Route Surveyor",
     summary:
-      "Bufo owns the safest marsh corridor. He turns survival into planning by forcing the player to cook before earning better tools.",
+      "The Route Survey Bot owns the safest marsh corridor. It turns exploration into planning by requiring a stable field ration before the granite route opens.",
     idleLine:
-      "Bufo: if you can feed yourself on the road, then maybe you deserve better steel.",
+      "Route Survey Bot: if your supply loop survives the marsh, the granite route can open.",
   },
   willow: {
     id: "willow",
@@ -798,12 +820,13 @@ export const NPC_PROFILES = {
 };
 
 export const WORLD_MARKER_STYLES = {
-  tangrowth: { glyph: "T", color: "#b26bff", ink: "#24123b" },
-  squirtle: { glyph: "P", color: "#75c6ee", ink: "#10253a" },
-  aunty: { glyph: "A", color: "#d7869b", ink: "#211015" },
-  bufo: { glyph: "B", color: "#81b96b", ink: "#11200f" },
+  tangrowth: { glyph: "O", color: "#b26bff", ink: "#24123b" },
+  squirtle: { glyph: "H", color: "#75c6ee", ink: "#10253a" },
+  aunty: { glyph: "K", color: "#d7869b", ink: "#211015" },
+  bufo: { glyph: "R", color: "#81b96b", ink: "#11200f" },
   willow: { glyph: "W", color: "#8b84d4", ink: "#131225" },
   workbench: { glyph: "i", color: "#7bc7ff", ink: "#0b1f32", shape: "circle" },
+  colonyCache: { glyph: "C", color: "#f2c66d", ink: "#211608", shape: "circle" },
   stove: { glyph: "S", color: "#db8a59", ink: "#2a1308" },
   bridge: { glyph: "B", color: "#c6a46b", ink: "#23160d" },
   gate: { glyph: "G", color: "#7b8799", ink: "#151a20" },
@@ -818,85 +841,12 @@ export const WORLD_MARKER_STYLES = {
 };
 
 export const PLACEHOLDER_RECIPES = {
-  campfire: {
-    id: "campfire",
-    title: "Train House",
-    stationId: "workbench",
-    ingredients: {
-      wood: 3,
-    },
-    output: {
-      [CAMPFIRE_ITEM_ID]: 1,
-    },
-    note: "Simple wooden DIY recipe for the first Workbench objective.",
-  },
-  strawBed: {
-    id: "strawBed",
-    title: "Solar Station",
-    stationId: "workbench",
-    ingredients: {
-      [LEAVES_ITEM_ID]: 2,
-    },
-    output: {
-      [STRAW_BED_ITEM_ID]: 1,
-    },
-    note: "A Bulbasaur recipe for a compact habitat Solar Station.",
-  },
-  bridgeKit: {
-    id: "bridgeKit",
-    title: "Bridge Repair Kit",
-    stationId: "workbench",
-    ingredients: {
-      wood: 4,
-      flaxFiber: 2,
-    },
-    output: {
-      bridgeKit: 1,
-    },
-    note: "Placeholder craft for the bridge repair step.",
-  },
-  marshPie: {
-    id: "marshPie",
-    title: "Marsh Pie",
-    stationId: "stove",
-    ingredients: {
-      blackberry: 4,
-      rowanberry: 4,
-      elderberry: 2,
-    },
-    output: {
-      marshPie: 1,
-    },
-    note: "Placeholder cooking step standing in for Bufo's pie route.",
-  },
-  granitePickaxe: {
-    id: "granitePickaxe",
-    title: "Granite Pickaxe",
-    stationId: "workbench",
-    ingredients: {
-      wood: 3,
-      granite: 3,
-      woolYarn: 1,
-    },
-    output: {
-      granitePickaxe: 1,
-    },
-    note: "Placeholder tool craft that opens the granite gate route.",
-  },
-  burrowRepairKit: {
-    id: "burrowRepairKit",
-    title: "Burrow Repair Kit",
-    stationId: "workbench",
-    ingredients: {
-      wood: 6,
-      granite: 4,
-      silkYarn: 1,
-    },
-    output: {
-      burrowRepairKit: 1,
-    },
-    note: "Placeholder restoration bundle for the finale.",
-  },
+  campfire: RECIPE_DEFS.campfire,
+  strawBed: RECIPE_DEFS.strawBed,
+  bridgeKit: RECIPE_DEFS.bridgeKit,
+  marshPie: RECIPE_DEFS.marshPie,
+  granitePickaxe: RECIPE_DEFS.granitePickaxe,
+  burrowRepairKit: RECIPE_DEFS.burrowRepairKit,
 };
 
 export const STORY_QUESTS = [
@@ -905,38 +855,38 @@ export const STORY_QUESTS = [
     eyebrow: "Opening",
     act: "Act I • First Voice in the Ash",
     difficulty: 1,
-    title: " ",
-    body: "Reach Tangrowth near the ruins and figure out what he just spotted in the ash.",
+    title: "Reach the Overseer Bot",
+    body: "Reach the Overseer Bot near the ruins and figure out what it just spotted in the ash.",
     storyBeat:
-      "The run does not start with tools or crafting. It starts with Tangrowth catching you in the aftermath and pulling your attention toward another survivor.",
+      "The run does not start with tools or crafting. It starts with the colony overseer catching you in the aftermath and pulling your attention toward another damaged bot.",
     onboarding:
-      "Walk up to Tangrowth, then press E to interact. This first beat only teaches movement, approach, and the basic talk cadence.",
+      "Walk up to the Overseer Bot, then press E to interact. This first beat only teaches movement, approach, and the basic talk cadence.",
     leadNpcId: "tangrowth",
-    reward: "Pokemon trail",
+    reward: "Bot trail",
     actionLabel: "E / Talk",
     targetId: "tangrowth",
     toolkitHint: "Opening / Route Setup",
     resolveLine:
-      `Tangrowth: ${TANGROWTH_OPENING_LINE} There is another Pokemon out there. Find them before the trail goes cold.`,
+      `${SANDBOTS_BOT_NAMES.overseer}: ${TANGROWTH_OPENING_LINE} There is another bot out there. Find them before the trail goes cold.`,
   },
   {
     id: "findPokemon",
     eyebrow: "Opening",
     act: "Act I • First Voice in the Ash",
     difficulty: 1,
-    title: "Find the Pokemon",
-    body: "A weak cry is coming from deeper in the ruins. Track down the stranded Pokemon Tangrowth heard.",
+    title: "Find the Stranded Bot",
+    body: "A weak signal is coming from deeper in the ruins. Track down the stranded bot the overseer heard.",
     storyBeat:
       "The first hook is not home. It is the sound of another survivor somewhere out in the dead ground.",
     onboarding:
-      "Follow the marker toward the cry, move close to the stranded Pokemon, then press E to talk.",
+      "Follow the marker toward the signal, move close to the stranded bot, then press E to interact.",
     leadNpcId: "tangrowth",
     reward: "First contact",
     actionLabel: "E / Talk",
     targetId: "squirtle",
     toolkitHint: "Onboarding / First Cry",
     resolveLine:
-      "You found the stranded Pokemon. Try restoring the dead ground nearby and see what returns.",
+      "You found the stranded bot. Try restoring the dead ground nearby and see what systems come back online.",
   },
   {
     id: "makingHabitats",
@@ -945,11 +895,11 @@ export const STORY_QUESTS = [
     difficulty: 1,
     title: "Making Habitats!",
     body:
-      "Arrange tall grass, trees, rocks, and furniture into the right combinations to create a pokemon habitat!",
+      "Arrange tall grass, trees, rocks, and furniture into the right combinations to create a viable colony zone!",
     storyBeat:
       "Restoration is not only about repairs. Every revived patch teaches how the island becomes livable again.",
     onboarding:
-      "Use Water Gun on dead ground and watch for habitat clues when plants return. New habitats will begin appearing in the world.",
+      `Use ${SANDBOTS_ITEM_NAMES.hydroTool} on dead ground and watch for colony-zone clues when plants return. New restoration zones will begin appearing in the world.`,
     leadNpcId: "tangrowth",
     reward: PRETTY_FLOWER_BED_HABITAT_LABEL,
     actionLabel: "Space / Restore",
@@ -960,19 +910,19 @@ export const STORY_QUESTS = [
     eyebrow: "Active",
     act: "Act I • Embers at Home",
     difficulty: 1,
-    title: "Find Aunty",
-    body: "Talk to Aunty beside the burrow to turn Tangrowth's warning into an actual restoration route.",
+    title: "Find the Core Keeper",
+    body: "Talk to the Core Keeper Bot beside the hub to turn the overseer's warning into an actual restoration route.",
     storyBeat:
-      "You return to a burrow held together by habit and ash. Aunty is the only reason the hearth still glows.",
+      "You return to a damaged colony hub held together by emergency routines. The Core Keeper is the only reason the first work loop still responds.",
     onboarding:
-      "Follow Tangrowth's pointer back to the burrow, then press E to talk to Aunty and anchor the route at home.",
+      "Follow the overseer's pointer back to the hub, then press E to talk to the Core Keeper and anchor the route at the colony core.",
     leadNpcId: "aunty",
     reward: "Bridge plan",
     actionLabel: "E / Talk",
     targetId: "aunty",
     toolkitHint: "Articles / Walkthrough",
     resolveLine:
-      "Aunty: good, you're steady on your feet. Now gather the basics and prove this place can still be repaired.",
+      "Core Keeper Bot: gait stable. Now gather the basics and prove this place can still be repaired.",
   },
   {
     id: "craftBridgeKit",
@@ -982,9 +932,9 @@ export const STORY_QUESTS = [
     title: "Repair the Bridge",
     body: "Gather Wood x4 and Flax Fiber x2, then craft a Bridge Repair Kit at the Workbench.",
     storyBeat:
-      "The first repair is small on purpose. Aunty teaches that survival begins with tight loops and simple materials.",
+      "The first repair is small on purpose. The Core Keeper teaches that colony survival begins with tight loops and simple materials.",
     onboarding:
-      "Press Enter near palms and flax patches to harvest. Watch the mission panel counts, then use E at the Workbench to craft.",
+      "Press Enter near palms and flax patches to harvest. Watch the task panel counts, then use E at the Workbench to craft.",
     leadNpcId: "aunty",
     reward: "Bridge Kit",
     actionLabel: "Enter + E",
@@ -994,7 +944,7 @@ export const STORY_QUESTS = [
     },
     recipeId: "bridgeKit",
     stationId: "workbench",
-    toolkitHint: "Crafting / Train House Kit",
+    toolkitHint: `Crafting / ${SANDBOTS_ITEM_NAMES.thermalCabin} Kit`,
   },
   {
     id: "repairBridge",
@@ -1008,7 +958,7 @@ export const STORY_QUESTS = [
     onboarding:
       "Quest deliveries are contextual. Carry the crafted kit automatically, walk to the highlighted site, and press E.",
     leadNpcId: "aunty",
-    reward: "Bufo unlocked",
+    reward: "South route signal",
     actionLabel: "E / Install",
     delivery: {
       bridgeKit: 1,
@@ -1021,33 +971,33 @@ export const STORY_QUESTS = [
     eyebrow: "Marsh Route",
     act: "Act II • Marsh Bargain",
     difficulty: 2,
-    title: "Meet Bufo",
-    body: "Cross the repaired route and speak to Bufo in the marsh pocket.",
+    title: "Meet the Route Survey Bot",
+    body: "Cross the repaired route and speak to the Route Survey Bot in the marsh pocket.",
     storyBeat:
-      "The south corridor is the game's first real excursion. Bufo tests whether you can leave home without losing the rhythm.",
+      "The south corridor is the game's first real excursion. The Route Survey Bot tests whether your supply loop can leave the hub and return intact.",
     onboarding:
       "Use the south bridge marker as your first longer route. The map and world markers now matter more than the house line of sight.",
     leadNpcId: "bufo",
-    reward: "Pie request",
+    reward: "Ration request",
     actionLabel: "E / Talk",
     targetId: "bufo",
     toolkitHint: "Articles / Granite Guide",
     resolveLine:
-      "Bufo: no one crosses my marsh hungry. Bake something deliberate and I'll show you where the stone starts.",
+      "Route Survey Bot: no one crosses my marsh on vibes. Prepare a stable ration and I will show you where the stone starts.",
   },
   {
     id: "cookMarshPie",
     eyebrow: "Cooking",
     act: "Act II • Marsh Bargain",
     difficulty: 2,
-    title: "Bake Bufo's Pie",
-    body: "Gather Blackberry x4, Rowanberry x4, and Elderberry x2. Cook them into a Marsh Pie at the Stove.",
+    title: "Prepare Marsh Rations",
+    body: "Gather Blackberry x4, Rowanberry x4, and Elderberry x2. Cook them into a Marsh Ration at the Stove.",
     storyBeat:
       "The marsh raises the demand: now you need multi-node gathering and a cooked item, not just raw stockpiles.",
     onboarding:
       "Collect berry routes with Space, then return home and use E at the Stove. This step teaches route planning and cooking cadence.",
     leadNpcId: "bufo",
-    reward: "Marsh Pie",
+    reward: "Marsh Ration",
     actionLabel: "Space + E",
     requirements: {
       blackberry: 4,
@@ -1063,10 +1013,10 @@ export const STORY_QUESTS = [
     eyebrow: "Quest Turn-In",
     act: "Act II • Marsh Bargain",
     difficulty: 2,
-    title: "Deliver the Pie",
-    body: "Bring the Marsh Pie back to Bufo to unlock the Granite Pickaxe blueprint.",
+    title: "Deliver the Ration",
+    body: "Bring the Marsh Ration back to the Route Survey Bot to unlock the Granite Pickaxe blueprint.",
     storyBeat:
-      "Bufo is not comic relief; he is the checkpoint between comfort and competence. Feed him and he opens the mid-game.",
+      "The Route Survey Bot is the checkpoint between comfort and competence. Prove the supply loop and it opens the mid-game.",
     onboarding:
       "Talk to the same NPC again to turn in cooked quest items. Delivery happens automatically if the item is in your inventory.",
     leadNpcId: "bufo",
@@ -1141,8 +1091,8 @@ export const STORY_QUESTS = [
     eyebrow: "Final Prep",
     act: "Act IV • West of Stone",
     difficulty: 4,
-    title: "Assemble the Burrow Kit",
-    body: "Gather Wood x6, Granite x4, and Silk Yarn x1. Craft a Burrow Repair Kit at the Workbench.",
+    title: "Assemble the Hub Repair Kit",
+    body: "Gather Wood x6, Granite x4, and Silk Yarn x1. Craft a Hub Repair Kit at the Workbench.",
     storyBeat:
       "The final craft consolidates every lesson so far: local wood, marsh stone, and western silk into one decisive bundle.",
     onboarding:
@@ -1157,17 +1107,17 @@ export const STORY_QUESTS = [
     },
     recipeId: "burrowRepairKit",
     stationId: "workbench",
-    toolkitHint: "Guides / Burrow Restoration",
+    toolkitHint: "Guides / Hub Restoration",
   },
   {
     id: "repairBurrow",
     eyebrow: "Finale",
-    act: "Act V • The Last Burrow",
+    act: "Act V • The Last Hub",
     difficulty: 5,
-    title: "Repair Aunty's Old Burrow",
-    body: "Carry the Burrow Repair Kit to the west burrow site and finish the structural repair.",
+    title: "Repair the Old Colony Hub",
+    body: "Carry the Hub Repair Kit to the west hub site and finish the structural repair.",
     storyBeat:
-      "The old burrow is the campaign's physical climax. Once it stands again, the island stops feeling temporary.",
+      "The old colony hub is the campaign's physical climax. Once it stands again, the island stops feeling temporary.",
     onboarding:
       "Final deliveries reuse familiar rules. Carry the repair kit west, press E at the site, and watch the route close cleanly.",
     leadNpcId: "willow",
@@ -1182,21 +1132,21 @@ export const STORY_QUESTS = [
   {
     id: "hostDinner",
     eyebrow: "Finale",
-    act: "Act V • The Last Burrow",
+    act: "Act V • The Last Hub",
     difficulty: 5,
     title: "Host the Grand Dinner",
-    body: "Return to Aunty and close the route with the final dinner scene placeholder.",
+    body: "Return to the Core Keeper and close the route with the colony's first shared dinner.",
     storyBeat:
       "The ending is not another fetch quest. It is the proof that every loop, tool, and repair was building toward a shared home.",
     onboarding:
-      "Return to Aunty for the final interaction. After this, the island remains open as a post-story sandbox.",
+      "Return to the Core Keeper for the final interaction. After this, the island remains open as a post-story sandbox.",
     leadNpcId: "aunty",
     reward: "Story complete",
     actionLabel: "E / Host",
     targetId: "aunty",
     toolkitHint: "Articles / Complete Story Guide",
     resolveLine:
-      "Aunty: walls fixed, table warm, everyone accounted for. Sit down. You brought the island back into rhythm.",
+      "Core Keeper Bot: walls fixed, systems stable, everyone accounted for. Sit down. You brought the island back into rhythm.",
   },
   {
     id: "epilogue",
@@ -1204,7 +1154,7 @@ export const STORY_QUESTS = [
     act: "Epilogue • Free Roam",
     difficulty: 1,
     title: "Grand Dinner Complete",
-    body: "The placeholder campaign is complete. Free-roam, gather supplies, and use the handbook as a live codex.",
+    body: "The first colony route is complete. Free-roam, gather supplies, and use the handbook as a live codex.",
     storyBeat:
       "The crisis is over. What remains is maintenance, mastery, and the comfort of knowing the routes now belong to you.",
     onboarding:
@@ -1219,7 +1169,7 @@ export const STORY_QUESTS = [
 export const NPC_DEFS = [
   {
     id: "tangrowth",
-    label: "Tangrowth",
+    label: SANDBOTS_BOT_NAMES.overseer,
     position: [...ACT_TWO_MONSTER_POSITION],
     facing: "down",
     markerKey: null,
@@ -1230,7 +1180,7 @@ export const NPC_DEFS = [
   },
   {
     id: "aunty",
-    label: "Aunty",
+    label: "Core Keeper Bot",
     position: [6.5, 0, -4.5],
     facing: "left",
     markerKey: "aunty",
@@ -1241,7 +1191,7 @@ export const NPC_DEFS = [
   },
   {
     id: "bufo",
-    label: "Bufo",
+    label: "Route Survey Bot",
     position: [10.5, 0, 47.5],
     facing: "down",
     markerKey: "bufo",
@@ -1285,6 +1235,16 @@ export const INTERACTABLE_DEFS = [
     activeWhen: () => true,
   },
   {
+    id: "colonyCache",
+    label: "Colony Cache",
+    type: "site",
+    position: [...COLONY_CACHE_POSITION],
+    markerKey: "colonyCache",
+    markerHeight: 1.1,
+    interactDistance: 2.1,
+    activeWhen: () => true,
+  },
+  {
     id: "stove",
     label: "Stove",
     type: "station",
@@ -1295,7 +1255,7 @@ export const INTERACTABLE_DEFS = [
   },
   {
     id: "squirtle",
-    label: "Stranded Pokemon",
+    label: "Stranded Bot",
     type: "site",
     position: [...ACT_TWO_SQUIRTLE_POSITION],
     markerKey: null,
@@ -1330,7 +1290,7 @@ export const INTERACTABLE_DEFS = [
   },
   {
     id: "burrowSite",
-    label: "Old Burrow",
+    label: "Old Colony Hub",
     type: "site",
     position: [-58.5, 0.02, 38.5],
     markerKey: "burrow",
@@ -1339,7 +1299,7 @@ export const INTERACTABLE_DEFS = [
   },
   {
     id: "ruinedPokemonCenter",
-    label: "Ruined Pokemon Center",
+    label: SANDBOTS_WORLD_TERMS.terminalRuins,
     type: "site",
     position: [...RUINED_POKEMON_CENTER_POSITION],
     markerKey: "pokemonCenter",
@@ -1353,12 +1313,12 @@ export const INTERACTABLE_DEFS = [
   },
   {
     id: "pokemonCenterPc",
-    label: "Pokemon Center PC",
+    label: SANDBOTS_WORLD_TERMS.terminal,
     type: "site",
     position: [...POKEMON_CENTER_PC_POSITION],
     markerKey: "pokemonCenterPc",
     markerHeight: 1.28,
-    interactDistance: 1.85,
+    interactDistance: COLONY_TERMINAL_INTERACT_DISTANCE,
     activeWhen: (state) => {
       return Boolean(state.flags?.ruinedPokemonCenterInspected);
     },

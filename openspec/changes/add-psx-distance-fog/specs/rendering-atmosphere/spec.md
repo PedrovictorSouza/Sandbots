@@ -58,7 +58,7 @@ Fog settings MUST be configurable per scene or preset.
 
 ### Requirement: Fog Matches Retro PSX Direction
 
-The fog SHOULD feel like a stylized PSX-era distance fog rather than modern
+The fog MUST feel like a stylized PSX-era distance fog rather than modern
 volumetric fog.
 
 #### Scenario: Fog reads as retro

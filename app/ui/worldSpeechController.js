@@ -4,6 +4,9 @@ import {
 } from "../../rendering/worldCurvature.js";
 
 const LARGE_TASK_POP_MESSAGES = new Set([
+  "HYDRO BOT IS ONLINE!",
+  "HYDRO JET ONLINE!",
+  "BIO-GROW ONLINE!",
   "YOU TOOK YOUR FIRST STEPS!",
   "YOU RESTORED THE TALL GRASS!"
 ]);

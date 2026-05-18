@@ -10,6 +10,36 @@ import {
 } from "../../pokedexEntries.js";
 import { GAME_FLOW } from "../../gameFlow.js";
 import {
+  createInactiveFieldMoveState,
+  getActiveFieldMoveAbilityId
+} from "../gameplay/content/activeFieldMoveState.ts";
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES,
+  SANDBOTS_WORLD_TERMS
+} from "../story/sandbotsLexicon.js";
+import {
+  COLONY_FEEDBACK_IDS,
+  getColonyFeedbackActionLabel,
+  getColonyFeedbackNotice
+} from "../gameplay/colonyFeedbackContracts.js";
+import {
+  resolvePlacementConsumptionDecision
+} from "../gameplay/placementConsumptionContract.js";
+import {
+  resolveInputPrompt,
+  resolvePlacementPreviewPrompt,
+  UI_PROMPT_ACTION
+} from "../ui/inputPromptResolver.js";
+import {
+  mapActiveFieldMoveStateToSaveGameDto,
+  mapSaveGameDtoToActiveFieldMoveState
+} from "../save/saveGameDto.ts";
+import {
+  createConsoleGamePerformanceReporter,
+  measureFieldMoveSwitchToPaint
+} from "../performance/gamePerformanceMetrics.ts";
+import {
   CARBON_ITEM_ID,
   CAMPFIRE_ITEM_ID,
   DITTO_FLAG_ITEM_ID,
@@ -20,7 +50,6 @@ import {
   LEAF_DEN_KIT_ITEM_ID,
   LEAVES_ITEM_ID,
   LEPPA_BERRY_ITEM_ID,
-  LIFE_COINS_ITEM_ID,
   LOG_CHAIR_ITEM_ID,
   NPC_PROFILES,
   PLACEHOLDER_RECIPES,
@@ -53,6 +82,11 @@ import {
 import { createDialogueSystem } from "../dialogue/createDialogueSystem.js";
 import { SMALL_ISLAND_DIALOGUES } from "../dialogue/dialogueData.js";
 import { createQuestSystem } from "../quest/createQuestSystem.js";
+import {
+  getErrandQuestProgressFeedback,
+  unlockErrandQuestPokedeskReward,
+  warnInvalidErrandQuestDesign
+} from "../quest/errandQuestDesign.js";
 import { QUEST_EVENT, SMALL_ISLAND_QUESTS } from "../quest/questData.js";
 import { createStoryBeatSystem } from "../story/createStoryBeatSystem.js";
 import {
@@ -60,6 +94,11 @@ import {
   SMALL_ISLAND_FIELD_TASKS,
   STORY_BEAT_IDS
 } from "../story/storyBeatData.js";
+import {
+  getHouseKitPlacementReadiness,
+  getSolarStationProgressState,
+  SOLAR_STATION_PROGRESS_STATE
+} from "../story/progressionContracts.js";
 import { AUTOSAVE_EVENT, createAutosaveRuntime } from "../runtime/autosaveRuntime.js";
 import { createHabitatSystem } from "../sandbox/createHabitatSystem.js";
 import { HABITAT_EVENT, SMALL_ISLAND_HABITATS } from "../sandbox/habitatData.js";
@@ -103,6 +142,9 @@ import {
   clonePlayerProfileState,
   confirmPlayerName,
   createPlayerProfileState,
+  formatBuilderCallsignAcknowledgement,
+  formatBuilderCallsignRegisteredNotice,
+  formatHouseRegisteredNotice,
   hasConfirmedPlayerName
 } from "../player/playerProfile.js";
 import { createEngineRuntime } from "../runtime/createEngineRuntime.js";
@@ -112,6 +154,10 @@ import { createGameAppController } from "../runtime/gameAppController.js";
 import { shouldGamepadSourceHarvestTarget } from "../runtime/gamepadHarvestPolicy.js";
 import { startGameLoop } from "../runtime/gameLoop.js";
 import { createMusicRuntime, MUSIC_TRACK_IDS } from "../runtime/musicRuntime.js";
+import {
+  SOUND_EVENT_IDS,
+  createSoundEventRuntime
+} from "../runtime/soundEventRuntime.js";
 import { createLeafageObjectModalController } from "../ui/leafageObjectModalController.js";
 import {
   PLANET_AMBIENT_INTENSITY,
@@ -146,6 +192,7 @@ import { createPokemonCenterPcModalController } from "../ui/pokemonCenterPcModal
 import {
   createDefaultPlacementDatabase,
   createGridSystem,
+  GRID_PLACEABLE_IDS,
   migrateLegacyPlaceablesToGridRecords
 } from "../gameplay/gridBuildingSystem.js";
 import { createWorkbenchRecipeMap } from "../gameplay/buildableCatalog.js";
@@ -170,6 +217,20 @@ const DEFAULT_GRID_PLACEMENT_DATABASE = createDefaultPlacementDatabase();
 const WORKBENCH_RECIPES = createWorkbenchRecipeMap({
   placeholderRecipes: PLACEHOLDER_RECIPES
 });
+const WORKBENCH_RECIPE_PROTOCOL_UI = Object.freeze({
+  campfire: Object.freeze({
+    label: "Power Plans",
+    purpose: "Thermal shelter and starter heat."
+  }),
+  strawBed: Object.freeze({
+    label: "Water Plans",
+    purpose: "A solar pump node for local circulation."
+  }),
+  [LEAF_DEN_KIT_ITEM_ID]: Object.freeze({
+    label: "Shelter Plans",
+    purpose: "Prepares the first human-ready habitat kit."
+  })
+});
 const FLOWER_FIELD_COMPLETION_SPARK_BUDGET = 420;
 const FLOWER_FIELD_COMPLETION_MIN_SPARKS_PER_PATCH = 4;
 const FLOWER_FIELD_COMPLETION_MAX_SPARKS_PER_PATCH = 8;
@@ -182,7 +243,7 @@ const POKEMON_CENTER_PC_ACTION = Object.freeze({
   UNLOCK_CHALLENGES: "unlock-challenges",
   CLAIM_BOULDER_REWARD: "claim-boulder-reward",
   REVIEW_NEW_CHALLENGES: "review-new-challenges",
-  PURCHASE_LEAF_DEN_KIT: "purchase-leaf-den-kit"
+  ISSUE_LEAF_DEN_KIT: "issue-leaf-den-kit"
 });
 const CHOPPER_BILL_CUTAWAY_START_TEXT =
   "Our human, Bill, waited as long as he could. Very patient man. Very limited warranty.";
@@ -199,24 +260,24 @@ const PLAYER_SKILL_DEFS = {
   },
   waterGun: {
     id: "waterGun",
-    label: "Water Gun",
-    shortLabel: "Water",
+    label: SANDBOTS_ITEM_NAMES.hydroTool,
+    shortLabel: "Hydro",
     glyph: "W",
     color: "#65c7ff",
     ink: "#081f33"
   },
   leafage: {
     id: "leafage",
-    label: "Leafage",
-    shortLabel: "Leaf",
+    label: SANDBOTS_ITEM_NAMES.growTool,
+    shortLabel: "Grow",
     glyph: "L",
     color: "#7ed36d",
     ink: "#0b2610"
   },
   fire: {
     id: "fire",
-    label: "Fire",
-    shortLabel: "Fire",
+    label: SANDBOTS_ITEM_NAMES.thermalTool,
+    shortLabel: "Heat",
     glyph: "F",
     color: "#ff8a3d",
     ink: "#2a1005"
@@ -230,19 +291,19 @@ const FIELD_MOVE_CAROUSEL_CARD_GAP = 10;
 const FIELD_MOVE_CAROUSEL_SELECTED_OVERLAY_URL = new URL("../ui/images/selected.png", import.meta.url).href;
 const FIELD_MOVE_SWITCH_PROMPT_PRESENTATION = Object.freeze({
   waterGun: {
-    companionName: "Squirtle",
+    companionName: SANDBOTS_BOT_NAMES.hydro,
     companionId: "squirtle",
     hint: "USE LT TO MARK THE GROUND",
     thumbnailUrl: new URL("../ui/images/Robot-1-thumb.png", import.meta.url).href
   },
   leafage: {
-    companionName: "Bulbasaur",
+    companionName: SANDBOTS_BOT_NAMES.grow,
     companionId: "bulbasaur",
     hint: "USE LT ON GREEN GROUND",
     thumbnailUrl: new URL("../ui/images/Robot-2-thumb.png", import.meta.url).href
   },
   fire: {
-    companionName: "Charmander",
+    companionName: SANDBOTS_BOT_NAMES.thermal,
     companionId: "charmander",
     hint: "USE LT ON WHITE GROUND",
     thumbnailUrl: new URL("../ui/images/Robot-3-thumb.png", import.meta.url).href
@@ -252,11 +313,12 @@ const QUEST_COMPLETION_POP_DURATION_MS = 2400;
 const QUEST_COMPLETION_POP_MESSAGES = Object.freeze({
   "learn-to-move": "YOU TOOK YOUR FIRST STEPS!",
   "wake-guide": "YOU MET CHOPPER!",
+  "gather-first-supplies": "HYDRO BOT IS ONLINE!",
   "shape-a-living-patch": "YOU RESTORED A PATCH!",
   "record-a-memory": "YOU RECORDED A MEMORY!",
-  "open-the-water-route": "YOU LEARNED WATER GUN!",
+  "open-the-water-route": `${SANDBOTS_ITEM_NAMES.hydroTool.toUpperCase()} ONLINE!`,
   "water-dry-grass": "YOU RESTORED THE TALL GRASS!",
-  "inspect-rustling-grass": "YOU LEARNED LEAFAGE!",
+  "inspect-rustling-grass": `${SANDBOTS_ITEM_NAMES.growTool.toUpperCase()} ONLINE!`,
   "grow-a-home-patch": "YOU GREW A HOME PATCH!",
   "chopper-first-habitat-report": "YOU REPORTED BACK!"
 });
@@ -285,6 +347,14 @@ const CHOPPER_BULBASAUR_REPAIR_BOX_INTRO_COMPLETE_FLAG = "chopperBulbasaurRepair
 const BULBASAUR_REPAIR_BOX_INTRO_FOCUS_HEIGHT = 1.12;
 const BULBASAUR_REPAIR_BOX_INTRO_FOCUS_DELAY_MS = 480;
 const BULBASAUR_REPAIR_BOX_INTRO_RUSTLE_DURATION_MS = 1550;
+const GROW_BOT_REVEAL_CINEMATIC_FOCUS_HEIGHT = 1.18;
+const GROW_BOT_REVEAL_CINEMATIC_DURATION = 4.35;
+const GROW_BOT_REVEAL_CINEMATIC_VISIBLE_PROGRESS = 0.72;
+const GROW_BOT_REVEAL_CINEMATIC_OPEN_START_PROGRESS = 0.62;
+const GROW_BOT_REVEAL_CINEMATIC_FLASH_START = 2.62;
+const GROW_BOT_REVEAL_CINEMATIC_FLASH_DURATION = 1.05;
+const CHOPPER_FIRST_GUIDE_APPROACH_DURATION = 0.85;
+const CHOPPER_FIRST_GUIDE_CAMERA_HEIGHT = 1.55;
 const CHOPPER_SECOND_TALK_APPROACH_DURATION = 1.05;
 const CHOPPER_SECOND_TALK_STOP_DISTANCE = 1.45;
 const SQUIRTLE_DIALOGUE_MIN_PLAYER_DISTANCE = 1.55;
@@ -300,7 +370,6 @@ const LEPPA_TREE_TASK_CAMERA_FOCUS_RETRY_MS = 160;
 const LEPPA_TREE_TASK_CAMERA_FOCUS_MAX_WAIT_MS = 8000;
 const SQUIRTLE_DRY_GRASS_FOCUS_LINE_INDEX = 3;
 const SQUIRTLE_DRY_GRASS_CAMERA_FOCUS_HEIGHT = 1.12;
-const LEAF_DEN_KIT_LIFE_COIN_COST = 10;
 const WORKBENCH_OBJECT_ROTATE_DISTANCE = 3.2;
 const WORKBENCH_OBJECT_ROTATE_TRIGGER_TILE_MARGIN = 1.425;
 const SOLAR_STATION_ROTATION_FOOTPRINT = [2.2, 2.2];
@@ -311,7 +380,6 @@ const HOUSE_BUILT_ROTATION_FOOTPRINT = [
   HOUSE_KIT_ROTATION_FOOTPRINT[1] * 2
 ];
 const MANUAL_SAVE_STORAGE_KEY = "small-island.manual-save.v1";
-const RESTART_GAME_CONFIRM_MESSAGE = "Restart game and clear saved progress?";
 const LOG_CHAIR_SAVE_REQUEST_GRACE_MS = 800;
 const SOLAR_STATION_RECIPE_ARTWORK_URL = new URL("../../Solar-Station/Solar-Station.gif", import.meta.url).href;
 const TRAIN_HOUSE_RECIPE_ARTWORK_URL = new URL("../../Train-house/train-house.gif", import.meta.url).href;
@@ -323,19 +391,19 @@ const LEAFAGE_OBJECT_OPTIONS = Object.freeze([
   {
     id: "tallGrass",
     label: "Tall Grass",
-    notice: "Bulbasaur will grow Tall Grass with Leafage.",
+    notice: `${SANDBOTS_BOT_NAMES.grow} will grow Tall Grass with ${SANDBOTS_ITEM_NAMES.growTool}.`,
     artworkUrl: LEAFAGE_TALL_GRASS_ARTWORK_URL
   },
   {
     id: "garden1",
     label: "Garden-1",
-    notice: "Bulbasaur will grow Garden-1 with Leafage.",
+    notice: `${SANDBOTS_BOT_NAMES.grow} will grow Garden-1 with ${SANDBOTS_ITEM_NAMES.growTool}.`,
     artworkUrl: LEAFAGE_GARDEN_1_ARTWORK_URL
   },
   {
     id: "flower",
     label: "Flower",
-    notice: "Bulbasaur will grow a revived Flower with Leafage.",
+    notice: `${SANDBOTS_BOT_NAMES.grow} will grow a revived Flower with ${SANDBOTS_ITEM_NAMES.growTool}.`,
     artworkUrl: LEAFAGE_FLOWER_ARTWORK_URL
   }
 ]);
@@ -1071,7 +1139,18 @@ export function createWorkbenchModalController({
   }
 
   function getRecipeRequirementCopy(currentRecipe) {
-    return formatRequirementSummary(currentRecipe.ingredients, inventory);
+    const ingredients = currentRecipe?.ingredients || {};
+    const ingredientEntries = Object.entries(ingredients);
+    if (!ingredientEntries.length) {
+      return "No materials needed";
+    }
+
+    return ingredientEntries
+      .map(([itemId, required]) => {
+        const owned = Math.max(0, Number(inventory?.[itemId] || 0));
+        return `${getItemLabel(itemId)} ${Math.min(owned, required)}/${required}`;
+      })
+      .join(" · ");
   }
 
   function close() {
@@ -1110,7 +1189,8 @@ export function createWorkbenchModalController({
           recipe: optionRecipe,
           onConfirm: option.onConfirm || nextOnConfirm,
           disabled: Boolean(option.disabled),
-          status: option.status || null
+          status: option.status || null,
+          actionLabel: option.actionLabel || null
         };
       })
       .filter(Boolean);
@@ -1160,6 +1240,18 @@ export function createWorkbenchModalController({
     }
 
     return "";
+  }
+
+  function getRecipeProtocolUi(currentRecipe) {
+    return WORKBENCH_RECIPE_PROTOCOL_UI[currentRecipe?.id] || Object.freeze({
+      label: "Colony Plans",
+      purpose: "Build support for the current restoration plan."
+    });
+  }
+
+  function formatWorkbenchActionHint(actionLabel) {
+    const label = String(actionLabel || "").trim();
+    return label.startsWith("X ") ? `X / Enter ${label.slice(2)}` : label;
   }
 
   function createRecipeIcon(currentRecipe) {
@@ -1277,6 +1369,8 @@ export function createWorkbenchModalController({
       recipeCard.type = "button";
       recipeCard.dataset.selected = selected ? "true" : "false";
       recipeCard.dataset.disabled = option.disabled ? "true" : "false";
+      recipeCard.setAttribute("aria-pressed", selected ? "true" : "false");
+      recipeCard.setAttribute("aria-disabled", option.disabled ? "true" : "false");
       applyElementStyles(recipeCard, {
         width: "100%",
         minHeight: recipeArtworkUrl ? "clamp(220px, 32vw, 312px)" : "132px",
@@ -1316,6 +1410,15 @@ export function createWorkbenchModalController({
         visibility: selected ? "visible" : "hidden",
         opacity: selected ? "1" : "0"
       });
+      const protocolMeta = getRecipeProtocolUi(currentRecipe);
+      const protocolLabel = createElement("span", "workbench-modal__recipe-protocol", protocolMeta.label);
+      applyElementStyles(protocolLabel, {
+        display: "block",
+        color: "#89ff00",
+        fontSize: "16px",
+        lineHeight: "1",
+        marginBottom: "8px"
+      });
       const recipeName = createElement("span", "workbench-modal__recipe-name", currentRecipe.title || "Recipe");
       applyElementStyles(recipeName, {
         display: "block",
@@ -1323,7 +1426,16 @@ export function createWorkbenchModalController({
         fontSize: "28px",
         lineHeight: "1"
       });
-      const requirementText = option.status || `Needs ${getRecipeRequirementCopy(currentRecipe)}`;
+      const requirementText = option.status || getRecipeRequirementCopy(currentRecipe);
+      recipeCard.setAttribute(
+        "aria-label",
+        [
+          `${selected ? "Selected" : "Plan"}: ${currentRecipe.title || "Recipe"}`,
+          protocolMeta.label,
+          requirementText,
+          protocolMeta.purpose
+        ].filter(Boolean).join(". ")
+      );
       const requirement = createElement(
         "span",
         "workbench-modal__recipe-requirement",
@@ -1336,7 +1448,16 @@ export function createWorkbenchModalController({
         lineHeight: "1.1",
         marginTop: "7px"
       });
-      textWrap.append(recipeName, requirement);
+      const protocolPurpose = createElement("span", "workbench-modal__recipe-purpose", protocolMeta.purpose);
+      applyElementStyles(protocolPurpose, {
+        display: "block",
+        color: "#f2d6a7",
+        fontSize: "16px",
+        lineHeight: "1.12",
+        marginTop: "8px",
+        textTransform: "none"
+      });
+      textWrap.append(protocolLabel, recipeName, requirement, protocolPurpose);
       if (recipeArt) {
         recipeCard.append(recipeArt, textWrap);
       } else {
@@ -1365,9 +1486,10 @@ export function createWorkbenchModalController({
       "workbench-modal__hint-action",
       selectedOption?.disabled ?
         selectedOption.status || "Unavailable" :
-        `X Craft ${selectedRecipe?.title || getItemLabel(CAMPFIRE_ITEM_ID)}`
+        formatWorkbenchActionHint(selectedOption?.actionLabel) ||
+        `X / Enter Craft ${selectedRecipe?.title || getItemLabel(CAMPFIRE_ITEM_ID)}`
     );
-    const closeHint = createElement("span", "workbench-modal__hint-close", "B Close");
+    const closeHint = createElement("span", "workbench-modal__hint-close", "B / Esc Close");
     applyElementStyles(closeHint, {
       position: "absolute",
       right: "24px",
@@ -1622,6 +1744,11 @@ export function createApplicationRuntime({
     hash: windowRef.location.hash,
     storedSkipStartScreen
   });
+  const reportGamePerformanceMetric = createConsoleGamePerformanceReporter({
+    enabled: isDev,
+    consoleRef: windowRef.console || globalThis.console
+  });
+  let gameInput = null;
   const manualSavePoint = readManualSavePoint(windowRef);
   const devSceneOverride =
     isDev &&
@@ -1656,6 +1783,10 @@ export function createApplicationRuntime({
   const inventory = createInitialInventory();
   const storyState = createStoryState();
   const settingsState = loadSettingsState(windowRef.localStorage, SETTINGS_SCHEMA);
+  function syncVisualSettings() {
+    appRoot.dataset.crtFilter = settingsState.accessibility?.crtFilter === false ? "off" : "on";
+  }
+  syncVisualSettings();
   const initialAudioMix = resolveAudioMix(settingsState);
   const musicRuntime = createMusicRuntime({
     tracks: {
@@ -1697,6 +1828,55 @@ export function createApplicationRuntime({
     windowRef,
     volumeScale: () => audioMixRuntime.getSfxVolumeScale()
   });
+  const soundEventRuntime = createSoundEventRuntime({
+    windowRef,
+    root: appRoot,
+    volumeScale: () => audioMixRuntime.getSfxVolumeScale()
+  });
+  soundEventRuntime.attachUiEventDelegates();
+  function playSoundEvent(eventId, options) {
+    soundEventRuntime.play(eventId, options);
+  }
+  function syncColliderDebugToggle(toggle) {
+    if (!toggle) {
+      return;
+    }
+
+    toggle.dataset.active = runtimeFlags.debugColliders ? "true" : "false";
+    toggle.setAttribute("aria-pressed", runtimeFlags.debugColliders ? "true" : "false");
+    toggle.textContent = runtimeFlags.debugColliders ? "COLLIDERS ON" : "COLLIDERS OFF";
+  }
+
+  function setupColliderDebugToggle() {
+    const fpsPanel = dom.fpsPanel;
+    const toggleMount = fpsPanel?.parentElement;
+    if (!fpsPanel || !toggleMount) {
+      runtimeFlags.debugColliders = true;
+      return null;
+    }
+
+    runtimeFlags.debugColliders = true;
+    const toggle = documentRef.createElement("button");
+    toggle.type = "button";
+    toggle.id = "collider-debug-toggle";
+    toggle.className = "collider-debug-toggle";
+    toggle.setAttribute("aria-label", "Toggle collision and trigger debug areas");
+    syncColliderDebugToggle(toggle);
+    toggle.addEventListener("click", () => {
+      runtimeFlags.debugColliders = !runtimeFlags.debugColliders;
+      syncColliderDebugToggle(toggle);
+      playSoundEvent(runtimeFlags.debugColliders ? SOUND_EVENT_IDS.UI_CONFIRM : SOUND_EVENT_IDS.UI_CANCEL);
+      uiRuntime?.pushNotice?.(
+        runtimeFlags.debugColliders ?
+          "Collision and trigger areas visible." :
+          "Collision and trigger areas hidden."
+      );
+    });
+
+    fpsPanel.insertAdjacentElement("afterend", toggle);
+    return toggle;
+  }
+  setupColliderDebugToggle();
   const playerMemory = createPlayerProfileState();
   const playerSkills = {
     transform: false,
@@ -1728,7 +1908,7 @@ export function createApplicationRuntime({
   let squirtleDryGrassCameraFocusFrame = null;
   let squirtleDryGrassCameraFocusShown = false;
   let followerCallRequested = false;
-  let activeFieldMoveId = null;
+  let activeFieldMoveState = createInactiveFieldMoveState();
   let mainThemeStarted = false;
   let settingsUnlockAutosaved = false;
   let fieldMoveSwitchPrompt = null;
@@ -1746,6 +1926,133 @@ export function createApplicationRuntime({
     placement.kind = "solarStation";
     placement.size = [0, 0];
     return placement;
+  }
+
+  function getCurrentPlayerPosition() {
+    const position = gameSession?.playerCharacter?.getPosition?.() || null;
+    return Array.isArray(position) ? position : null;
+  }
+
+  function setPendingPlacementIntent(intent = null) {
+    if (!gameSession) {
+      return null;
+    }
+
+    gameSession.pendingPlacementIntent = intent ? {
+      source: "workbench",
+      ...intent
+    } : null;
+    return gameSession.pendingPlacementIntent;
+  }
+
+  function clearPendingPlacementIntent(itemId = null) {
+    if (!gameSession?.pendingPlacementIntent) {
+      return;
+    }
+
+    if (!itemId || gameSession.pendingPlacementIntent.itemId === itemId) {
+      gameSession.pendingPlacementIntent = null;
+    }
+  }
+
+  function getCurrentInputModalityState() {
+    return gameInput?.getInputModalityState?.() || null;
+  }
+
+  function getCurrentSolarStationPlacementTarget() {
+    const playerPosition = getCurrentPlayerPosition();
+    if (!playerPosition || typeof findNearbyActionTarget !== "function") {
+      return null;
+    }
+
+    return findNearbyActionTarget({
+      playerPosition,
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      storyState,
+      inventory: {
+        [STRAW_BED_ITEM_ID]: inventory[STRAW_BED_ITEM_ID]
+      },
+      groundGrassPatches: gameSession.groundGrassPatches,
+      allowPlacement: true
+    })?.strawBedPlacement || null;
+  }
+
+  function requestSolarStationPlacementIntent() {
+    const solarStationState = getSolarStationProgressState({ storyState, inventory });
+
+    if (
+      !solarStationState.inBag ||
+      solarStationState.state === SOLAR_STATION_PROGRESS_STATE.PLACED
+    ) {
+      clearPendingPlacementIntent(STRAW_BED_ITEM_ID);
+      return false;
+    }
+
+    setPendingPlacementIntent({
+      itemId: STRAW_BED_ITEM_ID,
+      placeableId: GRID_PLACEABLE_IDS.SOLAR_STATION,
+      label: "Solar Station"
+    });
+
+    const placementTarget = getCurrentSolarStationPlacementTarget();
+    if (placementTarget?.canPlace && placementTarget?.center) {
+      startStrawBedPlacementPreview(placementTarget);
+      return true;
+    }
+
+    uiRuntime?.pushNotice?.(
+      placementTarget?.reason ||
+        `Solar Station ready. Move to open terrain and press ${
+          resolveInputPrompt(UI_PROMPT_ACTION.PLACE, getCurrentInputModalityState())
+        }.`
+    );
+    return false;
+  }
+
+  function requestHouseKitPlacementIntent() {
+    const hasSolarStationPower = Boolean(
+      storyState.flags.strawBedPlacedInBulbasaurHabitat &&
+      gameSession?.strawBed?.position
+    );
+    const placementReadiness = getHouseKitPlacementReadiness({
+      storyState,
+      inventory,
+      hasSolarStationPower
+    });
+
+    if (placementReadiness.blockedReason === "missing-house-kit") {
+      clearPendingPlacementIntent(LEAF_DEN_KIT_ITEM_ID);
+      return false;
+    }
+
+    setPendingPlacementIntent({
+      itemId: LEAF_DEN_KIT_ITEM_ID,
+      placeableId: GRID_PLACEABLE_IDS.LEAF_DEN_KIT,
+      label: "House Kit",
+      blockedReason: placementReadiness.blockedReason
+    });
+
+    if (!placementReadiness.canPlace) {
+      uiRuntime?.pushNotice?.(
+        getColonyFeedbackNotice(COLONY_FEEDBACK_IDS.HOUSE_KIT_READY_NEEDS_SOLAR_STATION)
+      );
+      return false;
+    }
+
+    const playerPosition = getCurrentPlayerPosition();
+    if (!playerPosition) {
+      uiRuntime?.pushNotice?.(
+        `House Kit ready. Move into the world and press ${
+          resolveInputPrompt(UI_PROMPT_ACTION.PLACE, getCurrentInputModalityState())
+        }.`
+      );
+      return false;
+    }
+
+    startLeafDenKitPlacementPreview(playerPosition);
+    return true;
   }
 
   function getPlacementQuarterTurnSize(size, yaw = 0) {
@@ -1879,7 +2186,9 @@ export function createApplicationRuntime({
       valid: true,
       readyForConfirm: false
     };
-    uiRuntime.pushNotice("Move the Solar Station preview. X / Enter place, B cancel, LB/RB rotate.");
+    uiRuntime.pushNotice(
+      resolvePlacementPreviewPrompt("Move the Solar Station preview.", getCurrentInputModalityState())
+    );
   }
 
   function confirmStrawBedPlacementPreview() {
@@ -1898,6 +2207,16 @@ export function createApplicationRuntime({
       return true;
     }
 
+    const consumptionDecision = resolvePlacementConsumptionDecision({
+      preview,
+      inventory,
+      itemId: STRAW_BED_ITEM_ID
+    });
+    if (!consumptionDecision.shouldConsume) {
+      uiRuntime.pushNotice("The Solar Station kit is no longer in the bag.");
+      return true;
+    }
+
     const placementPosition = Array.isArray(preview.snappedPosition) ?
       preview.snappedPosition :
       preview.position;
@@ -1906,6 +2225,7 @@ export function createApplicationRuntime({
     );
     gameSession.strawBed.yaw = Number(preview.yaw || 0);
     gameSession.strawBedPlacementPreview = null;
+    clearPendingPlacementIntent(STRAW_BED_ITEM_ID);
     syncStrawBedSolarStationModel(gameSession.strawBed, { animate: true });
     startConstructionCloudEffect({
       id: "solar-station",
@@ -1914,7 +2234,8 @@ export function createApplicationRuntime({
     consumeItems(inventory, { [STRAW_BED_ITEM_ID]: 1 });
     storyState.flags.strawBedPlacedInBulbasaurHabitat = true;
     uiRuntime.syncInventoryUi(inventory);
-    uiRuntime.pushNotice("You placed the Solar Station in the field.");
+    playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_PLACE);
+    uiRuntime.pushNotice(getColonyFeedbackNotice(COLONY_FEEDBACK_IDS.SOLAR_STATION_PLACED));
     syncQuestPanels();
     return true;
   }
@@ -1936,7 +2257,9 @@ export function createApplicationRuntime({
       valid: true,
       readyForConfirm: false
     };
-    uiRuntime.pushNotice("Move the House Kit preview. X / Enter place, B cancel, LB/RB rotate.");
+    uiRuntime.pushNotice(
+      resolvePlacementPreviewPrompt("Move the House Kit preview.", getCurrentInputModalityState())
+    );
   }
 
   function buildPlayerHousePlacement(basePlacement, placementPosition, preview) {
@@ -1985,9 +2308,19 @@ export function createApplicationRuntime({
         preview.invalidReason === "invalid-terrain" ?
           "The House Kit needs valid ground." :
           preview.invalidReason === "outside-solar-station-radius" ?
-            "The House Kit must stay inside the Solar Station power radius." :
+            "The House Kit must stay inside the blue Solar Station support zone." :
             "The House Kit is overlapping another object."
       );
+      return true;
+    }
+
+    const consumptionDecision = resolvePlacementConsumptionDecision({
+      preview,
+      inventory,
+      itemId: LEAF_DEN_KIT_ITEM_ID
+    });
+    if (!consumptionDecision.shouldConsume) {
+      uiRuntime.pushNotice("The House Kit is no longer in the bag.");
       return true;
     }
 
@@ -2002,14 +2335,16 @@ export function createApplicationRuntime({
       gameSession.playerHouses ||= [];
       gameSession.playerHouses.push(playerHouse);
       gameSession.leafDenKitPlacementPreview = null;
+      clearPendingPlacementIntent(LEAF_DEN_KIT_ITEM_ID);
       consumeItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 });
       storyState.flags.leafDenKitSelected = Number(inventory[LEAF_DEN_KIT_ITEM_ID] || 0) > 0;
       uiRuntime.syncInventoryUi(inventory);
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_PLACE);
       startConstructionCloudEffect({
         id: playerHouse.id,
         position: playerHouse.position
       });
-      uiRuntime.pushNotice("You placed a new House.");
+      uiRuntime.pushNotice(formatHouseRegisteredNotice(playerMemory));
       syncQuestPanels();
       return true;
     }
@@ -2030,11 +2365,13 @@ export function createApplicationRuntime({
     };
     attachPlayerPlacementSpawnEffect(gameSession.leafDen);
     gameSession.leafDenKitPlacementPreview = null;
+    clearPendingPlacementIntent(LEAF_DEN_KIT_ITEM_ID);
     consumeItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 });
     storyState.flags.leafDenKitPlaced = true;
     storyState.flags.leafDenKitSelected = false;
     uiRuntime.syncInventoryUi(inventory);
-    uiRuntime.pushNotice("You placed the House Kit.");
+    playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_PLACE);
+    uiRuntime.pushNotice(formatHouseRegisteredNotice(playerMemory));
     syncQuestPanels();
     return true;
   }
@@ -2119,6 +2456,9 @@ export function createApplicationRuntime({
   }
 
   function showQuestCompletionPop(completedQuestIds = []) {
+    if (completedQuestIds.length > 0) {
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_SUCCESS);
+    }
     questCompletionPop = {
       text: buildQuestCompletionPopText(completedQuestIds),
       expiresAt: getRuntimeNow() + QUEST_COMPLETION_POP_DURATION_MS
@@ -2334,7 +2674,7 @@ export function createApplicationRuntime({
 
   function setBillCameoVisible(visible) {
     if (gameSession?.billCameo) {
-      gameSession.billCameo.visible = visible;
+      gameSession.billCameo.visible = gameSession.billCameo.persistent ? true : visible;
     }
   }
 
@@ -2367,6 +2707,59 @@ export function createApplicationRuntime({
       interactables: gameSession?.interactables || []
     });
     return true;
+  }
+
+  function getFirstChopperGuideTarget() {
+    const playerPosition = gameSession?.playerCharacter?.getPosition?.();
+    const chopperPosition = getChopperNpcPosition();
+
+    if (!playerPosition || !chopperPosition) {
+      return null;
+    }
+
+    return buildChopperApproachTarget(playerPosition, chopperPosition);
+  }
+
+  function focusFirstChopperGuideBeat() {
+    const chopperPosition = getChopperNpcPosition();
+    const targetPosition = getFirstChopperGuideTarget();
+
+    if (!chopperPosition || !targetPosition) {
+      return refocusChopperConversation();
+    }
+
+    dialogueCamera?.focusWorldPoint({
+      position: [
+        (chopperPosition[0] + targetPosition[0]) * 0.5,
+        chopperPosition[1],
+        (chopperPosition[2] + targetPosition[2]) * 0.5
+      ],
+      height: CHOPPER_FIRST_GUIDE_CAMERA_HEIGHT
+    });
+    return true;
+  }
+
+  function playFirstChopperGuideAction() {
+    const chopperActor = gameSession?.chopperNpcActor;
+    const targetPosition = getFirstChopperGuideTarget();
+
+    if (!chopperActor || !targetPosition) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise((resolve) => {
+      const flightStarted = startChopperNpcFlight(chopperActor, {
+        targetPosition,
+        duration: CHOPPER_FIRST_GUIDE_APPROACH_DURATION,
+        onComplete() {
+          resolve(true);
+        }
+      });
+
+      if (!flightStarted) {
+        resolve(false);
+      }
+    });
   }
 
   function revealDismantledSquirtle() {
@@ -2954,7 +3347,7 @@ export function createApplicationRuntime({
 
       if (!storyState.flags.dittoFlagSelectedForHouse) {
         storyState.flags.dittoFlagSelectedForHouse = true;
-        uiRuntime.pushNotice("Ditto Flag selected.");
+        uiRuntime.pushNotice(`${SANDBOTS_ITEM_NAMES.colonyFlag} selected.`);
         syncQuestPanels();
       }
     }
@@ -3097,6 +3490,7 @@ export function createApplicationRuntime({
       return true;
     }
 
+    const activeFieldMoveId = getActiveFieldMoveId();
     const activeHarvestTarget = findNearbyActionTarget({
       playerPosition,
       palmModel: gameSession.palmModel,
@@ -3244,7 +3638,7 @@ export function createApplicationRuntime({
 
     storyState.flags.pokemonCenterGuideFlightStarted = true;
     uiRuntime?.pushNotice(
-      "Follow Professor Tangrowth to the destroyed Pokemon Center.",
+      `Follow ${SANDBOTS_BOT_NAMES.overseer} to the damaged ${SANDBOTS_WORLD_TERMS.terminal}.`,
       4.8
     );
 
@@ -3412,8 +3806,8 @@ export function createApplicationRuntime({
       .join(", ");
 
     return missing ?
-      `Missing helper specialties: ${missing}. Call or bring matching Pokemon.` :
-      "Call or bring matching Pokemon before building the House.";
+      `Missing helper specialties: ${missing}. Call or bring matching bots.` :
+      "Call or bring matching bots before building the House.";
   }
 
   function isCharmanderNearTangrowthForCelebration() {
@@ -3570,6 +3964,29 @@ export function createApplicationRuntime({
     return true;
   }
 
+  function hasCharmanderProgressStartedBeforeTrainHouse() {
+    return Boolean(
+      !storyState.flags.campfireSpatOut &&
+      (
+        storyState.flags.charmanderRustlingGrassCellId ||
+        storyState.flags.charmanderRevealed ||
+        storyState.flags.charmanderFollowing
+      )
+    );
+  }
+
+  function shouldRecoverBulbasaurWorkbenchGuide() {
+    return Boolean(
+      !storyState.flags.workbenchDiyRecipesReceived &&
+      !storyState.flags.bulbasaurWorkbenchGuideAvailable &&
+      !storyBeats?.hasCompleted?.(STORY_BEAT_IDS.BULBASAUR_WORKBENCH_GUIDE_INTRO) &&
+      (
+        storyState.flags.logChairSat ||
+        hasCharmanderProgressStartedBeforeTrainHouse()
+      )
+    );
+  }
+
   function playBulbasaurWorkbenchGuideIntro() {
     if (
       storyState.flags.bulbasaurWorkbenchGuideAvailable ||
@@ -3626,6 +4043,44 @@ export function createApplicationRuntime({
       }
     }
   });
+  warnInvalidErrandQuestDesign({
+    quests: SMALL_ISLAND_QUESTS,
+    enabled: isDev,
+    consoleRef: windowRef.console || globalThis.console
+  });
+
+  function reconcileQuestProgressFromUnlockedSkills() {
+    if (!playerSkills.waterGun) {
+      return;
+    }
+
+    questSystem.emit({
+      type: QUEST_EVENT.UNLOCK,
+      targetId: "waterGun"
+    });
+  }
+
+  function getQuestObjectiveProgress(quest = null, type = "", targetId = "") {
+    const objective = quest?.objectives?.find((candidate) => (
+      candidate.type === type &&
+      candidate.targetId === targetId
+    ));
+
+    return Number(objective?.current || 0);
+  }
+
+  function pushErrandQuestProgressFeedback(quest = null, progress = {}) {
+    const feedback = getErrandQuestProgressFeedback(quest, progress);
+    for (const message of feedback) {
+      uiRuntime?.pushNotice?.(message, 5.2);
+    }
+    unlockErrandQuestPokedeskReward({
+      quest,
+      completed: progress.completed,
+      pokedexRuntime: uiRuntime?.pokedexRuntime
+    });
+    return feedback;
+  }
 
   function writeManualSavePoint(meta = {}) {
     try {
@@ -3643,7 +4098,7 @@ export function createApplicationRuntime({
         inventory: { ...inventory },
         playerProfile: clonePlayerProfileState(playerMemory),
         playerSkills: { ...playerSkills },
-        activeFieldMoveId,
+        ...mapActiveFieldMoveStateToSaveGameDto(activeFieldMoveState),
         settings: Object.fromEntries(
           Object.entries(settingsState).map(([groupId, groupState]) => [
             groupId,
@@ -3757,12 +4212,22 @@ export function createApplicationRuntime({
     return Boolean(ITEM_DEFS[itemId]?.bagDetailsEligible);
   }
 
+  function getActiveFieldMoveId() {
+    return getActiveFieldMoveAbilityId(activeFieldMoveState);
+  }
+
+  function setActiveFieldMoveStateFromId(skillId) {
+    activeFieldMoveState = mapSaveGameDtoToActiveFieldMoveState({
+      activeFieldMoveId: skillId
+    });
+  }
+
   function getUnlockedFieldMoveIds() {
     return ACTIVE_FIELD_MOVE_ORDER.filter((skillId) => playerSkills[skillId]);
   }
 
   function syncSkillsUi() {
-    uiRuntime?.syncSkillsUi(playerSkills, activeFieldMoveId);
+    uiRuntime?.syncSkillsUi(playerSkills, getActiveFieldMoveId());
   }
 
   function getCarouselRelativeIndex(index, selectedIndex, total) {
@@ -3926,11 +4391,22 @@ export function createApplicationRuntime({
     };
   }
 
+  function measureFieldMoveSwitchPaint(activeFieldMoveId, previousFieldMoveId) {
+    measureFieldMoveSwitchToPaint({
+      activeFieldMoveId,
+      previousFieldMoveId,
+      now: getRuntimeNow,
+      requestAnimationFrame: windowRef.requestAnimationFrame?.bind(windowRef),
+      report: reportGamePerformanceMetric
+    });
+  }
+
   function setActiveFieldMove(skillId, { notify = false } = {}) {
     if (!ACTIVE_FIELD_MOVE_ORDER.includes(skillId) || !playerSkills[skillId]) {
       return false;
     }
 
+    const activeFieldMoveId = getActiveFieldMoveId();
     const previousActiveFieldMoveId = activeFieldMoveId;
 
     if (activeFieldMoveId === skillId) {
@@ -3940,28 +4416,31 @@ export function createApplicationRuntime({
       return true;
     }
 
-    activeFieldMoveId = skillId;
+    setActiveFieldMoveStateFromId(skillId);
     syncSkillsUi();
 
     if (notify) {
       showFieldMoveSwitchPrompt(skillId, previousActiveFieldMoveId);
+      measureFieldMoveSwitchPaint(skillId, previousActiveFieldMoveId);
     }
 
     return true;
   }
 
   function ensureActiveFieldMove() {
+    const activeFieldMoveId = getActiveFieldMoveId();
+
     if (activeFieldMoveId && playerSkills[activeFieldMoveId]) {
       return;
     }
 
-    activeFieldMoveId = getUnlockedFieldMoveIds()[0] || null;
+    setActiveFieldMoveStateFromId(getUnlockedFieldMoveIds()[0] || null);
     syncSkillsUi();
   }
 
   function cycleActiveFieldMove(direction = 1) {
     const unlockedFieldMoveIds = getUnlockedFieldMoveIds();
-    const previousActiveFieldMoveId = activeFieldMoveId;
+    const previousActiveFieldMoveId = getActiveFieldMoveId();
 
     if (unlockedFieldMoveIds.length === 0) {
       return;
@@ -3972,13 +4451,13 @@ export function createApplicationRuntime({
       return;
     }
 
-    const currentIndex = Math.max(0, unlockedFieldMoveIds.indexOf(activeFieldMoveId));
+    const currentIndex = Math.max(0, unlockedFieldMoveIds.indexOf(previousActiveFieldMoveId));
     const step = direction < 0 ? -1 : 1;
     const nextIndex =
       (currentIndex + step + unlockedFieldMoveIds.length) % unlockedFieldMoveIds.length;
 
     setActiveFieldMove(unlockedFieldMoveIds[nextIndex], { notify: true });
-    if (activeFieldMoveId !== previousActiveFieldMoveId) {
+    if (getActiveFieldMoveId() !== previousActiveFieldMoveId) {
       botTradeSfxPlayer.play();
     }
   }
@@ -3990,7 +4469,7 @@ export function createApplicationRuntime({
 
     playerSkills[skillId] = true;
     if (ACTIVE_FIELD_MOVE_ORDER.includes(skillId)) {
-      activeFieldMoveId = skillId;
+      setActiveFieldMoveStateFromId(skillId);
     } else {
       ensureActiveFieldMove();
     }
@@ -4085,6 +4564,9 @@ export function createApplicationRuntime({
     clearGameFlowInput,
     isBuilderPanelOpen: () => builderPanelOpen,
     setBuilderPanelOpen,
+    onNoticePushed: () => {
+      playSoundEvent(SOUND_EVENT_IDS.UI_NOTICE);
+    },
     onPokedexScriptedClose: () => {
       sceneFlowRuntime?.actTwoTutorial.notifyPokedexClosed();
     }
@@ -4109,19 +4591,6 @@ export function createApplicationRuntime({
   });
 
   function restartGameFromSettings() {
-    let confirmed = true;
-    if (typeof windowRef.confirm === "function") {
-      try {
-        confirmed = windowRef.confirm(RESTART_GAME_CONFIRM_MESSAGE);
-      } catch {
-        confirmed = true;
-      }
-    }
-
-    if (!confirmed) {
-      return false;
-    }
-
     removeLocalStorageItem(windowRef, MANUAL_SAVE_STORAGE_KEY);
     removeLocalStorageItem(windowRef, SKIP_START_SCREEN_STORAGE_KEY);
 
@@ -4143,6 +4612,7 @@ export function createApplicationRuntime({
     storyState,
     onChange: () => {
       audioMixRuntime.updateFromSettings(settingsState);
+      syncVisualSettings();
       saveSettingsState(windowRef.localStorage, settingsState);
     },
     onClose: clearGameFlowInput,
@@ -4185,7 +4655,7 @@ export function createApplicationRuntime({
     ) {
       return {
         actionId: POKEMON_CENTER_PC_ACTION.UNLOCK_CHALLENGES,
-        actionLabel: "Open Challenges"
+        actionLabel: "Open Habitat Checks"
       };
     }
 
@@ -4195,7 +4665,7 @@ export function createApplicationRuntime({
     ) {
       return {
         actionId: POKEMON_CENTER_PC_ACTION.CLAIM_BOULDER_REWARD,
-        actionLabel: "Claim Life Coins"
+        actionLabel: getColonyFeedbackActionLabel(COLONY_FEEDBACK_IDS.LOG_VIABILITY_ACTION)
       };
     }
 
@@ -4216,8 +4686,8 @@ export function createApplicationRuntime({
       !storyState.flags.leafDenKitPurchased
     ) {
       return {
-        actionId: POKEMON_CENTER_PC_ACTION.PURCHASE_LEAF_DEN_KIT,
-        actionLabel: "Buy Kit"
+        actionId: POKEMON_CENTER_PC_ACTION.ISSUE_LEAF_DEN_KIT,
+        actionLabel: getColonyFeedbackActionLabel(COLONY_FEEDBACK_IDS.ISSUE_HOUSE_KIT_ACTION)
       };
     }
 
@@ -4232,7 +4702,7 @@ export function createApplicationRuntime({
         source: "story",
         status: quest.status,
         title: locked ? "????" : quest.title,
-        description: locked ? "Mission data has not been recovered yet." : quest.description,
+        description: locked ? "Check data has not been recovered yet." : quest.description,
         progress: locked ? "" : formatQuestMissionProgress(quest)
       };
     });
@@ -4249,7 +4719,7 @@ export function createApplicationRuntime({
         status,
         title: status === "locked" ? "????" : task.title,
         description: status === "locked" ?
-          "Mission data has not been recovered yet." :
+          "Check data has not been recovered yet." :
           getFieldTaskDescription(task, storyState),
         ...action
       };
@@ -4262,12 +4732,6 @@ export function createApplicationRuntime({
     if (actionId === POKEMON_CENTER_PC_ACTION.CLAIM_BOULDER_REWARD) {
       storyState.flags.boulderChallengeRewardReady = true;
       storyBeats.playDialogue(STORY_BEAT_IDS.BOULDER_CHALLENGE_REWARD, {
-        onBeforeCompleteEffects: () => {
-          addItems(inventory, { [LIFE_COINS_ITEM_ID]: 10 });
-          uiRuntime.syncInventoryUi(inventory);
-          uiRuntime.bagUiRuntime.handleItemCollected(LIFE_COINS_ITEM_ID, storyState);
-          syncQuestPanels();
-        },
         onComplete: () => {
           dialogueCamera.restoreGameplayCamera();
           syncQuestPanels();
@@ -4286,17 +4750,9 @@ export function createApplicationRuntime({
       return true;
     }
 
-    if (actionId === POKEMON_CENTER_PC_ACTION.PURCHASE_LEAF_DEN_KIT) {
-      if (!hasItems(inventory, { [LIFE_COINS_ITEM_ID]: LEAF_DEN_KIT_LIFE_COIN_COST })) {
-        uiRuntime.pushNotice(`You need ${LEAF_DEN_KIT_LIFE_COIN_COST} ${getItemLabel(LIFE_COINS_ITEM_ID)} to purchase the House Kit.`);
-        dialogueCamera.restoreGameplayCamera();
-        syncQuestPanels();
-        return false;
-      }
-
+    if (actionId === POKEMON_CENTER_PC_ACTION.ISSUE_LEAF_DEN_KIT) {
       storyBeats.playDialogue(STORY_BEAT_IDS.LEAF_DEN_KIT_PURCHASED, {
         onBeforeCompleteEffects: () => {
-          consumeItems(inventory, { [LIFE_COINS_ITEM_ID]: LEAF_DEN_KIT_LIFE_COIN_COST });
           addItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 });
           uiRuntime.syncInventoryUi(inventory);
           uiRuntime.bagUiRuntime.handleItemCollected(LEAF_DEN_KIT_ITEM_ID, storyState);
@@ -4363,6 +4819,19 @@ export function createApplicationRuntime({
                       playerName: playerMemory.playerName,
                       nameConfirmation: playerMemory.nameConfirmation
                     });
+                    uiRuntime.pushNotice(formatBuilderCallsignRegisteredNotice(playerMemory), 3.6);
+                    const openedAcknowledgement = uiRuntime.gameplayDialogue.openConversation?.({
+                      lines: [
+                        {
+                          speaker: SANDBOTS_BOT_NAMES.scout,
+                          text: formatBuilderCallsignAcknowledgement(playerMemory)
+                        }
+                      ],
+                      onComplete: restoreCameraOnComplete
+                    });
+                    if (openedAcknowledgement) {
+                      return;
+                    }
                   }
                   restoreCameraOnComplete();
                 }
@@ -4392,6 +4861,8 @@ export function createApplicationRuntime({
             targetId,
             dialogueId,
             transitionVeil: firstChopperCinematicVeil,
+            focusGuideTarget: focusFirstChopperGuideBeat,
+            performGuideAction: playFirstChopperGuideAction,
             focusConversation: refocusChopperConversation,
             openConversation: playOnboardingConversation,
             clearGameFlowInput
@@ -4578,6 +5049,7 @@ export function createApplicationRuntime({
       if (!Array.isArray(repairPosition)) {
         return;
       }
+      const repairBoxFocusPosition = getBulbasaurRepairBoxFocusPosition() || repairPosition;
 
       const openChopperEncouragement = () => {
         const playerPosition = gameSession?.playerCharacter?.getPosition?.();
@@ -4625,6 +5097,9 @@ export function createApplicationRuntime({
       const openBulbasaurDiscoveryDialogue = () => {
         scriptedInteractionActive = false;
         clearGameFlowInput();
+        if (dom.uiLayer instanceof HTMLElement) {
+          dom.uiLayer.dataset.mode = "game";
+        }
         focusBulbasaurDiscovery();
         storyBeats.playDialogue(STORY_BEAT_IDS.BULBASAUR_HABITAT_DISCOVERY, {
           onComplete: openChopperEncouragement
@@ -4633,14 +5108,15 @@ export function createApplicationRuntime({
 
       scriptedInteractionActive = true;
       clearGameFlowInput();
+      if (dom.uiLayer instanceof HTMLElement) {
+        dom.uiLayer.dataset.mode = "cinematic";
+      }
       dialogueCamera?.focusWorldPoint({
-        position: repairPosition,
-        height: 1.12
+        position: repairBoxFocusPosition,
+        height: GROW_BOT_REVEAL_CINEMATIC_FOCUS_HEIGHT
       });
 
-      const revealDuration = 1.15;
-      const flashDuration = 0.2;
-      const visibleAtSeconds = revealDuration * 0.56;
+      const revealDuration = GROW_BOT_REVEAL_CINEMATIC_DURATION;
       requestAutosave(AUTOSAVE_EVENT.ROBOT_REACTIVATED, {
         robotId: "bulbasaur"
       });
@@ -4653,8 +5129,10 @@ export function createApplicationRuntime({
         active: true,
         elapsed: 0,
         duration: revealDuration,
-        flashStart: Math.max(0, visibleAtSeconds - flashDuration * 0.5),
-        flashDuration,
+        visibleProgress: GROW_BOT_REVEAL_CINEMATIC_VISIBLE_PROGRESS,
+        openStartProgress: GROW_BOT_REVEAL_CINEMATIC_OPEN_START_PROGRESS,
+        flashStart: GROW_BOT_REVEAL_CINEMATIC_FLASH_START,
+        flashDuration: GROW_BOT_REVEAL_CINEMATIC_FLASH_DURATION,
         hideBoxWhenVisible: true,
         bulbasaurVisible: false,
         onComplete: openBulbasaurDiscoveryDialogue
@@ -4705,7 +5183,12 @@ export function createApplicationRuntime({
       }
 
       storyBeats.playDialogue(STORY_BEAT_IDS.CHARMANDER_DISCOVERY, {
-        onComplete: syncQuestPanels
+        onComplete: () => {
+          syncQuestPanels();
+          if (shouldRecoverBulbasaurWorkbenchGuide()) {
+            playBulbasaurWorkbenchGuideIntro();
+          }
+        }
       });
     },
     onTimburrRevealed({ cellId }) {
@@ -4735,7 +5218,7 @@ export function createApplicationRuntime({
     },
     onLeppaBerryGiftRequested({ targetId = "bulbasaur" } = {}) {
       if (!hasItems(inventory, { [LEPPA_BERRY_ITEM_ID]: 1 })) {
-        uiRuntime.pushNotice("You need a Leppa Berry to show them.");
+        uiRuntime.pushNotice(`You need a ${SANDBOTS_ITEM_NAMES.pulseBerry} to show them.`);
         return;
       }
 
@@ -4768,18 +5251,37 @@ export function createApplicationRuntime({
       });
     },
     onLeafDenKitPlacementRequested({ playerPosition }) {
-      if (!hasItems(inventory, { [LEAF_DEN_KIT_ITEM_ID]: 1 })) {
-        uiRuntime.pushNotice("You need a House Kit before you can place it.");
+      const placementReadiness = getHouseKitPlacementReadiness({
+        storyState,
+        inventory,
+        hasSolarStationPower: Boolean(
+          storyState.flags.strawBedPlacedInBulbasaurHabitat &&
+          gameSession?.strawBed?.position
+        )
+      });
+
+      if (placementReadiness.blockedReason === "missing-house-kit") {
+        clearPendingPlacementIntent(LEAF_DEN_KIT_ITEM_ID);
+        uiRuntime.pushNotice(placementReadiness.reason);
         return;
       }
 
-      if (
-        !storyState.flags.strawBedPlacedInBulbasaurHabitat ||
-        !gameSession?.strawBed?.position
-      ) {
-        uiRuntime.pushNotice("Place the Solar Station before placing the House Kit.");
+      if (!placementReadiness.canPlace) {
+        setPendingPlacementIntent({
+          itemId: LEAF_DEN_KIT_ITEM_ID,
+          placeableId: GRID_PLACEABLE_IDS.LEAF_DEN_KIT,
+          label: "House Kit",
+          blockedReason: placementReadiness.blockedReason
+        });
+        uiRuntime.pushNotice(placementReadiness.reason);
         return;
       }
+
+      setPendingPlacementIntent({
+        itemId: LEAF_DEN_KIT_ITEM_ID,
+        placeableId: GRID_PLACEABLE_IDS.LEAF_DEN_KIT,
+        label: "House Kit"
+      });
 
       if (confirmLeafDenKitPlacementPreview()) {
         return;
@@ -4860,7 +5362,7 @@ export function createApplicationRuntime({
 
       const current = Math.min(3, Number(storyState.flags.leafDenFurniturePlacedCount || 0));
       if (current >= 3) {
-        uiRuntime.pushNotice("The House already has enough furniture. Talk to Timburr.");
+        uiRuntime.pushNotice(`The House already has enough furniture. Talk to ${SANDBOTS_BOT_NAMES.builder}.`);
         return;
       }
 
@@ -4869,9 +5371,10 @@ export function createApplicationRuntime({
         attachPlayerPlacementSpawnEffect(buildLeafDenFurniturePlacement(current))
       );
       storyState.flags.leafDenFurniturePlacedCount = current + 1;
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_PLACE);
       uiRuntime.pushNotice(
         storyState.flags.leafDenFurniturePlacedCount >= 3 ?
-          "All furniture is placed. Talk to Timburr." :
+          `All furniture is placed. Talk to ${SANDBOTS_BOT_NAMES.builder}.` :
           `Furniture placed inside the House. ${storyState.flags.leafDenFurniturePlacedCount}/3.`
       );
       syncQuestPanels();
@@ -4893,13 +5396,13 @@ export function createApplicationRuntime({
     },
     onCharmanderCelebrationTangrowthRequested() {
       if (!storyState.flags.charmanderCelebrationSuggested) {
-        uiRuntime.pushNotice("Talk to Charmander about the celebration first.");
+        uiRuntime.pushNotice(`Talk to ${SANDBOTS_BOT_NAMES.thermal} about the celebration first.`);
         dialogueCamera.restoreGameplayCamera();
         return;
       }
 
       if (!isCharmanderNearTangrowthForCelebration()) {
-        uiRuntime.pushNotice("Bring Charmander closer to Professor Tangrowth first.");
+        uiRuntime.pushNotice(`Bring ${SANDBOTS_BOT_NAMES.thermal} closer to ${SANDBOTS_BOT_NAMES.overseer} first.`);
         dialogueCamera.restoreGameplayCamera();
         syncQuestPanels();
         return;
@@ -4923,7 +5426,7 @@ export function createApplicationRuntime({
     },
     onDittoFlagPlacementRequested() {
       if (!storyState.flags.dittoFlagSelectedForHouse) {
-        uiRuntime.pushNotice("Open the bag with X and select the Ditto Flag first.");
+        uiRuntime.pushNotice(`Open the bag with X and select the ${SANDBOTS_ITEM_NAMES.colonyFlag} first.`);
         return;
       }
 
@@ -4933,7 +5436,7 @@ export function createApplicationRuntime({
       }
 
       if (!hasItems(inventory, { [DITTO_FLAG_ITEM_ID]: 1 })) {
-        uiRuntime.pushNotice("You need a Ditto Flag in your bag.");
+        uiRuntime.pushNotice(`You need a ${SANDBOTS_ITEM_NAMES.colonyFlag} in your bag.`);
         return;
       }
 
@@ -4941,6 +5444,7 @@ export function createApplicationRuntime({
       consumeItems(inventory, { [DITTO_FLAG_ITEM_ID]: 1 });
       storyState.flags.dittoFlagSelectedForHouse = false;
       uiRuntime.syncInventoryUi(inventory);
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_PLACE);
       storyBeats.complete(STORY_BEAT_IDS.DITTO_FLAG_PLACED_ON_HOUSE);
       syncQuestPanels();
     },
@@ -4954,6 +5458,7 @@ export function createApplicationRuntime({
       consumeItems(inventory, { [LOG_CHAIR_ITEM_ID]: 1 });
       storyState.flags.logChairPlaced = true;
       uiRuntime.syncInventoryUi(inventory);
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_PLACE);
       uiRuntime.pushNotice("You placed the Log Chair.");
       syncQuestPanels();
     },
@@ -5019,7 +5524,13 @@ export function createApplicationRuntime({
                   });
 
             if (crafted) {
+              playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_SUCCESS);
               syncQuestPanels();
+              if (option.recipe?.id === "strawBed") {
+                requestSolarStationPlacementIntent();
+              } else if (option.recipe?.id === LEAF_DEN_KIT_ITEM_ID) {
+                requestHouseKitPlacementIntent();
+              }
             }
 
             return crafted;
@@ -5036,6 +5547,7 @@ export function createApplicationRuntime({
             inventory
           });
           if (crafted) {
+            playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_SUCCESS);
             syncQuestPanels();
           }
           return crafted;
@@ -5053,17 +5565,26 @@ export function createApplicationRuntime({
       syncQuestPanels();
     },
     onStrawBedPlacementRequested({ placementTarget }) {
-      if (!hasItems(inventory, { [STRAW_BED_ITEM_ID]: 1 })) {
+      const solarStationState = getSolarStationProgressState({ storyState, inventory });
+
+      if (!solarStationState.inBag) {
+        clearPendingPlacementIntent(STRAW_BED_ITEM_ID);
         uiRuntime.pushNotice("You need a Solar Station in your bag.");
         return;
       }
+
+      setPendingPlacementIntent({
+        itemId: STRAW_BED_ITEM_ID,
+        placeableId: GRID_PLACEABLE_IDS.SOLAR_STATION,
+        label: "Solar Station"
+      });
 
       if (confirmStrawBedPlacementPreview()) {
         return;
       }
 
       if (!placementTarget?.center) {
-        uiRuntime.pushNotice("Move closer to Bulbasaur's restored tall grass habitat.");
+        uiRuntime.pushNotice(`Move closer to ${SANDBOTS_BOT_NAMES.grow}'s restored tall grass habitat.`);
         return;
       }
 
@@ -5076,7 +5597,7 @@ export function createApplicationRuntime({
     },
     onCampfireSpitOutRequested({ playerPosition = null } = {}) {
       if (!hasItems(inventory, { [CAMPFIRE_ITEM_ID]: 1 })) {
-        uiRuntime.pushNotice("You need the Train House in your bag.");
+        uiRuntime.pushNotice(`You need the ${SANDBOTS_ITEM_NAMES.thermalCabin} in your bag.`);
         return;
       }
 
@@ -5086,12 +5607,13 @@ export function createApplicationRuntime({
           gameSession?.playerCharacter?.getPosition?.() || null;
 
       if (!Array.isArray(placementAnchor)) {
-        uiRuntime.pushNotice("Move into the world before placing the Train House.");
+        uiRuntime.pushNotice(`Move into the world before placing the ${SANDBOTS_ITEM_NAMES.thermalCabin}.`);
         return;
       }
 
       musicRuntime.stopBackgroundSoundtrack();
       gameSession.campfire = attachPlayerPlacementSpawnEffect(buildCampfirePlacement(placementAnchor));
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_PLACE);
       startConstructionCloudEffect({
         id: "train-house",
         position: gameSession.campfire.position
@@ -5114,12 +5636,14 @@ export function createApplicationRuntime({
     },
     onPokemonCenterPcCheckRequested() {
       pokemonCenterPcModal.open({
+        builderCallsign: playerMemory.playerName,
         missions: buildPokemonCenterPcMissionEntries(),
         onConfirm: (actionId) => runPokemonCenterPcAction(actionId)
       });
     },
     onGroundItemCollected({ itemId }) {
       uiRuntime.bagUiRuntime.handleItemCollected(itemId, storyState);
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_COLLECT);
     },
     questSystem,
     habitatSystem,
@@ -5142,6 +5666,37 @@ export function createApplicationRuntime({
       startNatureRevivalEffect(gameSession.natureRevivalEffects, {
         patch,
         type
+      });
+    },
+    onWaterGunImpactMotionRequested({ groundCell = null, patch = null, type = "ground" } = {}) {
+      if (!gameSession?.natureRevivalEffects) {
+        return;
+      }
+
+      const targetPatch = patch || (
+        groundCell ?
+          {
+            id: `water-gun-impact-${groundCell.id}`,
+            position: groundCell.offset || [0, 0, 0],
+            size: [
+              groundCell.tileSpan || groundCell.size?.[0] || 1,
+              groundCell.tileSpan || groundCell.size?.[1] || 1
+            ]
+          } :
+          null
+      );
+
+      if (!targetPatch) {
+        return;
+      }
+
+      playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_WATER);
+      startNatureRevivalEffect(gameSession.natureRevivalEffects, {
+        patch: targetPatch,
+        type,
+        maxSparks: 54,
+        emitInterval: 0.035,
+        scalePulse: 1.04
       });
     },
     onFlowerHabitatRestored({ restoredFlowerBedHabitat } = {}) {
@@ -5183,7 +5738,7 @@ export function createApplicationRuntime({
         selectedId: storyState.flags.leafageObjectId || "tallGrass",
         onSelect: (option) => {
           storyState.flags.leafageObjectId = option.id;
-          uiRuntime.pushNotice(option.notice || "Bulbasaur changed Leafage object.");
+          uiRuntime.pushNotice(option.notice || `${SANDBOTS_BOT_NAMES.grow} changed ${SANDBOTS_ITEM_NAMES.growTool} object.`);
           syncQuestPanels();
           requestAutosave(AUTOSAVE_EVENT.STORY_STEP_ADVANCED, {
             storyBeatId: "leppa-tree-leafage-options"
@@ -5241,7 +5796,8 @@ export function createApplicationRuntime({
     }
   });
 
-  const gameInput = createGameInputController({
+  let gameplayCinematicInputActive = false;
+  gameInput = createGameInputController({
     pressedKeys,
     cameraTurnKeys: engine.cameraTurnKeys,
     clearGameFlowInput,
@@ -5296,7 +5852,9 @@ export function createApplicationRuntime({
     isSettingsOpen: () => settingsMenu.isOpen(),
     handleSettingsKeydown: (event) => settingsMenu.handleKeydown(event),
     isGameplayDialogueActive: () => uiRuntime.gameplayDialogue.isActive(),
+    isGameplayCinematicInputActive: () => gameplayCinematicInputActive,
     inspectBag,
+    getKeyboardControls: () => settingsState.controls?.keyboard,
     windowRef
   });
 
@@ -5351,12 +5909,17 @@ export function createApplicationRuntime({
         consumeCameraLookDelta: gameInput.consumeCameraLookDelta,
         clearCameraLookInput: gameInput.clearCameraLookInput,
         updateGamepads: gameInput.updateGamepads,
+        getInputModalityState: gameInput.getInputModalityState,
         isPaused: () => gamePaused,
         isSkillLearnActive: () => uiRuntime.skillLearnOverlay.isActive(),
         isScriptedInteractionActive: () => scriptedInteractionActive,
         isPrimaryActionActive: gameInput.isPrimaryActionActive,
+        isCinematicSkipActionActive: gameInput.isCinematicSkipActionActive,
+        setGameplayCinematicInputActive(active) {
+          gameplayCinematicInputActive = Boolean(active);
+        },
         shouldBagButtonInteract: shouldBagButtonInteractWithNearbyCharacter,
-        getActiveMoveId: () => activeFieldMoveId,
+        getActiveMoveId: getActiveFieldMoveId,
         setActiveMoveId: setActiveFieldMove,
         getFieldMoveSwitchPrompt(nowMs = getRuntimeNow()) {
           if (!fieldMoveSwitchPrompt || fieldMoveSwitchPrompt.expiresAt <= nowMs) {
@@ -5466,6 +6029,7 @@ export function createApplicationRuntime({
 
           if (collectedLeppaBerryCount > 0) {
             uiRuntime.bagUiRuntime.handleItemCollected(LEPPA_BERRY_ITEM_ID, storyState);
+            playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_COLLECT);
             questSystem.emit({
               type: QUEST_EVENT.COLLECT,
               targetId: LEPPA_BERRY_ITEM_ID,
@@ -5480,11 +6044,26 @@ export function createApplicationRuntime({
           const collectedWoodCount = collectWoodDrops(playerPosition, woodDrops, inventoryState);
 
           if (collectedWoodCount > 0) {
+            const activeQuestBeforeCollection = questSystem.getActiveQuest();
+            const previousWoodQuestProgress = getQuestObjectiveProgress(
+              activeQuestBeforeCollection,
+              QUEST_EVENT.COLLECT,
+              "wood"
+            );
             uiRuntime.bagUiRuntime.handleItemCollected("wood", storyState);
-            questSystem.emit({
+            playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_COLLECT);
+            const questResult = questSystem.emit({
               type: QUEST_EVENT.COLLECT,
               targetId: "wood",
               amount: collectedWoodCount
+            });
+            const updatedQuest = activeQuestBeforeCollection?.id ?
+              questSystem.getQuest(activeQuestBeforeCollection.id) :
+              null;
+            pushErrandQuestProgressFeedback(activeQuestBeforeCollection, {
+              previousProgress: previousWoodQuestProgress,
+              nextProgress: getQuestObjectiveProgress(updatedQuest, QUEST_EVENT.COLLECT, "wood"),
+              completed: questResult.completedQuestIds.includes(activeQuestBeforeCollection?.id)
             });
             recordBulbasaurSturdyStickChallengeProgress(collectedWoodCount);
           }
@@ -5496,6 +6075,7 @@ export function createApplicationRuntime({
 
           if (collectedLeafCount > 0) {
             uiRuntime.bagUiRuntime.handleItemCollected(LEAVES_ITEM_ID, storyState);
+            playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_COLLECT);
             questSystem.emit({
               type: QUEST_EVENT.COLLECT,
               targetId: LEAVES_ITEM_ID,
@@ -5516,6 +6096,7 @@ export function createApplicationRuntime({
 
           if (collectedLeafCount > 0) {
             uiRuntime.bagUiRuntime.handleItemCollected(LEAVES_ITEM_ID, storyState);
+            playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_COLLECT);
             questSystem.emit({
               type: QUEST_EVENT.COLLECT,
               targetId: LEAVES_ITEM_ID,
@@ -5536,6 +6117,7 @@ export function createApplicationRuntime({
 
           if (collectedCarbonCount > 0) {
             uiRuntime.bagUiRuntime.handleItemCollected(CARBON_ITEM_ID, storyState);
+            playSoundEvent(SOUND_EVENT_IDS.GAMEPLAY_COLLECT);
             questSystem.emit({
               type: QUEST_EVENT.COLLECT,
               targetId: CARBON_ITEM_ID,
@@ -5567,7 +6149,8 @@ export function createApplicationRuntime({
         updatePalmShake,
         updateResourceNodes,
         audioMixRuntime,
-        musicRuntime
+        musicRuntime,
+        playSoundEvent
       },
       hud: {
         getNoticeMessage: uiRuntime.getNoticeMessage,
@@ -5583,7 +6166,9 @@ export function createApplicationRuntime({
       gameplayUiVisibility: uiRuntime.gameplayUiVisibility,
       rendering: {
         ...engine.rendering,
-        debugColliders: runtimeFlags.debugColliders,
+        get debugColliders() {
+          return runtimeFlags.debugColliders;
+        },
         isNpcActive,
         isInteractableActive,
         isResourceNodeActive
@@ -5592,12 +6177,15 @@ export function createApplicationRuntime({
     onSessionReady(session) {
       gameSession = session;
       if (manualSavePoint) {
-        activeFieldMoveId = applyManualSaveState(manualSavePoint, {
-          storyState,
-          inventory,
-          playerSkills,
-          playerMemory
-        });
+        setActiveFieldMoveStateFromId(
+          applyManualSaveState(manualSavePoint, {
+            storyState,
+            inventory,
+            playerSkills,
+            playerMemory
+          })
+        );
+        reconcileQuestProgressFromUnlockedSkills();
         restoreSavedSessionState(session, manualSavePoint);
         restoreSavedWorldState(session, manualSavePoint);
         if (session.strawBed) {
@@ -5650,11 +6238,7 @@ export function createApplicationRuntime({
         if (runtimeFlags.debugColliders) {
           uiRuntime.pushNotice("Collider gizmos enabled.");
         }
-        if (
-          storyState.flags.logChairSat &&
-          !storyState.flags.bulbasaurWorkbenchGuideAvailable &&
-          !storyBeats?.hasCompleted?.(STORY_BEAT_IDS.BULBASAUR_WORKBENCH_GUIDE_INTRO)
-        ) {
+        if (shouldRecoverBulbasaurWorkbenchGuide()) {
           windowRef.setTimeout?.(() => {
             playBulbasaurWorkbenchGuideIntro();
           }, 0);
@@ -5713,7 +6297,7 @@ export function createApplicationRuntime({
         warmDeferredUiModules();
       } catch (error) {
         console.error(error);
-        reportStatus(error.message || "Falha ao carregar a cena.", true);
+        reportStatus(error.message || "Failed to load scene.", true);
         markAppReady(appRoot, "error", effectiveLaunchMode);
       }
     }

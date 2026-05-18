@@ -1,4 +1,4 @@
-export const PLAYER_DISPLAY_NAME_FALLBACK = "Trainer";
+export const PLAYER_DISPLAY_NAME_FALLBACK = "Operator";
 
 export function createPlayerProfileState(overrides = {}) {
   return {
@@ -23,6 +23,18 @@ export function normalizePlayerName(value) {
 
 export function getPlayerDisplayName(profile = {}) {
   return normalizePlayerName(profile.playerName) || PLAYER_DISPLAY_NAME_FALLBACK;
+}
+
+export function formatBuilderCallsignRegisteredNotice(profile = {}) {
+  return `Chopper will call you ${getPlayerDisplayName(profile)}.`;
+}
+
+export function formatBuilderCallsignAcknowledgement(profile = {}) {
+  return `Logged, ${getPlayerDisplayName(profile)}. I will pretend the registry always said that.`;
+}
+
+export function formatHouseRegisteredNotice(profile = {}) {
+  return `${getPlayerDisplayName(profile)}'s first house is registered.`;
 }
 
 export function hasConfirmedPlayerName(profile = {}) {

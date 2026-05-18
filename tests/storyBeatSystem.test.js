@@ -170,12 +170,12 @@ describe("createStoryBeatSystem", () => {
     expect(system.getDialogueLines("greeting", { playerName: "" })).toEqual([
       {
         speaker: "Chopper",
-        text: "Good morning, Trainer."
+        text: "Good morning, Operator."
       }
     ]);
   });
 
-  it("turns in Bulbasaur's request, unlocks Leafage, and opens Squirtle's request", () => {
+  it("turns in Grow Bot's request, unlocks Bio-Grow, and opens Hydro Bot's request", () => {
     const unlockPlayerSkill = vi.fn();
     const pushNotice = vi.fn();
     const { openConversation, pokedexRuntime, questSystem, storyState, system, trackFieldTask } = createSystem({
@@ -199,7 +199,7 @@ describe("createStoryBeatSystem", () => {
     expect(unlockPlayerSkill).toHaveBeenCalledWith("leafage", {
       silent: true
     });
-    expect(pushNotice).toHaveBeenCalledWith("You learned Leafage.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You learned Bio-Grow.", undefined);
     expect(pokedexRuntime.setOpen).toHaveBeenCalledWith(true, {
       markSeen: true,
       page: "requests",
@@ -208,7 +208,7 @@ describe("createStoryBeatSystem", () => {
     });
   });
 
-  it("builds Leppa Berry delivery dialogue from the chosen helper and completes the task", () => {
+  it("builds Pulse Berry delivery dialogue from the chosen helper and completes the task", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -227,8 +227,8 @@ describe("createStoryBeatSystem", () => {
           text: "Look at this!"
         }),
         expect.objectContaining({
-          speaker: "Squirtle",
-          text: expect.stringContaining("Leppa Berry")
+          speaker: "Hydro Bot",
+          text: expect.stringContaining("Pulse Berry")
         })
       ]),
       onLineChange: undefined,
@@ -240,7 +240,7 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.leppaBerryGiftComplete).toBe(true);
     expect(storyState.flags.tangrowthLogChairRequestAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.TANGROWTH_LOG_CHAIR);
-    expect(pushNotice).toHaveBeenCalledWith("You gave away the Leppa Berry.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You gave away the Pulse Berry.", undefined);
   });
 
   it("marks Chopper's log chair gift and chair rest beats", () => {
@@ -271,7 +271,7 @@ describe("createStoryBeatSystem", () => {
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.WORKBENCH_CAMPFIRE);
   });
 
-  it("unlocks the first Workbench recipe and marks Train House creation beats", () => {
+  it("unlocks the first Workbench recipe and marks Thermal Cabin creation beats", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -292,24 +292,24 @@ describe("createStoryBeatSystem", () => {
 
     expect(storyState.flags.workbenchDiyRecipesReceived).toBe(true);
     expect(pushNotice).toHaveBeenCalledWith(
-      "You learned simple wooden DIY recipes.",
+      "New Workbench plans available: Power.",
       undefined
     );
 
     expect(system.complete(STORY_BEAT_IDS.CAMPFIRE_CREATED)).toBe(true);
     expect(storyState.flags.campfireCrafted).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.SPIT_OUT_CAMPFIRE);
-    expect(pushNotice).toHaveBeenCalledWith("You created Charmander's Train House.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You created Thermal Bot's Thermal Cabin.", undefined);
 
     system.playDialogue(STORY_BEAT_IDS.CAMPFIRE_SPIT_OUT);
     openConversation.mock.results[1].value.complete();
 
     expect(storyState.flags.campfireSpatOut).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.CHARMANDER_TALL_GRASS);
-    expect(pushNotice).toHaveBeenCalledWith("You placed Charmander's Train House.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You placed Thermal Bot's Thermal Cabin.", undefined);
   });
 
-  it("registers Charmander and completes the Train House home beat", () => {
+  it("registers Thermal Bot and completes the Thermal Cabin home beat", () => {
     const pushNotice = vi.fn();
     const { openConversation, pokedexRuntime, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -319,6 +319,7 @@ describe("createStoryBeatSystem", () => {
     openConversation.mock.results[0].value.complete();
 
     expect(storyState.flags.charmanderRevealed).toBe(true);
+    expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.CHARMANDER_TALL_GRASS);
     expect(pokedexRuntime.setOpen).toHaveBeenCalledWith(true, {
       markSeen: true,
       entryId: CHARMANDER_POKEDEX_ENTRY_ID
@@ -330,10 +331,10 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.charmanderCampfireLit).toBe(true);
     expect(storyState.flags.pokemonCenterGuideStarted).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.RUINED_POKEMON_CENTER);
-    expect(pushNotice).toHaveBeenCalledWith("Charmander moved into the Train House.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("Thermal Bot moved into the Thermal Cabin.", undefined);
   });
 
-  it("keeps ruined Pokemon Center discovery separate from Challenges unlock", () => {
+  it("keeps ruined Colony Terminal discovery separate from Challenges unlock", () => {
     const pushNotice = vi.fn();
     const { openConversation, pokedexRuntime, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -350,7 +351,7 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.boulderChallengeAvailable).toBeUndefined();
     expect(trackFieldTask).not.toHaveBeenCalled();
     expect(pushNotice).toHaveBeenCalledWith(
-      "You inspected the ruined Pokemon Center.",
+      "You inspected the ruined Colony Terminal.",
       undefined
     );
 
@@ -369,7 +370,7 @@ describe("createStoryBeatSystem", () => {
       entryId: undefined,
       requestId: BOULDER_SHADED_TALL_GRASS_CHALLENGE_ID
     });
-    expect(pushNotice).toHaveBeenCalledWith("Challenges unlocked.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("Habitat checks unlocked.", undefined);
   });
 
   it("registers Timburr and completes the Boulder Challenge reward beat", () => {
@@ -394,10 +395,10 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.boulderChallengeRewardClaimed).toBe(true);
     expect(storyState.flags.bulbasaurStrawBedChallengeAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.BULBASAUR_STRAW_BED);
-    expect(pushNotice).toHaveBeenCalledWith("You received Life Coins.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("Viability check logged.", undefined);
   });
 
-  it("unlocks the Solar Station recipe from Bulbasaur after the first challenge set", () => {
+  it("unlocks the Solar Station plans from Grow Bot after the first challenge set", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -411,7 +412,7 @@ describe("createStoryBeatSystem", () => {
           text: "Do you need anything?"
         }),
         expect.objectContaining({
-          text: expect.stringContaining("Solar Station recipe")
+          text: expect.stringContaining("Solar Station plans")
         })
       ]),
       onLineChange: undefined,
@@ -423,10 +424,10 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.bulbasaurStrawBedChallengeComplete).toBe(true);
     expect(storyState.flags.strawBedRecipeUnlocked).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.STRAW_BED_RECIPE);
-    expect(pushNotice).toHaveBeenCalledWith("You learned the Solar Station recipe.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("Solar Station plans received.", undefined);
   });
 
-  it("marks Solar Station creation and Bulbasaur request completion beats", () => {
+  it("marks Solar Station creation and Grow Bot request completion beats", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -435,7 +436,7 @@ describe("createStoryBeatSystem", () => {
     system.complete(STORY_BEAT_IDS.STRAW_BED_CREATED);
 
     expect(storyState.flags.strawBedCrafted).toBe(true);
-    expect(pushNotice).toHaveBeenCalledWith("You created a Solar Station.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("Solar Station prepared.", undefined);
 
     system.playDialogue(STORY_BEAT_IDS.BULBASAUR_STRAW_BED_REQUEST_COMPLETE);
     openConversation.mock.results[0].value.complete();
@@ -444,12 +445,12 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.newPcChallengesAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.NEW_CHALLENGES_IN_PC);
     expect(pushNotice).toHaveBeenCalledWith(
-      "Bulbasaur's Solar Station request complete.",
+      "Grow Bot's Solar Station request complete.",
       undefined
     );
   });
 
-  it("checks new Challenges from the Pokemon Center PC", () => {
+  it("checks new habitat checks from the Colony Terminal", () => {
     const pushNotice = vi.fn();
     const { openConversation, pokedexRuntime, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -468,10 +469,10 @@ describe("createStoryBeatSystem", () => {
       entryId: undefined,
       requestId: NEW_HABITAT_CHALLENGES_ID
     });
-    expect(pushNotice).toHaveBeenCalledWith("New Challenges added.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("New habitat checks added.", undefined);
   });
 
-  it("unlocks the House Kit purchase after Professor Tangrowth explains houses", () => {
+  it("authorizes the House Kit after Overseer Bot explains houses", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -483,15 +484,18 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.tangrowthHouseTalkComplete).toBe(true);
     expect(storyState.flags.leafDenKitPurchaseAvailable).toBe(true);
     expect(pushNotice).toHaveBeenCalledWith(
-      "House Kit is available in the PC Shop.",
+      "House Kit ready.",
       undefined
     );
   });
 
-  it("marks the House Kit purchase complete", () => {
+  it("marks the House Kit claim complete", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
-      pushNotice
+      pushNotice,
+      playerProfile: {
+        playerName: "Ada"
+      }
     });
 
     system.playDialogue(STORY_BEAT_IDS.LEAF_DEN_KIT_PURCHASED);
@@ -500,7 +504,27 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.leafDenKitPurchased).toBe(true);
     expect(storyState.flags.leafDenBuildAvailable).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.BUILD_LEAF_DEN);
-    expect(pushNotice).toHaveBeenCalledWith("You purchased a House Kit.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith(
+      "House Kit ready for Ada's first shelter.",
+      undefined
+    );
+  });
+
+  it("uses the player name in the House Kit terminal dialogue", () => {
+    const { system } = createSystem({
+      playerProfile: {
+        playerName: "Ada"
+      }
+    });
+
+    expect(system.getDialogueLines(STORY_BEAT_IDS.LEAF_DEN_KIT_PURCHASED)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          speaker: "Colony Codex",
+          text: "House Kit ready for Ada's first shelter."
+        })
+      ])
+    );
   });
 
   it("sets the House hub repair completion flag after construction", () => {
@@ -527,7 +551,7 @@ describe("createStoryBeatSystem", () => {
     expect(pushNotice).toHaveBeenCalledWith("The House is complete.", undefined);
   });
 
-  it("completes Timburr's House furniture request", () => {
+  it("completes Builder Bot's House furniture request", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -545,7 +569,7 @@ describe("createStoryBeatSystem", () => {
     );
   });
 
-  it("starts and completes Charmander's celebration request", () => {
+  it("starts and completes Thermal Bot's celebration request", () => {
     const pushNotice = vi.fn();
     const { openConversation, storyState, system, trackFieldTask } = createSystem({
       pushNotice
@@ -557,7 +581,7 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.charmanderCelebrationSuggested).toBe(true);
     expect(storyState.flags.charmanderFollowing).toBe(true);
     expect(pushNotice).toHaveBeenCalledWith(
-      "Bring Charmander to Professor Tangrowth.",
+      "Bring Thermal Bot to Overseer Bot.",
       undefined
     );
 
@@ -567,7 +591,7 @@ describe("createStoryBeatSystem", () => {
     expect(storyState.flags.charmanderCelebrationComplete).toBe(true);
     expect(storyState.flags.dittoFlagReceived).toBe(true);
     expect(trackFieldTask).toHaveBeenCalledWith(FIELD_TASK_IDS.DITTO_FLAG_HOUSE);
-    expect(pushNotice).toHaveBeenCalledWith("You received a Ditto Flag.", undefined);
+    expect(pushNotice).toHaveBeenCalledWith("You received a Colony Flag.", undefined);
   });
 
   it("completes the Ditto Flag house marker beat", () => {

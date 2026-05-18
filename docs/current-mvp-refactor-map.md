@@ -11,20 +11,20 @@ The active loop is:
 1. The player explores the island.
 2. The player collects resources such as sturdy sticks, leaves, and carbon ore.
 3. Companion abilities transform the world:
-   - Squirtle restores dry ground, flowers, and thirsty trees with Water Gun.
-   - Bulbasaur creates living landscape objects with Leafage.
-   - Charmander burns white ground with Fire and consumes carbon.
-   - Timburr supports construction through the build specialty.
+   - Hydro Bot restores dry ground, flowers, and thirsty trees with Hydro Jet.
+   - Grow Bot creates living landscape objects with Bio-Grow.
+   - Thermal Bot burns white ground with Thermal Torch and consumes carbon.
+   - Builder Bot supports construction through the build specialty.
 4. The player uses the Workbench to turn resources and recipes into buildables.
 5. The player previews and places buildables in the world.
-6. Larger construction uses construction feedback, helper creatures, and a timed build state.
+6. Larger construction uses construction feedback, helper bots, and a timed build state.
 7. Finished buildings become part of the island, support furnishing, and can become homes.
-8. The Pokemon Center PC presents missions, rewards, and meta-progression.
+8. The Colony Terminal presents habitat checks, rewards, and meta-progression.
 
 The important design pattern is:
 
 ```txt
-restore world -> create habitat -> unlock/helper creature -> use ability -> gather resources -> build -> furnish/home -> unlock next goal
+restore world -> create habitat -> wake/helper bot -> use module -> gather resources -> build -> furnish/home -> unlock next goal
 ```
 
 ## Current Source-Of-Truth Map
@@ -123,7 +123,7 @@ player input
 
 Every placed Workbench object should eventually pass through the same route:
 
-- Train House.
+- Thermal Cabin.
 - Solar Station.
 - House.
 - Future furniture and placeables.
@@ -135,7 +135,7 @@ The Workbench should create build intents or inventory kits. It should not own p
 Recommended order:
 
 1. Create a `buildableCatalog` facade over the existing item/recipe/building kit data.
-2. Route Train House, Solar Station, and House labels/assets through that facade without changing behavior.
+2. Route Thermal Cabin, Solar Station, and House labels/assets through that facade without changing behavior.
 3. Add tests for the facade so future content can be added without touching runtime.
 4. Extract construction state helpers for House into a module while keeping `leafDen` save fields unchanged.
 5. Move placement validation calls behind `gridBuildingSystem` one buildable at a time.

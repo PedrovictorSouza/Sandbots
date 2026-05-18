@@ -35,7 +35,8 @@ export function createHabitatHudController({
       return;
     }
 
-    const nextValue = habitatLabels.filter(Boolean).join(" • ");
+    const safeHabitatLabels = Array.isArray(habitatLabels) ? habitatLabels : [];
+    const nextValue = safeHabitatLabels.filter(Boolean).join(" • ");
     if (uiCache.nearbyHabitats === nextValue) {
       return;
     }

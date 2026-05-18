@@ -2,6 +2,7 @@ import {
   FLOWER_BED_POKEDEX_ENTRY_ID,
   TALL_GRASS_POKEDEX_ENTRY_ID
 } from "../../pokedexEntries.js";
+import { SANDBOTS_ITEM_NAMES } from "../story/sandbotsLexicon.js";
 
 export const HABITAT_EVENT = Object.freeze({
   RESTORE_HABITAT: "RESTORE_HABITAT",
@@ -140,7 +141,7 @@ export const SMALL_ISLAND_HABITATS = Object.freeze([
     ],
     pokedexEntryId: FLOWER_BED_POKEDEX_ENTRY_ID,
     helperArchetypes: ["wing-helper", "honey-helper", "ember-helper"],
-    notes: "First flower discovery after Water Gun restores life."
+    notes: `First flower discovery after ${SANDBOTS_ITEM_NAMES.hydroTool} restores life.`
   },
   {
     id: "tree-shaded-flower-bed",

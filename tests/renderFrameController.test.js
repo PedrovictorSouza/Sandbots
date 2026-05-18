@@ -26,23 +26,23 @@ describe("createRenderFrameController", () => {
       height: 900,
       canvasWidth: 426,
       canvasHeight: 240,
-      sceneScale: 1
+      sceneScale: 1.05
     });
-    expect(frame.gameScale).toBe(1);
-    expect(frame.renderScale).toBe(1);
-    expect(frame.safeScale).toBe(1);
+    expect(frame.gameScale).toBeCloseTo(1.05);
+    expect(frame.renderScale).toBeCloseTo(1050 / 900);
+    expect(frame.safeScale).toBeCloseTo(1.05);
     expect(frameElement.dataset.renderFrameMode).toBe(RENDER_FRAME_MODE.WIDESCREEN_SAFE);
     expect(frameElement.style.getPropertyValue("--game-stage-width")).toBe("1600px");
     expect(frameElement.style.getPropertyValue("--game-stage-height")).toBe("900px");
-    expect(frameElement.style.getPropertyValue("--game-scale")).toBe("1");
-    expect(frameElement.style.getPropertyValue("--render-frame-scale")).toBe("1");
-    expect(frameElement.style.getPropertyValue("--render-frame-safe-scale")).toBe("1");
-    expect(frameElement.style.getPropertyValue("--scene-scale")).toBe("1");
+    expect(frameElement.style.getPropertyValue("--game-scale")).toBe("1.05");
+    expect(frameElement.style.getPropertyValue("--render-frame-scale")).toBe("1.167");
+    expect(frameElement.style.getPropertyValue("--render-frame-safe-scale")).toBe("1.05");
+    expect(frameElement.style.getPropertyValue("--scene-scale")).toBe("1.05");
     expect(frameElement.style.getPropertyValue("--viewport-internal-width")).toBe("426");
     expect(frameElement.style.getPropertyValue("--viewport-internal-height")).toBe("240");
   });
 
-  it("scales only in integer multiples of the fixed stage", () => {
+  it("keeps exact multiples when the viewport matches the fixed stage ratio", () => {
     const frameElement = document.createElement("div");
     const controller = createRenderFrameController({
       frameElement,
@@ -87,9 +87,9 @@ describe("createRenderFrameController", () => {
     expect(frameElement.style.getPropertyValue("--render-frame-scale")).toBe("0.8");
   });
 
-  it("uses the expected integer scale for common 16:9 viewports", () => {
+  it("uses the expected fractional scale for common 16:9 viewports", () => {
     const cases = [
-      { width: 1920, height: 1080, scale: 1 },
+      { width: 1920, height: 1080, scale: 1.2 },
       { width: 3200, height: 1800, scale: 2 },
       { width: 4800, height: 2700, scale: 3 }
     ];
@@ -104,7 +104,7 @@ describe("createRenderFrameController", () => {
         }
       });
 
-      expect(controller.sync().gameScale).toBe(viewport.scale);
+      expect(controller.sync().gameScale).toBeCloseTo(viewport.scale);
       expect(frameElement.style.getPropertyValue("--game-scale")).toBe(`${viewport.scale}`);
     }
   });

@@ -115,7 +115,8 @@ export function buildElevatedTerrain({
             position: [...instance.offset],
             size: [cellSpan, cellHeight, cellSpan],
             surfaceY,
-            blocksPlayer: true
+            blocksPlayer: false,
+            visualOnly: true
           });
         }
       }

@@ -1,10 +1,12 @@
 import { QUEST_STATUS } from "./questData.js";
 import {
   assertImmutableFirstQuest,
+  assertReachableQuestFlow,
   shouldResetToImmutableFirstQuest
 } from "./questFlowGuards.js";
 
 const DEFAULT_STORAGE_KEY = "small-island.quest-state.v6";
+const TASK_COMPLETE_MOTION_ID = "task-complete";
 
 function cloneObjective(objective) {
   return {
@@ -126,12 +128,14 @@ export function createQuestSystem({
   storageKey = DEFAULT_STORAGE_KEY,
   initialState = null,
   transitionDelayMs = 0,
+  onTaskCompleteMotionRequested = () => {},
   onChange = () => {}
 } = {}) {
   if (!Array.isArray(quests) || quests.length === 0) {
     throw new Error("QuestSystem requires at least one quest.");
   }
   assertImmutableFirstQuest(quests);
+  assertReachableQuestFlow(quests);
 
   let state = mergePersistedState(
     createInitialState(quests),
@@ -324,6 +328,12 @@ export function createQuestSystem({
 
       completedQuestIds.push(quest.id);
       completeQuest(quest);
+      onTaskCompleteMotionRequested({
+        motionId: TASK_COMPLETE_MOTION_ID,
+        questId: quest.id,
+        quest,
+        event
+      });
       changed = true;
     }
 

@@ -1,8 +1,14 @@
+import {
+  createDefaultKeyboardControls,
+  normalizeKeyboardControls
+} from "../../input/gameInputBindings.js";
+
 export const SETTINGS_GROUP_IDS = Object.freeze({
   CAMERA: "camera",
   VOLUME: "volume",
   LANGUAGE: "language",
-  ACCESSIBILITY: "accessibility"
+  ACCESSIBILITY: "accessibility",
+  CONTROLS: "controls"
 });
 
 export const SETTINGS_STORAGE_KEY = "small-island.settings.v1";
@@ -134,6 +140,12 @@ export const SETTINGS_SCHEMA = Object.freeze([
         defaultValue: false
       },
       {
+        id: "crtFilter",
+        label: "CRT Filter",
+        type: SETTINGS_CONTROL_TYPES.TOGGLE,
+        defaultValue: true
+      },
+      {
         id: "holdToConfirm",
         label: "Hold To Confirm",
         type: SETTINGS_CONTROL_TYPES.TOGGLE,
@@ -144,14 +156,19 @@ export const SETTINGS_SCHEMA = Object.freeze([
 ]);
 
 export function createDefaultSettingsState(schema = SETTINGS_SCHEMA) {
-  return Object.fromEntries(
+  return {
+    ...Object.fromEntries(
     schema.map((group) => [
       group.id,
       Object.fromEntries(
         group.settings.map((setting) => [setting.id, setting.defaultValue])
       )
     ])
-  );
+    ),
+    [SETTINGS_GROUP_IDS.CONTROLS]: {
+      keyboard: createDefaultKeyboardControls()
+    }
+  };
 }
 
 export function cloneSettingsState(settingsState = {}) {
@@ -178,6 +195,10 @@ export function mergeSettingsState(persistedSettings = {}, schema = SETTINGS_SCH
       }
     }
   }
+
+  defaults[SETTINGS_GROUP_IDS.CONTROLS] = {
+    keyboard: normalizeKeyboardControls(persistedSettings?.[SETTINGS_GROUP_IDS.CONTROLS]?.keyboard)
+  };
 
   return defaults;
 }

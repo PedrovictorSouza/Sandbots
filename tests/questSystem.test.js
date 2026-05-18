@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createQuestSystem } from "../app/quest/createQuestSystem.js";
 import { QUEST_EVENT, QUEST_STATUS, SMALL_ISLAND_QUESTS } from "../app/quest/questData.js";
+import { MOTION_IMPACT_PRESET_IDS } from "../app/motion/motionImpactPresets.js";
 
 function createMemoryStorage(initial = {}) {
   const store = { ...initial };
@@ -108,36 +109,51 @@ describe("createQuestSystem", () => {
     }));
   });
 
-  it("unlocks the first restoration ability when Water Gun is learned", () => {
+  it("completes Wake Up Hydro when Water Gun is learned", () => {
     const questSystem = createQuestSystem({
       quests: SMALL_ISLAND_QUESTS,
       storage: createMemoryStorage()
     });
 
-    questSystem.activateQuest("open-the-water-route");
+    questSystem.activateQuest("gather-first-supplies");
     expect(questSystem.hasUnlocked("water-restoration")).toBe(false);
 
     const result = questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
 
-    expect(result.completedQuestIds).toEqual(["open-the-water-route"]);
-    expect(questSystem.getQuest("open-the-water-route").status).toBe(QUEST_STATUS.COMPLETED);
+    expect(result.completedQuestIds).toEqual(["gather-first-supplies"]);
+    expect(questSystem.getQuest("gather-first-supplies").status).toBe(QUEST_STATUS.COMPLETED);
     expect(questSystem.hasUnlocked("water-restoration")).toBe(true);
     expect(questSystem.getActiveQuest().id).toBe("water-dry-grass");
   });
 
   it("does not duplicate the first restoration ability reward", () => {
+    const onTaskCompleteMotionRequested = vi.fn();
     const questSystem = createQuestSystem({
       quests: SMALL_ISLAND_QUESTS,
-      storage: createMemoryStorage()
+      storage: createMemoryStorage(),
+      onTaskCompleteMotionRequested
     });
 
-    questSystem.activateQuest("open-the-water-route");
+    questSystem.activateQuest("gather-first-supplies");
     questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
     questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
 
     const state = questSystem.getState();
     expect(state.unlocked.filter((unlockId) => unlockId === "water-restoration")).toHaveLength(1);
-    expect(state.completedQuestIds.filter((questId) => questId === "open-the-water-route")).toHaveLength(1);
+    expect(state.completedQuestIds.filter((questId) => questId === "gather-first-supplies")).toHaveLength(1);
+    expect(onTaskCompleteMotionRequested).toHaveBeenCalledTimes(1);
+    expect(onTaskCompleteMotionRequested).toHaveBeenCalledWith({
+      motionId: MOTION_IMPACT_PRESET_IDS.TASK_COMPLETE,
+      questId: "gather-first-supplies",
+      quest: expect.objectContaining({
+        id: "gather-first-supplies",
+        status: QUEST_STATUS.COMPLETED
+      }),
+      event: {
+        type: QUEST_EVENT.UNLOCK,
+        targetId: "waterGun"
+      }
+    });
   });
 
   it("reveals the first companion discovery after the first habitat restoration", () => {
@@ -146,7 +162,7 @@ describe("createQuestSystem", () => {
       storage: createMemoryStorage()
     });
 
-    questSystem.activateQuest("open-the-water-route");
+    questSystem.activateQuest("gather-first-supplies");
     questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
 
     const firstHabitatQuest = questSystem.getActiveQuest();
@@ -195,7 +211,7 @@ describe("createQuestSystem", () => {
     expect(questSystem.getActiveQuest().id).toBe("chopper-first-habitat-report");
   });
 
-  it("does not replay future onboarding events into tasks that become active later", () => {
+  it("replays the Hydro unlock when Wake Up Hydro becomes active later", () => {
     const questSystem = createQuestSystem({
       quests: SMALL_ISLAND_QUESTS,
       storage: createMemoryStorage()
@@ -207,14 +223,14 @@ describe("createQuestSystem", () => {
 
     expect(questSystem.getActiveQuest().id).toBe("learn-to-move");
     expect(questSystem.getQuest("wake-guide").status).toBe("locked");
-    expect(questSystem.getQuest("open-the-water-route").objectives[0].current).toBe(0);
+    expect(questSystem.getQuest("gather-first-supplies").objectives[0].current).toBe(0);
 
     questSystem.emit({ type: QUEST_EVENT.MOVE, targetId: "player" });
     expect(questSystem.getActiveQuest().id).toBe("wake-guide");
 
     questSystem.emit({ type: QUEST_EVENT.TALK, targetId: "tangrowth" });
-    expect(questSystem.getActiveQuest().id).toBe("open-the-water-route");
-    expect(questSystem.getQuest("open-the-water-route").objectives[0].current).toBe(0);
+    expect(questSystem.getActiveQuest().id).toBe("water-dry-grass");
+    expect(questSystem.getQuest("gather-first-supplies").status).toBe(QUEST_STATUS.COMPLETED);
   });
 
   it("rejects persisted progress that tries to skip the immutable first movement task", () => {
@@ -328,10 +344,12 @@ describe("createQuestSystem", () => {
     questSystem.emit({ type: QUEST_EVENT.MOVE, targetId: "player" });
     expect(questSystem.getActiveQuest().id).toBe("wake-guide");
     questSystem.emit({ type: QUEST_EVENT.TALK, targetId: "tangrowth" });
-    expect(questSystem.getActiveQuest().id).toBe("open-the-water-route");
+    expect(questSystem.getActiveQuest().id).toBe("gather-first-supplies");
+    expect(questSystem.hasUnlocked("thermal-generator-diagnostic")).toBe(false);
 
     questSystem.emit({ type: QUEST_EVENT.UNLOCK, targetId: "waterGun" });
     expect(questSystem.getActiveQuest().id).toBe("water-dry-grass");
+    expect(questSystem.hasUnlocked("thermal-generator-diagnostic")).toBe(true);
     expect(questSystem.hasUnlocked("water-restoration")).toBe(true);
 
     questSystem.emit({ type: QUEST_EVENT.BUILD, targetId: "revived-grass", amount: 10 });
@@ -372,6 +390,12 @@ describe("createQuestSystem", () => {
       ...quests[0],
       nextQuestId: "optional-remembered-wood"
     };
+    for (let index = 2; index < quests.length; index += 1) {
+      quests[index] = {
+        ...quests[index],
+        detached: true
+      };
+    }
 
     const questSystem = createQuestSystem({
       quests,

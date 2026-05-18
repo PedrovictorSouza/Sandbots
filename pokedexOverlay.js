@@ -1,5 +1,6 @@
 import { getPokedexEntry, SQUIRTLE_POKEDEX_ENTRY_ID } from "./pokedexEntries.js";
 import { getPokedexRequest } from "./pokedexRequests.js";
+import { SANDBOTS_WORLD_TERMS } from "./app/story/sandbotsLexicon.js";
 
 const POKEDEX_PAGE_ORDER = ["details", "where-to-find", "specialties", "requests"];
 
@@ -7,9 +8,20 @@ function isValidPage(page) {
   return POKEDEX_PAGE_ORDER.includes(page);
 }
 
+function renderTextList(listElement, items = []) {
+  listElement.replaceChildren();
+  const normalizedItems = Array.isArray(items) ? items : [];
+
+  for (const item of normalizedItems) {
+    const listItem = document.createElement("li");
+    listItem.textContent = item ?? "";
+    listElement.append(listItem);
+  }
+}
+
 export function createPokedexOverlay({ root, onClose = () => {} } = {}) {
   if (!(root instanceof HTMLElement)) {
-    throw new Error("Pokedex overlay root invalido.");
+    throw new Error(`${SANDBOTS_WORLD_TERMS.codex} overlay root is invalid.`);
   }
 
   const state = {
@@ -106,9 +118,7 @@ export function createPokedexOverlay({ root, onClose = () => {} } = {}) {
 
     const favoritesList = root.querySelector('[data-pokedex-field="favorites-list"]');
     if (favoritesList) {
-      favoritesList.innerHTML = entry.specialties.favorites
-        .map((favorite) => `<li>${favorite}</li>`)
-        .join("");
+      renderTextList(favoritesList, entry.specialties.favorites);
     }
 
     setText("art-card-title", entry.artCard.title);
@@ -127,11 +137,11 @@ export function createPokedexOverlay({ root, onClose = () => {} } = {}) {
     const request = getPokedexRequest(state.requestId);
 
     setText("request-status", request?.status || "No Active Request");
-    setText("request-giver", request?.giver || "Pokedex");
+    setText("request-giver", request?.giver || SANDBOTS_WORLD_TERMS.codex);
     setText("request-title", request?.title || "No requests yet");
     setText(
       "request-description",
-      request?.description || "Keep restoring habitats and checking in with Pokemon."
+      request?.description || "Keep restoring habitats and checking in with colony bots."
     );
     setText("request-objective", request?.objective || "No objective tracked.");
     setText("request-reward", request?.reward || "No reward listed.");

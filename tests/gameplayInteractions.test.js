@@ -22,6 +22,7 @@ import {
   consumeItems
 } from "../story/progression.js";
 import { findNearbyInteractable } from "../world/islandWorld.js";
+import { MOTION_IMPACT_PRESET_IDS } from "../app/motion/motionImpactPresets.js";
 
 function createInteractions(overrides = {}) {
   return createGameplayInteractions({
@@ -176,18 +177,20 @@ describe("createGameplayInteractions", () => {
 
     expect(pushNotice).toHaveBeenNthCalledWith(
       1,
-      "Nothing to talk to nearby. Move closer to a marker or character, then press E."
+      "Nothing to talk to nearby. Move closer to a marker or bot, then press E / X."
     );
     expect(pushNotice).toHaveBeenNthCalledWith(
       2,
-      "Still nothing nearby. Look for a PRESS X bubble or move closer, then press A / E / X."
+      "Still nothing nearby. Look for an interaction marker or move closer, then press A / E / X."
     );
   });
 
   it("requests Professor Tangrowth's house-building talk when available", () => {
     const onTangrowthHouseTalkRequested = vi.fn();
+    const pushNotice = vi.fn();
     const interactions = createInteractions({
       onTangrowthHouseTalkRequested,
+      pushNotice,
       findNearbyInteractable: vi.fn(() => ({
         target: {
           kind: "npc",
@@ -216,6 +219,7 @@ describe("createGameplayInteractions", () => {
     expect(onTangrowthHouseTalkRequested).toHaveBeenCalledWith({
       targetId: "tangrowth"
     });
+    expect(pushNotice).not.toHaveBeenCalled();
   });
 
   it("purifies a nearby corrupted ground cell when the water power is available", () => {
@@ -231,6 +235,7 @@ describe("createGameplayInteractions", () => {
     const pushNotice = vi.fn();
     const purifyGroundCell = vi.fn(() => true);
     const reviveGroundGrass = vi.fn();
+    const onWaterGunImpactMotionRequested = vi.fn();
     const interactions = createInteractions({
       findNearbyGroundCell: vi.fn(() => ({
         groundCell,
@@ -238,6 +243,7 @@ describe("createGameplayInteractions", () => {
       })),
       purifyGroundCell,
       reviveGroundGrass,
+      onWaterGunImpactMotionRequested,
       pushNotice
     });
 
@@ -267,10 +273,16 @@ describe("createGameplayInteractions", () => {
       groundPurifiedInstances
     );
     expect(reviveGroundGrass).toHaveBeenCalledWith(groundCell, []);
-    expect(pushNotice).toHaveBeenCalledWith("Chao purificado.");
+    expect(onWaterGunImpactMotionRequested).toHaveBeenCalledWith({
+      presetId: MOTION_IMPACT_PRESET_IDS.WATER_GUN_HIT,
+      groundCell,
+      patch: null,
+      type: "ground"
+    });
+    expect(pushNotice).toHaveBeenCalledWith("Ground restored.");
   });
 
-  it("blocks Water Gun on empty dry ground before Bulbasaur's dry grass mission is complete", () => {
+  it("allows Hydro Jet on empty dry ground before the dry grass mission is complete", () => {
     const groundCell = {
       id: "ground-empty-early",
       offset: [0, 0, 0],
@@ -312,11 +324,13 @@ describe("createGameplayInteractions", () => {
       }
     });
 
-    expect(result).toBe(false);
-    expect(purifyGroundCell).not.toHaveBeenCalled();
-    expect(pushNotice).toHaveBeenCalledWith(
-      "Water Gun can only restore dry tall grass right now."
+    expect(result).toBe(true);
+    expect(purifyGroundCell).toHaveBeenCalledWith(
+      groundCell,
+      [groundCell],
+      []
     );
+    expect(pushNotice).toHaveBeenCalledWith("Ground restored.");
   });
 
   it("allows Water Gun on dry grass before Bulbasaur's dry grass mission is complete", () => {
@@ -373,7 +387,7 @@ describe("createGameplayInteractions", () => {
     );
   });
 
-  it("targets nearby dry grass when a closer empty dry ground tile is not valid yet", () => {
+  it("targets the nearest dry ground instead of forcing the player toward dry grass", () => {
     const emptyGroundCell = {
       id: "ground-empty-nearby",
       offset: [0.1, 0, 0],
@@ -399,11 +413,7 @@ describe("createGameplayInteractions", () => {
       }
     ];
     const purifyGroundCell = vi.fn(() => true);
-    const reviveGroundGrass = vi.fn(() => ({
-      id: "dry-grass-visible",
-      cellId: dryGrassGroundCell.id,
-      state: "alive"
-    }));
+    const reviveGroundGrass = vi.fn(() => null);
     const resourceNode = {
       id: "wood-nearby",
       itemId: "wood",
@@ -441,12 +451,12 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(true);
     expect(purifyGroundCell).toHaveBeenCalledWith(
-      dryGrassGroundCell,
+      emptyGroundCell,
       groundDeadInstances,
       []
     );
     expect(reviveGroundGrass).toHaveBeenCalledWith(
-      dryGrassGroundCell,
+      emptyGroundCell,
       groundGrassPatches
     );
     expect(resourceNode.cooldown).toBe(0);
@@ -556,7 +566,7 @@ describe("createGameplayInteractions", () => {
       wasColdGroundBurned: true
     }));
     expect(pushNotice).toHaveBeenCalledWith(
-      "Fire burned the white ground into dry ground."
+      "Thermal Torch burned the white ground into dry ground."
     );
   });
 
@@ -641,7 +651,7 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(false);
     expect(iceGroundInstances).toEqual([extraFireGroundCell]);
-    expect(pushNotice).toHaveBeenCalledWith("Charmander needs Carbon to use Fire.");
+    expect(pushNotice).toHaveBeenCalledWith("Thermal Bot needs Carbon to use Thermal Torch.");
   });
 
   it("does not burn a white ground cell with Fire when Carbon is empty", () => {
@@ -687,7 +697,7 @@ describe("createGameplayInteractions", () => {
     expect(iceGroundInstances).toEqual([fireGroundCell]);
     expect(groundDeadInstances).toEqual([]);
     expect(fireGroundCell.groundKind).toBe("cold");
-    expect(pushNotice).toHaveBeenCalledWith("Charmander needs Carbon to use Fire.");
+    expect(pushNotice).toHaveBeenCalledWith("Thermal Bot needs Carbon to use Thermal Torch.");
   });
 
   it("lets LT field moves ignore pending Solar Station placement targets", () => {
@@ -870,7 +880,69 @@ describe("createGameplayInteractions", () => {
       itemId: "reed",
       amount: 2
     });
-    expect(pushNotice).toHaveBeenCalledWith("+2 reed");
+    expect(pushNotice).toHaveBeenCalledWith("+2 reed added to cache");
+  });
+
+  it("explains the colony purpose for cataloged resource pickups", () => {
+    const resourceNode = {
+      id: "wood-node",
+      itemId: "wood",
+      yield: 3,
+      respawnDuration: 12
+    };
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      findNearbyHarvestTarget: vi.fn(() => ({
+        resourceNode,
+        distance: 0.4
+      })),
+      getItemLabel: (itemId) => itemId === "wood" ? "Wood" : itemId,
+      pushNotice
+    });
+
+    const result = interactions.performHarvestAction({
+      playerPosition: [0, 0, 0],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [resourceNode],
+      inventory: {},
+      storyState: { questIndex: 0, flags: {} },
+      woodDrops: []
+    });
+
+    expect(result).toBe(true);
+    expect(pushNotice).toHaveBeenCalledWith(
+      "+3 Wood added to Colony Cache: Turns local debris into the first shelter and furniture projects."
+    );
+  });
+
+  it("summarizes protected supplies when interacting with the Colony Cache", () => {
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "site",
+          id: "colonyCache",
+          label: "Colony Cache"
+        },
+        distance: 0.6
+      })),
+      pushNotice
+    });
+
+    const result = interactions.performInteractAction({
+      playerPosition: [34.6, 0, -14],
+      npcActors: [],
+      interactables: [],
+      storyState: { questIndex: 0, flags: {} },
+      inventory: { wood: 3 },
+      groundGrassPatches: []
+    });
+
+    expect(result).toBe(true);
+    expect(pushNotice).toHaveBeenCalledWith(
+      "Colony Cache: 3 protected supplies. Sturdy stick: Turns local debris into the first shelter and furniture projects."
+    );
   });
 
   it("keeps the old no-resource fallback when the purification power is unavailable", () => {
@@ -928,7 +1000,7 @@ describe("createGameplayInteractions", () => {
     );
     expect(pushNotice).toHaveBeenNthCalledWith(
       2,
-      "Still no target. Move until a tile outline or PRESS X bubble appears, then press Enter / X."
+      "Still no target. Move until a tile outline or interaction marker appears, then press X / Enter."
     );
   });
 
@@ -1039,7 +1111,7 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(true);
     expect(storyState.flags.firstGrassRestored).toBe(true);
-    expect(pushNotice).toHaveBeenCalledWith("You've restored a dead grass!");
+    expect(pushNotice).toHaveBeenCalledWith("Dry grass restored.");
     expect(habitatSystem.recordEvent).toHaveBeenCalledWith({
       type: HABITAT_EVENT.REVIVE_PATCH,
       targetId: "grass"
@@ -1332,7 +1404,7 @@ describe("createGameplayInteractions", () => {
       type: HABITAT_EVENT.REVIVE_PATCH,
       targetId: "flower"
     });
-    expect(pushNotice).toHaveBeenCalledWith("Leafage grew a flower.");
+    expect(pushNotice).toHaveBeenCalledWith("Bio-Grow grew a flower.");
   });
 
   it("finds a Leafage target without rebuilding the full ground grid candidate list", () => {
@@ -1432,7 +1504,7 @@ describe("createGameplayInteractions", () => {
     expect(result).toBe(false);
     expect(groundGrassPatches).toEqual([]);
     expect(pushNotice).toHaveBeenCalledWith(
-      "Leafage needs restored ground. Use Water Gun here first."
+      "Bio-Grow needs restored ground. Use Hydro Jet here first."
     );
   });
 
@@ -1987,7 +2059,7 @@ describe("createGameplayInteractions", () => {
       "You've restored a pretty flower bed habitat!",
       3.6
     );
-    expect(pushNotice).not.toHaveBeenCalledWith("Chao purificado.");
+    expect(pushNotice).not.toHaveBeenCalledWith("Ground restored.");
     expect(habitatSystem.recordEvent).toHaveBeenCalledWith({
       type: HABITAT_EVENT.REVIVE_PATCH,
       targetId: "flower"
@@ -2006,7 +2078,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "grassEncounter",
           id: "rustlingGrass",
-          label: "Inspect dismantled Bulbasaur",
+          label: "Check on Grow Bot",
           cellId: "ground-2-3"
         },
         distance: 1.05
@@ -2016,7 +2088,8 @@ describe("createGameplayInteractions", () => {
     const storyState = {
       questIndex: 2,
       flags: {
-        bulbasaurRevealed: false
+        bulbasaurRevealed: false,
+        chopperBulbasaurRepairBoxIntroComplete: true
       }
     };
 
@@ -2046,7 +2119,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "charmanderGrassEncounter",
           id: "charmanderRustlingGrass",
-          label: "Repair dismantled Charmander",
+          label: "Help Thermal Bot",
           cellId: "ground-8-7"
         },
         distance: 1.05
@@ -2384,7 +2457,7 @@ describe("createGameplayInteractions", () => {
     expect(result).toBe(true);
     expect(waterNearbyPalm).toHaveBeenCalledTimes(1);
     expect(strikeNearbyPalm).not.toHaveBeenCalled();
-    expect(pushNotice).toHaveBeenCalledWith("First set of challenges complete. Talk to Bulbasaur.");
+    expect(pushNotice).toHaveBeenCalledWith("First habitat check complete. Talk to Grow Bot.");
   });
 
   it("does not revive the Leppa tree by clicking the dead tree with Water Gun", () => {
@@ -2532,7 +2605,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("collects a Leppa Berry from a revived tree through the interact action", () => {
+  it("collects a Pulse Berry from a revived tree through the interact action", () => {
     const pushNotice = vi.fn();
     const syncInventoryUi = vi.fn();
     const interactions = createInteractions({
@@ -2542,7 +2615,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "leppaBerryTree",
           id: "leppaTree",
-          label: "Pick Leppa Berry"
+          label: "Pick Pulse Berry"
         },
         distance: 1.2
       }))
@@ -2580,7 +2653,7 @@ describe("createGameplayInteractions", () => {
     expect(leppaBerryDrops).toHaveLength(1);
     expect(leppaBerryDrops[0].collected).toBe(true);
     expect(syncInventoryUi).toHaveBeenCalledWith(inventory);
-    expect(pushNotice).toHaveBeenCalledWith("+1 Leppa Berry");
+    expect(pushNotice).toHaveBeenCalledWith("+1 Pulse Berry");
   });
 
   it("opens Leafage object options from a revived Leppa tree after the berry drops", () => {
@@ -2591,7 +2664,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "leppaTreeLeafageOptions",
           id: "leppaTree",
-          label: "Leafage Options"
+          label: "Bio-Grow Options"
         },
         distance: 2.8
       }))
@@ -2635,7 +2708,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "leppaBerryTree",
           id: "leppaTree",
-          label: "Pick Leppa Berry"
+          label: "Pick Pulse Berry"
         },
         distance: 1.2
       }))
@@ -2986,10 +3059,12 @@ describe("createGameplayInteractions", () => {
 
   it("crafts a Campfire only after confirming the Workbench modal", () => {
     const onCampfireCrafted = vi.fn();
+    const onWorkbenchCraftMotionRequested = vi.fn();
     const syncInventoryUi = vi.fn();
     const questSystem = { emit: vi.fn() };
     const interactions = createInteractions({
       onCampfireCrafted,
+      onWorkbenchCraftMotionRequested,
       placeholderRecipes: PLACEHOLDER_RECIPES,
       addItems,
       consumeItems,
@@ -3029,15 +3104,53 @@ describe("createGameplayInteractions", () => {
         id: "campfire"
       })
     });
+    expect(onWorkbenchCraftMotionRequested).toHaveBeenCalledWith({
+      presetId: MOTION_IMPACT_PRESET_IDS.WORKBENCH_CRAFT,
+      recipe: expect.objectContaining({
+        id: "campfire"
+      })
+    });
+  });
+
+  it("shows concrete Workbench material progress when a protocol is missing supplies", () => {
+    const pushNotice = vi.fn();
+    const formatRequirementSummary = vi.fn(() => "3 Wood");
+    const interactions = createInteractions({
+      placeholderRecipes: PLACEHOLDER_RECIPES,
+      hasItems: vi.fn(() => false),
+      formatRequirementSummary,
+      getItemLabel: (itemId) => ({
+        wood: "Wood"
+      })[itemId] || itemId,
+      pushNotice
+    });
+    const inventory = {
+      wood: 1
+    };
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        workbenchDiyRecipesReceived: true,
+        campfireCrafted: false
+      }
+    };
+
+    expect(interactions.craftCampfireAtWorkbench({ storyState, inventory })).toBe(false);
+    expect(inventory.wood).toBe(1);
+    expect(storyState.flags.campfireCrafted).toBe(false);
+    expect(pushNotice).toHaveBeenCalledWith("Missing: Wood 1/3");
+    expect(formatRequirementSummary).not.toHaveBeenCalled();
   });
 
   it("opens Workbench craft options with Campfire first and Solar Station second", () => {
     const onStrawBedCrafted = vi.fn();
+    const onWorkbenchCraftMotionRequested = vi.fn();
     const onWorkbenchCraftOptionsRequested = vi.fn();
     const syncInventoryUi = vi.fn();
     const questSystem = { emit: vi.fn() };
     const interactions = createInteractions({
       onStrawBedCrafted,
+      onWorkbenchCraftMotionRequested,
       onWorkbenchCraftOptionsRequested,
       placeholderRecipes: PLACEHOLDER_RECIPES,
       addItems,
@@ -3062,6 +3175,7 @@ describe("createGameplayInteractions", () => {
       flags: {
         workbenchDiyRecipesReceived: true,
         campfireCrafted: true,
+        campfireSpatOut: true,
         strawBedRecipeUnlocked: true,
         strawBedCrafted: false
       }
@@ -3082,7 +3196,7 @@ describe("createGameplayInteractions", () => {
         expect.objectContaining({
           recipe: expect.objectContaining({ id: "campfire" }),
           disabled: true,
-          status: "Created"
+          status: "Placed"
         }),
         expect.objectContaining({
           recipe: expect.objectContaining({ id: "strawBed" }),
@@ -3112,6 +3226,286 @@ describe("createGameplayInteractions", () => {
       recipe: expect.objectContaining({
         id: "strawBed"
       })
+    });
+    expect(onWorkbenchCraftMotionRequested).toHaveBeenCalledWith({
+      presetId: MOTION_IMPACT_PRESET_IDS.WORKBENCH_CRAFT,
+      recipe: expect.objectContaining({
+        id: "strawBed"
+      })
+    });
+  });
+
+  it("keeps the unplaced Thermal Cabin available at the Workbench for recovery", () => {
+    const onCampfireSpitOutRequested = vi.fn();
+    const onCampfireCrafted = vi.fn();
+    const onWorkbenchCraftOptionsRequested = vi.fn();
+    const syncInventoryUi = vi.fn();
+    const questSystem = { emit: vi.fn() };
+    const interactions = createInteractions({
+      onCampfireCrafted,
+      onCampfireSpitOutRequested,
+      onWorkbenchCraftOptionsRequested,
+      placeholderRecipes: PLACEHOLDER_RECIPES,
+      addItems,
+      consumeItems,
+      questSystem,
+      syncInventoryUi,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "station",
+          id: "workbench",
+          label: "Workbench"
+        },
+        distance: 0.8
+      })),
+      pushNotice: vi.fn()
+    });
+    const inventory = {
+      wood: 3
+    };
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        workbenchDiyRecipesReceived: true,
+        campfireCrafted: true,
+        campfireSpatOut: false
+      }
+    };
+
+    const result = interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory,
+      groundGrassPatches: []
+    });
+
+    expect(result).toBe(true);
+    expect(onWorkbenchCraftOptionsRequested).toHaveBeenCalledWith({
+      recipes: expect.arrayContaining([
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "campfire" }),
+          disabled: false,
+          status: null
+        })
+      ])
+    });
+
+    expect(interactions.craftCampfireAtWorkbench({ storyState, inventory })).toBe(true);
+    expect(inventory.wood).toBe(0);
+    expect(inventory[CAMPFIRE_ITEM_ID]).toBe(1);
+    expect(onCampfireCrafted).toHaveBeenCalledWith({
+      recipe: expect.objectContaining({
+        id: "campfire"
+      })
+    });
+    expect(questSystem.emit).toHaveBeenCalledWith({
+      type: "BUILD",
+      targetId: CAMPFIRE_ITEM_ID,
+      amount: 1
+    });
+
+    expect(interactions.craftCampfireAtWorkbench({ storyState, inventory })).toBe(true);
+    expect(onCampfireSpitOutRequested).toHaveBeenCalledWith({ source: "workbench" });
+  });
+
+  it("selects an owned House Kit at the Workbench without crafting another one", () => {
+    const syncInventoryUi = vi.fn();
+    const consumeItemsMock = vi.fn();
+    const addItemsMock = vi.fn();
+    const pushNotice = vi.fn();
+    const questSystem = { emit: vi.fn() };
+    const interactions = createInteractions({
+      consumeItems: consumeItemsMock,
+      addItems: addItemsMock,
+      questSystem,
+      syncInventoryUi,
+      pushNotice
+    });
+    const inventory = {
+      wood: 7,
+      [LEAF_DEN_KIT_ITEM_ID]: 1
+    };
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafDenKitPurchaseAvailable: true,
+        leafDenBuildAvailable: true,
+        leafDenKitSelected: false
+      }
+    };
+
+    expect(interactions.craftLeafDenKitAtWorkbench({ storyState, inventory })).toBe(true);
+    expect(inventory.wood).toBe(7);
+    expect(inventory[LEAF_DEN_KIT_ITEM_ID]).toBe(1);
+    expect(storyState.flags.leafDenKitSelected).toBe(true);
+    expect(consumeItemsMock).not.toHaveBeenCalled();
+    expect(addItemsMock).not.toHaveBeenCalled();
+    expect(questSystem.emit).not.toHaveBeenCalled();
+    expect(syncInventoryUi).toHaveBeenCalledWith(inventory);
+    expect(pushNotice).toHaveBeenCalledWith("House Kit selected.");
+  });
+
+  it("issues an authorized House Kit at the Workbench without currency or material cost", () => {
+    const syncInventoryUi = vi.fn();
+    const consumeItemsMock = vi.fn();
+    const onWorkbenchCraftMotionRequested = vi.fn();
+    const pushNotice = vi.fn();
+    const questSystem = { emit: vi.fn() };
+    const interactions = createInteractions({
+      consumeItems: consumeItemsMock,
+      addItems,
+      onWorkbenchCraftMotionRequested,
+      questSystem,
+      syncInventoryUi,
+      pushNotice
+    });
+    const inventory = {
+      lifeCoins: 10,
+      wood: 0
+    };
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafDenKitPurchaseAvailable: true,
+        leafDenKitSelected: false
+      }
+    };
+
+    expect(interactions.craftLeafDenKitAtWorkbench({ storyState, inventory })).toBe(true);
+    expect(inventory.lifeCoins).toBe(10);
+    expect(inventory.wood).toBe(0);
+    expect(inventory[LEAF_DEN_KIT_ITEM_ID]).toBe(1);
+    expect(storyState.flags.leafDenKitPurchased).toBe(true);
+    expect(storyState.flags.leafDenBuildAvailable).toBe(true);
+    expect(storyState.flags.leafDenKitSelected).toBe(true);
+    expect(consumeItemsMock).not.toHaveBeenCalled();
+    expect(questSystem.emit).toHaveBeenCalledWith({
+      type: "BUILD",
+      targetId: LEAF_DEN_KIT_ITEM_ID,
+      amount: 1
+    });
+    expect(syncInventoryUi).toHaveBeenCalledWith(inventory);
+    expect(pushNotice).toHaveBeenCalledWith("House Kit prepared.");
+    expect(onWorkbenchCraftMotionRequested).toHaveBeenCalledWith({
+      presetId: MOTION_IMPACT_PRESET_IDS.WORKBENCH_CRAFT,
+      recipe: expect.objectContaining({
+        id: LEAF_DEN_KIT_ITEM_ID
+      })
+    });
+  });
+
+  it("keeps the crafted Solar Station available at the Workbench until placed", () => {
+    const onStrawBedPlacementRequested = vi.fn();
+    const onStrawBedCrafted = vi.fn();
+    const onWorkbenchCraftOptionsRequested = vi.fn();
+    const syncInventoryUi = vi.fn();
+    const questSystem = { emit: vi.fn() };
+    const interactions = createInteractions({
+      onStrawBedCrafted,
+      onStrawBedPlacementRequested,
+      onWorkbenchCraftOptionsRequested,
+      placeholderRecipes: PLACEHOLDER_RECIPES,
+      addItems,
+      consumeItems,
+      questSystem,
+      syncInventoryUi,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "station",
+          id: "workbench",
+          label: "Workbench"
+        },
+        distance: 0.8
+      })),
+      pushNotice: vi.fn()
+    });
+    const inventory = {
+      [LEAVES_ITEM_ID]: 2,
+      [STRAW_BED_ITEM_ID]: 1
+    };
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        strawBedRecipeUnlocked: true,
+        strawBedCrafted: true,
+        strawBedPlacedInBulbasaurHabitat: false
+      }
+    };
+
+    expect(interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory,
+      groundGrassPatches: []
+    })).toBe(true);
+
+    expect(onWorkbenchCraftOptionsRequested).toHaveBeenCalledWith({
+      recipes: expect.arrayContaining([
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "strawBed" }),
+          disabled: false,
+          status: "Ready to place",
+          actionLabel: "X Place Solar Station"
+        })
+      ])
+    });
+
+    expect(interactions.craftStrawBedAtWorkbench({ storyState, inventory })).toBe(true);
+    expect(onStrawBedPlacementRequested).toHaveBeenCalledWith({ source: "workbench" });
+    expect(inventory[LEAVES_ITEM_ID]).toBe(2);
+    expect(inventory[STRAW_BED_ITEM_ID]).toBe(1);
+    expect(onStrawBedCrafted).not.toHaveBeenCalled();
+    expect(questSystem.emit).not.toHaveBeenCalled();
+  });
+
+  it("shows an owned House Kit as ready to place in the Workbench catalog", () => {
+    const onWorkbenchCraftOptionsRequested = vi.fn();
+    const interactions = createInteractions({
+      onWorkbenchCraftOptionsRequested,
+      placeholderRecipes: PLACEHOLDER_RECIPES,
+      findNearbyInteractable: vi.fn(() => ({
+        target: {
+          kind: "station",
+          id: "workbench",
+          label: "Workbench"
+        },
+        distance: 0.8
+      })),
+      pushNotice: vi.fn()
+    });
+    const inventory = {
+      [LEAF_DEN_KIT_ITEM_ID]: 1
+    };
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafDenBuildAvailable: true,
+        leafDenKitSelected: false
+      }
+    };
+
+    expect(interactions.performInteractAction({
+      playerPosition: [0, 0, 0],
+      npcActors: [],
+      interactables: [],
+      storyState,
+      inventory,
+      groundGrassPatches: []
+    })).toBe(true);
+
+    expect(onWorkbenchCraftOptionsRequested).toHaveBeenCalledWith({
+      recipes: expect.arrayContaining([
+        expect.objectContaining({
+          recipe: expect.objectContaining({ id: "leafDenKit" }),
+          disabled: false,
+          status: "Ready to place",
+          actionLabel: "X Place House Kit"
+        })
+      ])
     });
   });
 
@@ -3194,6 +3588,7 @@ describe("createGameplayInteractions", () => {
       flags: {
         leafDenBuildAvailable: true,
         leafDenKitSelected: true,
+        strawBedPlacedInBulbasaurHabitat: true,
         leafDenKitPlaced: false
       }
     };
@@ -3213,6 +3608,38 @@ describe("createGameplayInteractions", () => {
     expect(onLeafDenKitPlacementRequested).toHaveBeenCalledWith({
       playerPosition: [5, 0, 5]
     });
+  });
+
+  it("blocks House Kit placement until the Solar Station is placed", () => {
+    const onLeafDenKitPlacementRequested = vi.fn();
+    const pushNotice = vi.fn();
+    const interactions = createInteractions({
+      onLeafDenKitPlacementRequested,
+      pushNotice
+    });
+    const storyState = {
+      questIndex: 2,
+      flags: {
+        leafDenBuildAvailable: true,
+        leafDenKitSelected: true,
+        strawBedPlacedInBulbasaurHabitat: false
+      }
+    };
+
+    expect(interactions.performHarvestAction({
+      playerPosition: [5, 0, 5],
+      palmModel: null,
+      palmInstances: [],
+      resourceNodes: [],
+      inventory: {
+        [LEAF_DEN_KIT_ITEM_ID]: 1
+      },
+      storyState,
+      woodDrops: []
+    })).toBe(false);
+
+    expect(onLeafDenKitPlacementRequested).not.toHaveBeenCalled();
+    expect(pushNotice).toHaveBeenCalledWith("Place the Solar Station before placing the House Kit.");
   });
 
   it("requests House construction when inspecting the placed kit", () => {
@@ -3425,7 +3852,7 @@ describe("createGameplayInteractions", () => {
 
     expect(result).toBe(true);
     expect(storyState.flags.charmanderFollowing).toBe(true);
-    expect(pushNotice).toHaveBeenCalledWith("Charmander is following you.");
+    expect(pushNotice).toHaveBeenCalledWith("Thermal Bot is following you.");
   });
 
   it("enforces the active follower limit before adding another Pokemon", () => {
@@ -3708,7 +4135,7 @@ describe("createGameplayInteractions", () => {
     expect(storyState.flags.tangrowthTallGrassCommentSeen).toBe(true);
   });
 
-  it("requests ruined Pokemon Center inspection from the site interaction", () => {
+  it("requests Ruined Colony Terminal inspection from the site interaction", () => {
     const onRuinedPokemonCenterInspectRequested = vi.fn();
     const onNpcInteractionStart = vi.fn();
     const interactions = createInteractions({
@@ -3717,7 +4144,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "site",
           id: "ruinedPokemonCenter",
-          label: "Ruined Pokemon Center"
+          label: "Ruined Colony Terminal"
         },
         distance: 1.4
       }))
@@ -3750,7 +4177,7 @@ describe("createGameplayInteractions", () => {
     });
   });
 
-  it("requests Challenges unlock from the Pokemon Center PC interaction", () => {
+  it("requests Habitat Checks unlock from the Colony Terminal interaction", () => {
     const onPokemonCenterPcCheckRequested = vi.fn();
     const interactions = createInteractions({
       onPokemonCenterPcCheckRequested,
@@ -3758,7 +4185,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "site",
           id: "pokemonCenterPc",
-          label: "Pokemon Center PC"
+          label: "Colony Terminal"
         },
         distance: 1.2
       }))
@@ -3852,7 +4279,7 @@ describe("createGameplayInteractions", () => {
         target: {
           kind: "timburrGrassEncounter",
           id: "timburrRustlingGrass",
-          label: "Repair dismantled Timburr",
+          label: "Help Builder Bot",
           cellId: "boulder-ground-0"
         },
         distance: 1.1

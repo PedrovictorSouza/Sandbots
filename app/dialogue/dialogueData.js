@@ -1,3 +1,9 @@
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES,
+  SANDBOTS_WORLD_TERMS
+} from "../story/sandbotsLexicon.js";
+
 export const SMALL_ISLAND_DIALOGUES = Object.freeze({
   chopperOnboarding: {
     id: "chopperOnboarding",
@@ -36,29 +42,32 @@ export const SMALL_ISLAND_DIALOGUES = Object.freeze({
       },
       {
         id: "notice-squirtle-sound",
-        text: "First things firts. See that pile of metal. That's our friend faucet. Let's wake him up."
+        text: "First things first. See that collapsed Hydro Bot? If we wake it, water circulation can start again."
+      },
+      {
+        text: "Before we move, register your Builder frame callsign. What should we call you?"
       }
     ]
   },
   strandedHelperDiscovery: {
     id: "strandedHelperDiscovery",
-    speakerId: "stranded-helper",
+    speakerId: SANDBOTS_BOT_NAMES.hydro,
     lines: [
       {
-        text: "Hello! im piper!"
+        text: "Hydro core online. I am Piper, apparently."
       },
       {
         speakerId: "chopper",
-        text: "I was built to wash the ground of this soil."
+        text: "It was built to wash salts out of the topsoil."
       },
       {
-        text: "Just press LT on the ground and start hidrating this planet already my friend!",
+        text: "Press LT near dead ground and start hydrating this planet already, my friend.",
         completesQuest: "record-a-memory"
       },
       {
         speakerId: "",
-        text: "Now you can use this bot to hidrate the planet.",
-        completesQuest: "open-the-water-route"
+        text: `Hydro Bot is online. ${SANDBOTS_ITEM_NAMES.hydroTool} can restore dry patches.`,
+        completesQuest: "gather-first-supplies"
       }
     ]
   },
@@ -85,7 +94,7 @@ export const SMALL_ISLAND_DIALOGUES = Object.freeze({
         text: "Back in the day, there was tall grass like this all over the place around here!"
       },
       {
-        text: "Seeing such fresh, green tall grass makes me feel like Pokemon might return at any moment..."
+        text: `Seeing such fresh, green tall grass makes me feel like ${SANDBOTS_WORLD_TERMS.bots} might return to work at any moment...`
       }
     ]
   },
@@ -106,53 +115,53 @@ export const SMALL_ISLAND_DIALOGUES = Object.freeze({
     speakerId: "chopper",
     lines: [
       {
-        text: "Seems like you're doing a great job, if you want something, just ask me"
+        text: `${SANDBOTS_BOT_NAMES.grow} is tracking the restored patches. Keep the route small and visible; ask me if the Workbench gets confusing.`
       }
     ]
   },
   leafHelperHabitat: {
     id: "leafHelperHabitat",
-    speakerId: "bulbasaur",
+    speakerId: SANDBOTS_BOT_NAMES.grow,
     lines: [
       {
-        text: "Yippee! Nice to meet you! This plot of tall grass is kinda small, but I like it!"
+        text: "Signal stabilized. This grass patch is small, but it can hold moisture."
       },
       {
-        text: "I love leaves and grass and stuff. And living by lotsa green things!"
+        text: `I can seed plant kits here once ${SANDBOTS_BOT_NAMES.hydro} has hydrated the ground.`
       }
     ]
   },
   bulbasaurDryGrassRequest: {
     id: "bulbasaurDryGrassRequest",
-    speakerId: "bulbasaur",
+    speakerId: SANDBOTS_BOT_NAMES.grow,
     lines: [
       {
-        text: "The ground here is too dry, and the grass is all wilty, and... And it's nothing like where I lived before!"
+        text: "The soil is still dry. My grow routines keep failing before the roots take."
       },
       {
-        text: "Can you help? Would you water the dry tall grass? Please?"
+        text: `Restore the dry tall grass with ${SANDBOTS_ITEM_NAMES.hydroTool}, then I can teach you a growth protocol.`
       },
       {
-        text: "If you do that, I'll teach you something really neat"
+        text: "Ten patches should prove the habitat can breathe again."
       }
     ]
   },
   bulbasaurLeafageReward: {
     id: "bulbasaurLeafageReward",
-    speakerId: "bulbasaur",
+    speakerId: SANDBOTS_BOT_NAMES.grow,
     lines: [
       {
-        text: "You did it! The tall grass feels soft and springy again!"
+        text: "The patch is holding water. That is enough for a first grow loop."
       },
       {
-        text: "A promise is a promise. Watch closely, okay?"
+        text: "Watch the ground, not me. The useful part happens under the roots."
       },
       {
-        text: "This is Leafage! Use it to grow tall grass one square at a time."
+        text: `This is ${SANDBOTS_ITEM_NAMES.growTool}! Use it to grow tall grass one square at a time.`
       },
       {
         speakerId: "",
-        text: "You learned Leafage."
+        text: `You learned ${SANDBOTS_ITEM_NAMES.growTool}.`
       }
     ]
   },

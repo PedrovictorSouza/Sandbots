@@ -5,6 +5,7 @@ import { createPokedexOverlay } from "../pokedexOverlay.js";
 import {
   BULBASAUR_POKEDEX_ENTRY_ID,
   FLOWER_BED_POKEDEX_ENTRY_ID,
+  POKEDEX_ENTRIES,
   TALL_GRASS_POKEDEX_ENTRY_ID,
   TIMBURR_POKEDEX_ENTRY_ID
 } from "../pokedexEntries.js";
@@ -105,12 +106,34 @@ describe("createPokedexOverlay", () => {
     expect(root.querySelector('[data-pokedex-field="number"]')?.textContent).toBe("No. 001");
     expect(root.querySelector('[data-pokedex-field="name"]')?.textContent).toBe("Tall grass");
     expect(root.querySelector('[data-pokedex-field="description"]')?.innerHTML).toContain("Four tufts of tall grass");
+    expect(root.querySelector('[data-pokedex-field="specialties-eyebrow"]')?.textContent).toBe("Habitat Notes");
+    expect(root.querySelector('[data-pokedex-field="favorites-title"]')?.textContent).toBe("Care Inputs");
     expect(root.querySelector(".pokedex-entry")?.dataset.pokedexDrawer).toBe("hidden");
     expect(root.querySelector('[data-pokedex-art-scene="tall-grass"]')?.hidden).toBe(false);
     expect(root.querySelector('[data-pokedex-art-scene="squirtle"]')?.hidden).toBe(true);
   });
 
-  it("switches to the Bulbasaur entry when that encounter is unlocked", () => {
+  it("renders care inputs as text instead of injected HTML", () => {
+    const root = createOverlayRoot();
+    const entry = POKEDEX_ENTRIES[TALL_GRASS_POKEDEX_ENTRY_ID];
+    const originalFavorites = entry.specialties.favorites;
+    entry.specialties.favorites = ['<img src="bad" onerror="alert(1)">'];
+
+    try {
+      const overlay = createPokedexOverlay({ root });
+      overlay.setOpen(true, {
+        entryId: TALL_GRASS_POKEDEX_ENTRY_ID
+      });
+
+      const favoritesList = root.querySelector('[data-pokedex-field="favorites-list"]');
+      expect(favoritesList?.querySelector("img")).toBeNull();
+      expect(favoritesList?.textContent).toContain('<img src="bad" onerror="alert(1)">');
+    } finally {
+      entry.specialties.favorites = originalFavorites;
+    }
+  });
+
+  it("switches to the Grow Bot entry when that encounter is unlocked", () => {
     const root = createOverlayRoot();
     const overlay = createPokedexOverlay({ root });
 
@@ -118,26 +141,26 @@ describe("createPokedexOverlay", () => {
       entryId: BULBASAUR_POKEDEX_ENTRY_ID
     });
 
-    expect(root.querySelector('[data-pokedex-field="number"]')?.textContent).toBe("No. 001");
-    expect(root.querySelector('[data-pokedex-field="name"]')?.textContent).toBe("Bulbasaur");
-    expect(root.querySelector('[data-pokedex-field="species"]')?.textContent).toBe("Seed Pokemon");
-    expect(root.querySelector('[data-pokedex-field="description"]')?.innerHTML).toContain("It carries a seed on its back");
-    expect(root.querySelector('[data-pokedex-field="detail-type-label"]')?.textContent).toBe("Grass / Poison");
+    expect(root.querySelector('[data-pokedex-field="number"]')?.textContent).toBe("Bot G-01");
+    expect(root.querySelector('[data-pokedex-field="name"]')?.textContent).toBe("Grow Bot");
+    expect(root.querySelector('[data-pokedex-field="species"]')?.textContent).toBe("Bio-Growth Utility Bot");
+    expect(root.querySelector('[data-pokedex-field="description"]')?.innerHTML).toContain("Maintains seed tanks");
+    expect(root.querySelector('[data-pokedex-field="detail-type-label"]')?.textContent).toBe("Growth");
     expect(root.querySelector('[data-pokedex-field="where-pin"]')?.textContent).toBe("Tall grass");
     expect(root.querySelector('[data-pokedex-field="where-count"]')?.textContent).toBe("1/2");
     expect(root.querySelector('[data-pokedex-field="where-island"]')?.innerHTML).toContain("pokedex-entry__where-preview--tall-grass");
     expect(root.querySelector('[data-pokedex-field="where-stat-value-0"]')?.innerHTML).toContain("pokedex-entry__where-token--night");
     expect(root.querySelector('[data-pokedex-field="where-stat-value-1"]')?.innerHTML).toContain("pokedex-entry__where-token--rainy");
-    expect(root.querySelector('[data-pokedex-field="specialty-label"]')?.textContent).toBe("Grow");
+    expect(root.querySelector('[data-pokedex-field="specialty-label"]')?.textContent).toBe("Habitat growth");
     expect(root.querySelector('[data-pokedex-field="habitat-copy"]')?.textContent).toBe("Bright");
-    expect(root.querySelector('[data-pokedex-field="favorites-list"]')?.textContent).toContain("Lots of nature");
-    expect(root.querySelector('[data-pokedex-field="favorites-list"]')?.textContent).toContain("Sweet flavors");
+    expect(root.querySelector('[data-pokedex-field="favorites-list"]')?.textContent).toContain("Restored soil");
+    expect(root.querySelector('[data-pokedex-field="favorites-list"]')?.textContent).toContain("Morning light");
     expect(root.querySelector(".pokedex-entry")?.dataset.pokedexTheme).toBe("forest");
     expect(root.querySelector('[data-pokedex-art-scene="bulbasaur"]')?.hidden).toBe(false);
     expect(root.querySelector('[data-pokedex-art-scene="squirtle"]')?.hidden).toBe(true);
   });
 
-  it("opens the request menu with a Squirtle request", () => {
+  it("opens the request menu with a Hydro Bot request", () => {
     const root = createOverlayRoot();
     const overlay = createPokedexOverlay({ root });
 
@@ -148,9 +171,9 @@ describe("createPokedexOverlay", () => {
 
     expect(overlay.getPage()).toBe("requests");
     expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("New Request");
-    expect(root.querySelector('[data-pokedex-field="request-giver"]')?.textContent).toBe("Squirtle");
-    expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("A Leppa Berry for Bulbasaur");
-    expect(root.querySelector('[data-pokedex-field="request-objective"]')?.textContent).toContain("Use Water Gun on the dead tree");
+    expect(root.querySelector('[data-pokedex-field="request-giver"]')?.textContent).toBe("Hydro Bot");
+    expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("A Pulse Berry for Grow Bot");
+    expect(root.querySelector('[data-pokedex-field="request-objective"]')?.textContent).toContain("Use Hydro Jet on the dead tree");
     expect(root.querySelector('[data-pokedex-page-panel="requests"]')?.hidden).toBe(false);
   });
 
@@ -171,7 +194,7 @@ describe("createPokedexOverlay", () => {
     expect(event.preventDefault).toHaveBeenCalledTimes(1);
   });
 
-  it("renders Timburr and the Boulder-Shaded Tall Grass challenge request", () => {
+  it("renders Timburr and the Boulder-Shaded Tall Grass habitat check request", () => {
     const root = createOverlayRoot();
     const overlay = createPokedexOverlay({ root });
 
@@ -179,7 +202,7 @@ describe("createPokedexOverlay", () => {
       entryId: TIMBURR_POKEDEX_ENTRY_ID
     });
 
-    expect(root.querySelector('[data-pokedex-field="name"]')?.textContent).toBe("Timburr");
+    expect(root.querySelector('[data-pokedex-field="name"]')?.textContent).toBe("Builder Bot");
     expect(root.querySelector('[data-pokedex-field="habitat-copy"]')?.textContent).toBe("Boulder shade");
     expect(root.querySelector('[data-pokedex-art-scene="timburr"]')?.hidden).toBe(false);
 
@@ -188,12 +211,12 @@ describe("createPokedexOverlay", () => {
       requestId: BOULDER_SHADED_TALL_GRASS_CHALLENGE_ID
     });
 
-    expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("Challenge");
+    expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("Habitat Check");
     expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("Boulder-Shaded Tall Grass");
-    expect(root.querySelector('[data-pokedex-field="request-reward"]')?.textContent).toBe("Life Coins.");
+    expect(root.querySelector('[data-pokedex-field="request-reward"]')?.textContent).toBe("Viability logged.");
   });
 
-  it("renders the new Habitat Challenges request from the PC", () => {
+  it("renders the new Habitat Checks request from the Colony Terminal", () => {
     const root = createOverlayRoot();
     const overlay = createPokedexOverlay({ root });
 
@@ -202,9 +225,9 @@ describe("createPokedexOverlay", () => {
       requestId: NEW_HABITAT_CHALLENGES_ID
     });
 
-    expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("New Challenges");
-    expect(root.querySelector('[data-pokedex-field="request-giver"]')?.textContent).toBe("Pokemon Center PC");
-    expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("New Habitat Challenges");
-    expect(root.querySelector('[data-pokedex-field="request-objective"]')?.textContent).toContain("Review the new Challenges");
+    expect(root.querySelector('[data-pokedex-field="request-status"]')?.textContent).toBe("New Habitat Checks");
+    expect(root.querySelector('[data-pokedex-field="request-giver"]')?.textContent).toBe("Colony Terminal");
+    expect(root.querySelector('[data-pokedex-field="request-title"]')?.textContent).toBe("New Habitat Checks");
+    expect(root.querySelector('[data-pokedex-field="request-objective"]')?.textContent).toContain("Review the new habitat checks");
   });
 });

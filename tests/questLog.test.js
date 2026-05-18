@@ -39,6 +39,7 @@ describe("createQuestLog", () => {
     expect(logHtml).not.toContain("Take Your First Steps");
     expect(logHtml).not.toContain("Left stick");
     expect(logHtml).toContain("Talk to Chopper");
+    expect(logHtml).toContain('aria-label="locked: Talk to Chopper');
   });
 
   it("renders task title and subtitle as separate HUD elements", () => {
@@ -71,7 +72,7 @@ describe("createQuestLog", () => {
     const logHtml = questLog.renderLogHtml();
 
     expect(summaryHtml).toContain("Water dry grass!");
-    expect(summaryHtml).toContain("Use Water Gun to revive 10 patches");
+    expect(summaryHtml).toContain("Use Hydro Jet to revive 10 patches");
     expect(summaryHtml).not.toContain("Next:");
     expect(summaryHtml).not.toContain("Stand near dry grass");
     expect(summaryText).not.toContain("Next:");
@@ -87,8 +88,20 @@ describe("createQuestLog", () => {
       }
     });
 
-    expect(questLog.renderChecklistHtml()).not.toContain("Collect: Wood");
-    expect(questLog.renderLogHtml()).not.toContain("Collect: Wood");
+    expect(questLog.renderChecklistHtml()).toContain("Wake up Hydro Bot");
+    expect(questLog.renderLogHtml()).toContain("Wake up Hydro Bot");
+    expect(questLog.renderActiveSummaryHtml()).not.toContain("hud-task-subtitle");
+    expect(questLog.renderActiveSummary()).toBe(
+      "Wake up Hydro Bot. Follow Chopper's marker to Hydro Bot, then interact when the prompt appears."
+    );
+    expect(questLog.renderLogHtml()).toContain("Follow the signal marker");
+    expect(questLog.renderLogHtml()).toContain("Sweep the dry edge first");
+    expect(questLog.renderLogHtml()).toContain("Reward:");
+    expect(questLog.renderLogHtml()).toContain("comes online and unlocks Hydro Jet");
+    expect(questLog.renderLogHtml()).toContain("Next signal:");
+    expect(questLog.renderLogHtml()).toContain("If water can move again");
+    expect(questLog.renderChecklistHtml()).not.toContain("Unlock: Hydro Jet");
+    expect(questLog.renderLogHtml()).not.toContain("Unlock: Hydro Jet");
   });
 
   it("renders tracked long-running tasks alongside the active quest", () => {
@@ -108,13 +121,13 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Making habitats");
+    expect(checklistHtml).toContain("Making colony zones");
     expect(checklistHtml).toContain("Arrange tall grass, trees, rocks and furniture");
     expect(logHtml).toContain('data-task-id="making-habitats"');
-    expect(logHtml).toContain("Pokemon Habitat");
+    expect(logHtml).toContain("viable colony zone");
   });
 
-  it("checks the Making habitats task after a habitat is restored", () => {
+  it("checks the Making colony zones task after a habitat is restored", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -132,7 +145,7 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
 
     expect(checklistHtml).toContain('data-done="true"');
-    expect(checklistHtml).toContain("Making habitats");
+    expect(checklistHtml).toContain("Making colony zones");
   });
 
   it("keeps completed tracked tasks visible only while they are flashing", () => {
@@ -157,7 +170,7 @@ describe("createQuestLog", () => {
       flashingTaskIds: new Set(["making-habitats"])
     };
 
-    expect(questLog.renderChecklistHtml(storyState, hiddenOptions)).not.toContain("Making habitats");
+    expect(questLog.renderChecklistHtml(storyState, hiddenOptions)).not.toContain("Making colony zones");
     expect(questLog.renderLogHtml(storyState, hiddenOptions)).not.toContain('data-task-id="making-habitats"');
     expect(questLog.renderChecklistHtml(storyState, flashingOptions)).toContain('data-task-flashing="true"');
     expect(questLog.renderLogHtml(storyState, flashingOptions)).toContain('data-task-flashing="true"');
@@ -206,7 +219,7 @@ describe("createQuestLog", () => {
     const logHtml = questLog.renderLogHtml(storyState);
 
     expect(checklistHtml).toContain("10/10 restored");
-    expect(checklistHtml).toContain("Return to Bulbasaur");
+    expect(checklistHtml).toContain("Return to Grow Bot");
     expect(logHtml).toMatch(/data-task-done="true"[\s\S]*data-task-id="water-dry-tall-grass"/);
   });
 
@@ -228,13 +241,13 @@ describe("createQuestLog", () => {
 
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
-    const bulbasaurIndex = checklistHtml.indexOf("Talk to Bulbasaur");
-    const habitatIndex = checklistHtml.indexOf("Making habitats");
+    const bulbasaurIndex = checklistHtml.indexOf("Talk to Grow Bot");
+    const habitatIndex = checklistHtml.indexOf("Making colony zones");
 
     expect(bulbasaurIndex).toBeGreaterThan(-1);
     expect(habitatIndex).toBeGreaterThan(-1);
     expect(bulbasaurIndex).toBeLessThan(habitatIndex);
-    expect(checklistHtml).toContain("he will teach you a new move");
+    expect(checklistHtml).toContain("it will unlock a new field tool");
     expect(logHtml).toContain('data-task-id="bulbasaur-dry-grass-request"');
     expect(logHtml).toContain("field note");
   });
@@ -260,17 +273,17 @@ describe("createQuestLog", () => {
 
     expect(checklistHtml).toContain("Revive the dead tree");
     expect(checklistHtml).toContain("four dry tiles around the dead tree");
-    expect(checklistHtml).not.toContain("Talk to Bulbasaur");
+    expect(checklistHtml).not.toContain("Talk to Grow Bot");
     expect(logHtml).toContain('data-task-id="revive-leppa-tree"');
 
     storyState.flags.leppaTreeRevived = true;
 
     const revivedChecklistHtml = questLog.renderChecklistHtml(storyState);
-    expect(revivedChecklistHtml).toContain("Talk to Bulbasaur");
+    expect(revivedChecklistHtml).toContain("Talk to Grow Bot");
     expect(revivedChecklistHtml).not.toContain("Revive the dead tree");
   });
 
-  it("shows the Leafage turn-in above old habitat notes after 10 dry grass patches", () => {
+  it("shows the Bio-Grow turn-in above old habitat notes after 10 dry grass patches", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "inspect-rustling-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -290,8 +303,8 @@ describe("createQuestLog", () => {
 
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
-    const returnIndex = checklistHtml.indexOf("Return to Bulbasaur");
-    const habitatIndex = checklistHtml.indexOf("Making habitats");
+    const returnIndex = checklistHtml.indexOf("Return to Grow Bot");
+    const habitatIndex = checklistHtml.indexOf("Making colony zones");
     const waterIndex = checklistHtml.indexOf("Water dry tall grass");
 
     expect(returnIndex).toBeGreaterThan(-1);
@@ -299,11 +312,11 @@ describe("createQuestLog", () => {
     expect(waterIndex).toBeGreaterThan(-1);
     expect(returnIndex).toBeLessThan(habitatIndex);
     expect(returnIndex).toBeLessThan(waterIndex);
-    expect(checklistHtml).toContain("learn Leafage");
+    expect(checklistHtml).toContain("learn Bio-Grow");
     expect(logHtml).toContain('data-task-id="bulbasaur-leafage-reward"');
   });
 
-  it("shows a non-blocking play seed after Leafage is learned", () => {
+  it("shows a non-blocking play seed after Bio-Grow is learned", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "grow-a-home-patch");
     const questLog = createQuestLog({
       questSystem: {
@@ -321,9 +334,9 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
     const playSeedIndex = checklistHtml.indexOf("Make a green corner");
-    const habitatIndex = checklistHtml.indexOf("Making habitats");
+    const habitatIndex = checklistHtml.indexOf("Making colony zones");
 
-    expect(quest.title).toBe("Plant Leafage for Bulbasaur");
+    expect(quest.title).toBe("Plant Bio-Grow for Grow Bot");
     expect(playSeedIndex).toBeGreaterThan(-1);
     expect(habitatIndex).toBeGreaterThan(-1);
     expect(playSeedIndex).toBeLessThan(habitatIndex);
@@ -336,7 +349,7 @@ describe("createQuestLog", () => {
     expect(questLog.renderChecklistHtml(storyState)).toContain("2/4 tall grass grown");
   });
 
-  it("renders the Leppa Berry task with step-specific guidance", () => {
+  it("renders the Pulse Berry task with step-specific guidance", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -354,7 +367,7 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Give Leppa Berry to Bulbasaur");
+    expect(checklistHtml).toContain("Give Pulse Berry to Grow Bot");
     expect(checklistHtml).toContain("Press X by the revived tree");
     expect(logHtml).toContain('data-task-id="give-leppa-berry"');
   });
@@ -378,8 +391,8 @@ describe("createQuestLog", () => {
     };
 
     const checklistHtml = questLog.renderChecklistHtml(storyState);
-    const leppaIndex = checklistHtml.indexOf("Give Leppa Berry to Bulbasaur");
-    const habitatIndex = checklistHtml.indexOf("Making habitats");
+    const leppaIndex = checklistHtml.indexOf("Give Pulse Berry to Grow Bot");
+    const habitatIndex = checklistHtml.indexOf("Making colony zones");
     const dryGrassIndex = checklistHtml.indexOf("Water dry tall grass");
 
     expect(leppaIndex).toBeGreaterThan(-1);
@@ -407,7 +420,7 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Tangrowth");
+    expect(checklistHtml).toContain("Overseer Bot");
     expect(checklistHtml).toContain("press X to save");
     expect(logHtml).toContain('data-task-id="tangrowth-log-chair"');
   });
@@ -431,11 +444,11 @@ describe("createQuestLog", () => {
     const logHtml = questLog.renderLogHtml(storyState);
 
     expect(checklistHtml).toContain("Workbench");
-    expect(checklistHtml).toContain("create Charmander&#39;s Train House");
+    expect(checklistHtml).toContain("create Thermal Bot&#39;s Thermal Cabin");
     expect(logHtml).toContain('data-task-id="workbench-campfire"');
   });
 
-  it("renders the Train House placement task after crafting", () => {
+  it("renders the Thermal Cabin placement task after crafting", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -452,19 +465,19 @@ describe("createQuestLog", () => {
 
     const initialChecklistHtml = questLog.renderChecklistHtml(storyState);
 
-    expect(initialChecklistHtml).toContain("Train House");
-    expect(initialChecklistHtml).toContain("Press A or E anywhere outside to place Charmander&#39;s Train House.");
+    expect(initialChecklistHtml).toContain("Thermal Cabin");
+    expect(initialChecklistHtml).toContain("Press A or E anywhere outside to place Thermal Bot&#39;s Thermal Cabin.");
 
     storyState.flags.campfireSpatOut = true;
 
     const placedChecklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(placedChecklistHtml).toContain("You placed Charmander&#39;s Train House.");
+    expect(placedChecklistHtml).toContain("You placed Thermal Bot&#39;s Thermal Cabin.");
     expect(logHtml).toContain('data-task-id="spit-out-campfire"');
   });
 
-  it("renders Charmander's habitat and Train House task as it progresses", () => {
+  it("renders Thermal Bot's habitat and Thermal Cabin task as it progresses", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -474,6 +487,9 @@ describe("createQuestLog", () => {
     });
     const storyState = {
       flags: {
+        workbenchDiyRecipesReceived: true,
+        campfireCrafted: true,
+        campfireSpatOut: true,
         leafageTallGrassCount: 2,
         trackedTaskIds: ["charmander-tall-grass"]
       }
@@ -483,7 +499,7 @@ describe("createQuestLog", () => {
 
     storyState.flags.charmanderRustlingGrassCellId = "ground-1-1";
     expect(questLog.renderChecklistHtml(storyState)).toContain(
-      "Repair the dismantled Charmander module."
+      "Help Thermal Bot in the tall grass."
     );
 
     storyState.flags.charmanderRevealed = true;
@@ -493,11 +509,51 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Lead Charmander close to the Train House.");
+    expect(checklistHtml).toContain("Lead Thermal Bot close to the Thermal Cabin.");
     expect(logHtml).toContain('data-task-id="charmander-tall-grass"');
+
+    const recoveredStoryState = {
+      flags: {
+        workbenchDiyRecipesReceived: true,
+        campfireCrafted: true,
+        campfireSpatOut: true,
+        charmanderFollowing: true
+      }
+    };
+    const recoveredChecklistHtml = questLog.renderChecklistHtml(recoveredStoryState);
+
+    expect(recoveredChecklistHtml).toContain("Lead Thermal Bot close to the Thermal Cabin.");
   });
 
-  it("renders the ruined Pokemon Center task through inspection and PC steps", () => {
+  it("keeps Thermal Cabin prerequisites ahead of Thermal Bot follow-up recovery", () => {
+    const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
+    const questLog = createQuestLog({
+      questSystem: {
+        getActiveQuest: () => quest,
+        getQuestLog: () => [quest]
+      }
+    });
+    const missingWorkbenchState = {
+      flags: {
+        charmanderFollowing: true,
+        trackedTaskIds: ["charmander-tall-grass"]
+      }
+    };
+
+    const workbenchChecklistHtml = questLog.renderChecklistHtml(missingWorkbenchState);
+
+    expect(workbenchChecklistHtml).toContain("Follow Grow Bot to the nearby area");
+    expect(workbenchChecklistHtml).not.toContain("Lead Thermal Bot close to the Thermal Cabin.");
+
+    missingWorkbenchState.flags.workbenchDiyRecipesReceived = true;
+    missingWorkbenchState.flags.campfireCrafted = true;
+    const trainHouseChecklistHtml = questLog.renderChecklistHtml(missingWorkbenchState);
+
+    expect(trainHouseChecklistHtml).toContain("Press A or E anywhere outside to place Thermal Bot&#39;s Thermal Cabin.");
+    expect(trainHouseChecklistHtml).not.toContain("Lead Thermal Bot close to the Thermal Cabin.");
+  });
+
+  it("renders the ruined Colony Terminal task through inspection and terminal steps", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -512,13 +568,13 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("destroyed Pokemon Center");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("destroyed Colony Terminal");
 
     storyState.flags.ruinedPokemonCenterInspected = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Check the PC beside");
+    expect(checklistHtml).toContain("Check the Colony Terminal beside");
     expect(logHtml).toContain('data-task-id="ruined-pokemon-center"');
   });
 
@@ -542,18 +598,18 @@ describe("createQuestLog", () => {
 
     storyState.flags.boulderShadedTallGrassHabitatCreated = true;
     expect(questLog.renderChecklistHtml(storyState)).toContain(
-      "Repair the dismantled Timburr module near the boulder."
+      "Help Builder Bot near the boulder."
     );
 
     storyState.flags.timburrRevealed = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("receive Life Coins");
+    expect(checklistHtml).toContain("log the habitat viability report");
     expect(logHtml).toContain('data-task-id="boulder-shaded-tall-grass"');
   });
 
-  it("renders Bulbasaur's Solar Station recipe challenge with both counters", () => {
+  it("renders Grow Bot's Solar Station recipe challenge with both counters", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -571,7 +627,7 @@ describe("createQuestLog", () => {
     };
 
     const supplyChecklistHtml = questLog.renderChecklistHtml(storyState);
-    expect(supplyChecklistHtml).toContain("Prepare Bulbasaur&#39;s habitat supplies.");
+    expect(supplyChecklistHtml).toContain("Prepare Grow Bot&#39;s habitat supplies.");
     expect(supplyChecklistHtml).toContain("Water 5 trees");
     expect(supplyChecklistHtml).toContain("3/5 trees watered");
     expect(supplyChecklistHtml).toContain("Gather 10 sturdy sticks");
@@ -614,11 +670,11 @@ describe("createQuestLog", () => {
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Talk to Bulbasaur after placing");
+    expect(checklistHtml).toContain("Talk to Grow Bot after placing");
     expect(logHtml).toContain('data-task-id="straw-bed-recipe"');
   });
 
-  it("renders the New Challenges in PC task", () => {
+  it("renders the new habitat checks in Terminal task", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -633,18 +689,18 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("New Challenges in PC");
-    expect(questLog.renderChecklistHtml(storyState)).toContain("check the new Challenges");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("New Habitat Checks in Colony Terminal");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("review the new habitat checks");
 
     storyState.flags.newPcChallengesChecked = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("You checked the new Challenges");
+    expect(checklistHtml).toContain("You checked the new habitat checks");
     expect(logHtml).toContain('data-task-id="new-challenges-in-pc"');
   });
 
-  it("renders the House Kit task from Tangrowth talk to PC purchase", () => {
+  it("renders the House Kit task from Tangrowth talk to Terminal issue", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -659,19 +715,19 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Professor Tangrowth");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Overseer Bot");
     expect(questLog.renderChecklistHtml(storyState)).toContain("building houses");
 
     storyState.flags.tangrowthHouseTalkComplete = true;
     storyState.flags.leafDenKitPurchaseAvailable = true;
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("purchase a House Kit");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("claim the House Kit");
 
     storyState.flags.leafDenKitPurchased = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("You purchased a House Kit");
+    expect(checklistHtml).toContain("The House Kit is ready");
     expect(logHtml).toContain('data-task-id="leaf-den-kit"');
   });
 
@@ -736,17 +792,17 @@ describe("createQuestLog", () => {
     expect(questLog.renderChecklistHtml(storyState)).toContain("2/3 placed");
 
     storyState.flags.leafDenFurniturePlacedCount = 3;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Timburr");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Builder Bot");
 
     storyState.flags.leafDenFurnitureRequestComplete = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("Timburr approved");
+    expect(checklistHtml).toContain("Builder Bot approved");
     expect(logHtml).toContain('data-task-id="leaf-den-furniture"');
   });
 
-  it("renders Charmander's celebration task through the Ditto Flag reward", () => {
+  it("renders Thermal Bot's celebration task through the Colony Flag reward", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -761,20 +817,20 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Charmander");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Talk to Thermal Bot");
 
     storyState.flags.charmanderCelebrationSuggested = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("Bring Charmander to Professor Tangrowth");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("Bring Thermal Bot to Overseer Bot");
 
     storyState.flags.dittoFlagReceived = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);
     const logHtml = questLog.renderLogHtml(storyState);
 
-    expect(checklistHtml).toContain("You received a Ditto Flag");
+    expect(checklistHtml).toContain("You received a Colony Flag");
     expect(logHtml).toContain('data-task-id="charmander-celebration"');
   });
 
-  it("renders the Ditto Flag house task from bag selection to placement", () => {
+  it("renders the Colony Flag house task from bag selection to placement", () => {
     const quest = SMALL_ISLAND_QUESTS.find((entry) => entry.id === "water-dry-grass");
     const questLog = createQuestLog({
       questSystem: {
@@ -789,10 +845,10 @@ describe("createQuestLog", () => {
       }
     };
 
-    expect(questLog.renderChecklistHtml(storyState)).toContain("select the Ditto Flag");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("select the Colony Flag");
 
     storyState.flags.dittoFlagSelectedForHouse = true;
-    expect(questLog.renderChecklistHtml(storyState)).toContain("place the Ditto Flag");
+    expect(questLog.renderChecklistHtml(storyState)).toContain("place the Colony Flag");
 
     storyState.flags.dittoFlagPlacedOnHouse = true;
     const checklistHtml = questLog.renderChecklistHtml(storyState);

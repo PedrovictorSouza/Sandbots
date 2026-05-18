@@ -101,27 +101,27 @@ export function createHudSuspenseBoundary({
   ];
 
   function applyFallbackContent() {
-    setTextWithFallbackMarker(statusElement, "Carregando HUD...");
+    setTextWithFallbackMarker(statusElement, "Loading HUD...");
     if (isElement(statusElement)) {
       statusElement.dataset.error = "false";
     }
 
     setTextWithFallbackMarker(
       hudInstructionsElement,
-      "Preparando comandos, prompts e feedback local do HUD."
+      "Preparing controls, prompts, and local HUD feedback."
     );
     setTextWithFallbackMarker(
       hudMetaElement,
-      "Sincronizando quest chain, inventario e sinais do campo."
+      "Syncing task chain, supplies, and field signals."
     );
-    setTextWithFallbackMarker(hudContextElement, "Carregando quadro de avisos...");
+    setTextWithFallbackMarker(hudContextElement, "Loading notice board...");
     setTextWithFallbackMarker(hudChecklistElement, "...");
-    setTextWithFallbackMarker(questTitleElement, "Carregando objetivo");
+    setTextWithFallbackMarker(questTitleElement, "Loading objective");
     setTextWithFallbackMarker(
       questBodyElement,
-      "O HUD da expedicao entra assim que o bundle da interface terminar de resolver."
+      "The expedition HUD will appear as soon as the interface bundle finishes loading."
     );
-    setTextWithFallbackMarker(nearbyHabitatsValueElement, "Mapeando habitats...");
+    setTextWithFallbackMarker(nearbyHabitatsValueElement, "Mapping habitats...");
 
     if (isElement(missionsStackElement) && missionsStackElement.dataset.hudFallback !== "true") {
       missionsStackElement.innerHTML = MISSION_FALLBACK_HTML;

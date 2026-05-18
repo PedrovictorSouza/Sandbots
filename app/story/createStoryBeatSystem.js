@@ -45,6 +45,17 @@ export function interpolateDialogueLine(line, context = {}, playerProfile = null
   };
 }
 
+function interpolateText(text, context = {}, playerProfile = null) {
+  if (typeof text !== "string") {
+    return text;
+  }
+
+  return text.replace(
+    PLAYER_NAME_TOKEN,
+    getInterpolationPlayerName(context, playerProfile)
+  );
+}
+
 function interpolateDialogueLines(lines, context = {}, playerProfile = null) {
   return normalizeFallbackLines(lines).map((line) => (
     interpolateDialogueLine(line, context, playerProfile)
@@ -207,7 +218,7 @@ export function createStoryBeatSystem({
     }
 
     if (effect.type === STORY_BEAT_EFFECT.PUSH_NOTICE) {
-      pushNotice(effect.message, effect.duration);
+      pushNotice(interpolateText(effect.message, context, playerProfile), effect.duration);
       return true;
     }
 

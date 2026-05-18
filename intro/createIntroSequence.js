@@ -118,16 +118,16 @@ function renderDialogue(step, state) {
 }
 
 function renderGenderChoices() {
+  const options = GENDER_OPTIONS.map((option) => `
+      <button class="intro-choice-card" type="button" data-intro-action="gender" data-intro-value="${option.id}">
+        <span class="intro-choice-card__avatar" data-gender="${option.id}"></span>
+        <strong>${option.label}</strong>
+      </button>
+    `).join("");
+
   return `
     <div class="intro-gender-layout">
-      <button class="intro-choice-card" type="button" data-intro-action="gender" data-intro-value="masculino">
-        <span class="intro-choice-card__avatar" data-gender="masculino"></span>
-        <strong>Masculino</strong>
-      </button>
-      <button class="intro-choice-card" type="button" data-intro-action="gender" data-intro-value="feminino">
-        <span class="intro-choice-card__avatar" data-gender="feminino"></span>
-        <strong>Feminino</strong>
-      </button>
+      ${options}
     </div>
   `;
 }
@@ -137,15 +137,20 @@ function renderConfirmCard(state, step) {
 
   return `
     <div class="intro-confirm-layout">
-      <div class="intro-confirm-card">
+      <div
+        class="intro-confirm-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="intro-confirm-frame-label intro-confirm-title"
+      >
         <div class="intro-confirm-card__portrait" data-gender="${selectedGender.id}"></div>
         <div class="intro-confirm-card__copy">
-          <span>${selectedGender.label}</span>
-          <strong>${step.text}</strong>
+          <span id="intro-confirm-frame-label">${selectedGender.label}</span>
+          <strong id="intro-confirm-title">${step.text}</strong>
         </div>
         <div class="intro-confirm-card__actions">
-          <button class="intro-confirm-button" type="button" data-intro-action="confirm" data-intro-value="yes">Sim</button>
-          <button class="intro-confirm-button" type="button" data-intro-action="confirm" data-intro-value="no">Nao</button>
+          <button class="intro-confirm-button" type="button" data-intro-action="confirm" data-intro-value="yes">Start as this Builder</button>
+          <button class="intro-confirm-button" type="button" data-intro-action="confirm" data-intro-value="no">Choose another look</button>
         </div>
       </div>
     </div>
@@ -281,7 +286,7 @@ function renderEditor(state, step) {
           <span>${HAIR_COLORS[state.editor.hairColor]?.label || HAIR_COLORS[0].label}</span>
           <span>${getSelectedOutfit(state).label}</span>
         </div>
-        <button class="trainer-editor__confirm" type="button" data-intro-action="finish">Confirmar memoria</button>
+        <button class="trainer-editor__confirm" type="button" data-intro-action="finish">Start mission</button>
       </div>
     </div>
   `;

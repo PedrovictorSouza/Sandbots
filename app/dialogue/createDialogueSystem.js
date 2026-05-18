@@ -1,3 +1,10 @@
+import { SANDBOTS_BOT_NAMES } from "../story/sandbotsLexicon.js";
+import { normalizeSandbotsVisibleText } from "../story/sandbotsTerminologyNormalizer.js";
+
+const LEGACY_SPEAKER_ID_LABELS = Object.freeze({
+  "stranded-helper": SANDBOTS_BOT_NAMES.hydro
+});
+
 function resolveSpeaker(line, dialogue) {
   if (Object.prototype.hasOwnProperty.call(line, "speaker")) {
     return line.speaker;
@@ -11,10 +18,14 @@ function resolveSpeaker(line, dialogue) {
     return "";
   }
 
-  return speakerId
+  if (LEGACY_SPEAKER_ID_LABELS[speakerId]) {
+    return LEGACY_SPEAKER_ID_LABELS[speakerId];
+  }
+
+  return normalizeSandbotsVisibleText(speakerId
     .split("-")
     .map((part) => part ? part[0].toUpperCase() + part.slice(1) : "")
-    .join(" ");
+    .join(" "));
 }
 
 function conditionMatches(condition, questSystem) {

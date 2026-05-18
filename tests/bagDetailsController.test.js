@@ -13,7 +13,10 @@ describe("createBagDetailsController", () => {
       iconElement,
       nameElement,
       countElement,
-      descriptionElement
+      descriptionElement,
+      getItemPurpose: (itemId) => itemId === "wood" ?
+        "Turns local debris into the first shelter and furniture projects." :
+        ""
     });
 
     controller.setItem({
@@ -31,6 +34,7 @@ describe("createBagDetailsController", () => {
     expect(iconElement.style.getPropertyValue("--bag-icon-ink")).toBe("#fff1e8");
     expect(nameElement.textContent).toBe("Sturdy stick");
     expect(countElement.textContent).toBe("x 1");
-    expect(descriptionElement.textContent).toBe("A branch that fell off a tree somewhere.");
+    expect(descriptionElement.textContent).toContain("A branch that fell off a tree somewhere.");
+    expect(descriptionElement.textContent).toContain("Purpose: Turns local debris into the first shelter");
   });
 });

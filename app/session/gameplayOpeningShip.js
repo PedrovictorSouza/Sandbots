@@ -1,3 +1,5 @@
+import { getModularDestructionSceneObjects } from "./modularDestruction.ts";
+
 export const GAMEPLAY_OPENING_SHIP_EVENTS = Object.freeze({
   FALL_STARTED: "gameplay-opening-ship:fall-started",
   IMPACT: "gameplay-opening-ship:impact",
@@ -12,7 +14,7 @@ const IMPACT_DUST_SIZE_SCALE = 4.8;
 const IMPACT_DUST_RADIUS_SCALE = 4.1;
 const IMPACT_DUST_LIFT_SCALE = 3.1;
 const SHIP_COLLIDER_RADIUS = 2.8;
-const DAMAGED_FRAGMENT_INDICES = Object.freeze([3, 4, 5]);
+const SHIP_DESTRUCTION_SCATTER_STRENGTH = 2.4;
 const LANDED_MODEL_POSE = Object.freeze({
   yaw: -0.52,
   pitch: 0.05,
@@ -23,8 +25,9 @@ const AIRBORNE_MODEL_POSE = Object.freeze({
   pitch: 0.34,
   roll: -0.52
 });
-const DAMAGED_FRAGMENT_POSES = Object.freeze([
+const SHIP_DESTRUCTION_PARTS = Object.freeze([
   {
+    id: "right-panel",
     primitiveIndex: 3,
     offset: [0.82, 0.02, -0.38],
     yaw: -0.9,
@@ -32,6 +35,7 @@ const DAMAGED_FRAGMENT_POSES = Object.freeze([
     roll: -1.05
   },
   {
+    id: "left-panel",
     primitiveIndex: 4,
     offset: [-0.64, 0.02, 0.46],
     yaw: 0.18,
@@ -39,6 +43,7 @@ const DAMAGED_FRAGMENT_POSES = Object.freeze([
     roll: 0.78
   },
   {
+    id: "rear-fragment",
     primitiveIndex: 5,
     offset: [0.28, 0.03, 0.88],
     yaw: 0.7,
@@ -49,6 +54,11 @@ const DAMAGED_FRAGMENT_POSES = Object.freeze([
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
+}
+
+function easeOutCubic(value) {
+  const t = clamp01(value);
+  return 1 - Math.pow(1 - t, 3);
 }
 
 function lerpVector(from, to, amount) {
@@ -245,6 +255,7 @@ function hideShip(ship) {
   ship.dust = [];
   ship.flash = null;
   ship.smoke = [];
+  ship.destructionProgress = 0;
 
   if (ship.modelInstance) {
     ship.modelInstance.active = false;
@@ -274,68 +285,26 @@ function syncModelInstance(ship) {
   return modelInstance;
 }
 
-function createPrimitiveModel(model, primitives) {
-  return {
-    ...model,
-    primitives
-  };
-}
-
 function getDamagedShipSceneObjects(ship, modelInstance) {
-  const model = ship?.model;
+  const destructionProgress = easeOutCubic(ship?.destructionProgress || 0);
+  const scatterScale = 1 + destructionProgress * SHIP_DESTRUCTION_SCATTER_STRENGTH;
+  const destructionParts = SHIP_DESTRUCTION_PARTS.map((part) => ({
+    ...part,
+    offset: [
+      part.offset[0] * scatterScale,
+      part.offset[1] * scatterScale,
+      part.offset[2] * scatterScale
+    ]
+  }));
 
-  if (!model?.primitives?.length || ship.phase !== "landed") {
-    return [
-      {
-        model,
-        instances: [modelInstance],
-        brightness: 0.92
-      }
-    ];
-  }
-
-  const movedPrimitiveIndices = new Set(DAMAGED_FRAGMENT_INDICES);
-  const bodyPrimitives = model.primitives.filter((primitive, index) => {
-    return primitive && !movedPrimitiveIndices.has(index);
+  return getModularDestructionSceneObjects({
+    model: ship?.model,
+    rootInstance: modelInstance,
+    active: ship.phase === "landed" && destructionProgress > 0,
+    parts: destructionParts,
+    rootBrightness: 0.92,
+    partBrightness: 0.86
   });
-  const sceneObjects = [];
-
-  if (bodyPrimitives.length) {
-    sceneObjects.push({
-      model: createPrimitiveModel(model, bodyPrimitives),
-      instances: [modelInstance],
-      brightness: 0.92
-    });
-  }
-
-  for (const fragmentPose of DAMAGED_FRAGMENT_POSES) {
-    const primitive = model.primitives[fragmentPose.primitiveIndex];
-
-    if (!primitive) {
-      continue;
-    }
-
-    sceneObjects.push({
-      model: createPrimitiveModel(model, [primitive]),
-      instances: [
-        {
-          offset: [
-            modelInstance.offset[0] + fragmentPose.offset[0],
-            modelInstance.offset[1] + fragmentPose.offset[1],
-            modelInstance.offset[2] + fragmentPose.offset[2]
-          ],
-          scale: SHIP_MODEL_SCALE,
-          yaw: fragmentPose.yaw,
-          pitch: fragmentPose.pitch,
-          roll: fragmentPose.roll,
-          active: true
-        }
-      ],
-      brightness: 0.86
-    });
-  }
-
-  return sceneObjects;
 }
 
 export function createGameplayOpeningShipState({ model = null } = {}) {
@@ -347,6 +316,7 @@ export function createGameplayOpeningShipState({ model = null } = {}) {
     dust: [],
     flash: null,
     smoke: [],
+    destructionProgress: 0,
     events: [],
     eventState: createEventState(),
     model,
@@ -417,6 +387,9 @@ export function updateGameplayOpeningShipFall(ship, {
   ship.visible = true;
   ship.phase = landed ? "landed" : "falling";
   ship.position = landed ? [...shipLandPosition] : position;
+  ship.destructionProgress = landed ?
+    clamp01((impactAge + 0.06) / 0.42) :
+    0;
   ship.size = landed && impactAge >= 0 && impactAge < 0.28 ?
     scaleSize([shipSize[0] * 1.12, shipSize[1] * 0.86], SHIP_MODEL_SCALE) :
     scaleSize([...shipSize], SHIP_MODEL_SCALE);

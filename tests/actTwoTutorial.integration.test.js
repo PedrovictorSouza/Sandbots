@@ -76,7 +76,7 @@ describe("createActTwoTutorial integration", () => {
 
     tutorial.update(fakeCamera, 320, 240, [2, 0, 0], 0);
 
-    expect(root.textContent).toContain("Squirtle");
+    expect(root.textContent).not.toContain("Builder frame");
 
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
@@ -84,7 +84,15 @@ describe("createActTwoTutorial integration", () => {
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
 
-    expect(root.textContent).toContain("Talk to Squirtle");
+    expect(root.textContent).toContain("Wa...water");
+
+    tutorial.update(fakeCamera, 320, 240, [2, 0, 0], 0);
+    pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
+    pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
+    pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
+    pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
+    pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
+    expect(root.textContent).toContain("Talk to Hydro Bot");
 
     pressKey(tutorial.handleKeydown, { code: "KeyE", key: "e" });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
@@ -95,22 +103,22 @@ describe("createActTwoTutorial integration", () => {
 
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
 
-    expect(root.textContent).toContain("You learned Water gun!");
+    expect(root.textContent).toContain("You learned Hydro Jet.");
 
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
 
-    expect(root.textContent).toContain("I've seen better transformations");
+    expect(root.textContent).toContain("water tool is yours now");
 
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
 
-    expect(root.textContent).toContain("Use Water Gun");
+    expect(root.textContent).toContain("Use Hydro Jet");
     expect(root.textContent).toContain("Press");
 
     pressKey(tutorial.handleKeydown, { code: "KeyE", key: "e" });
 
-    expect(root.textContent).toContain("Im saved, thank you!");
+    expect(root.textContent).toContain("I'm online. Thank you.");
 
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
@@ -135,12 +143,13 @@ describe("createActTwoTutorial integration", () => {
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
+    pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     expect(root.textContent).toContain("don't really remember too well");
 
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
-    expect(root.textContent).toContain("Facinating");
+    expect(root.textContent).toContain("Fascinating");
 
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
@@ -153,9 +162,8 @@ describe("createActTwoTutorial integration", () => {
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
-    expect(root.textContent).toContain("mysterious power");
+    expect(root.textContent).toContain("Hydro Jet on dry ground");
 
-    pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     pressKey(tutorial.handleKeydown, { code: "Space", key: " " });
     expect(root.textContent).toContain("Yeah, great idea!");

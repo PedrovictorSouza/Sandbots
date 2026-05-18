@@ -3,8 +3,8 @@ export const FIRST_TAUGHT_ACTION_IDS = Object.freeze({
 });
 
 export const EARLY_FREEDOM_WINDOW_DEFAULTS = Object.freeze({
-  durationMs: 15000,
-  overCompletionAllowance: 3
+  durationMs: 25000,
+  overCompletionAllowance: 5
 });
 
 function getFlags(storyState = {}) {

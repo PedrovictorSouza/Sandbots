@@ -1,3 +1,9 @@
+import {
+  SANDBOTS_BOT_NAMES,
+  SANDBOTS_ITEM_NAMES,
+  SANDBOTS_WORLD_TERMS
+} from "../app/story/sandbotsLexicon.js";
+
 export const TALK_DISTANCE = 4.2;
 export const INSPECT_DISTANCE = 2.25;
 export const REPAIR_DISTANCE = 2.1;
@@ -7,7 +13,7 @@ export const FOLLOW_SPEED = 2.05;
 export const CAMERA_LOOK_COMPLETE_DELAY = 0.9;
 export const NAME_CHAR_LIMIT = 12;
 
-export const OPENING_LINE = "Hohohoh! I've found quite the haul today!";
+export const OPENING_LINE = "Impact confirmed. I found a living Builder in the ash.";
 export const SQUIRTLE_HELP_LINE = "nnng...Wa...water...";
 
 export const NAME_KEYBOARD_ROWS = [
@@ -17,11 +23,11 @@ export const NAME_KEYBOARD_ROWS = [
   ["Z", "X", "C", "V", "B", "N", "M", "<", ">", "+", "="]
 ];
 
-const TANGROWTH_NAME = "Tangrowth";
+const TANGROWTH_NAME = SANDBOTS_BOT_NAMES.overseer;
 
 const HUMAN_CHOICES = [
-  { id: "human", label: "Sure am!" },
-  { id: "nope", label: "Nope" }
+  { id: "human", label: "Builder" },
+  { id: "nope", label: "Not sure" }
 ];
 
 const POKEDEX_REACTION_CHOICES = [
@@ -35,8 +41,8 @@ const POKEDEX_CHOICES = [
 ];
 
 const TRAINER_MEMORY_CHOICES = [
-  { id: "yep", label: "Yep" },
-  { id: "bingo", label: "Bingo!" }
+  { id: "yep", label: "Maybe" },
+  { id: "bingo", label: "Probably" }
 ];
 
 const NAME_CONFIRM_CHOICES = [
@@ -54,11 +60,11 @@ export function getActTwoTutorialFollowTarget(state) {
     return {
       id: "overlook",
       destination: [18.6, 0.02, -12.4],
-      title: state.followTargetReached ? "Catch Up" : "Follow Tangrowth",
+      title: state.followTargetReached ? "Catch Up" : `Follow ${TANGROWTH_NAME}`,
       eyebrow: "Escort",
       copy: state.followTargetReached
-        ? "Tangrowth stopped ahead. Move closer to keep talking."
-        : "Tangrowth is heading deeper into the ruins. Keep up.",
+        ? `${TANGROWTH_NAME} stopped ahead. Move closer to keep talking.`
+        : `${TANGROWTH_NAME} is heading deeper into the ruins. Keep up.`,
       nextConversation: "overlookInfo"
     };
   }
@@ -71,11 +77,11 @@ export function getActTwoTutorialFollowTarget(state) {
         state.repairPlantPosition[1],
         state.repairPlantPosition[2] - 0.85
       ],
-      title: state.followTargetReached ? "Catch Up" : "Follow Tangrowth",
+      title: state.followTargetReached ? "Catch Up" : `Follow ${TANGROWTH_NAME}`,
       eyebrow: "Escort",
       copy: state.followTargetReached
-        ? "Tangrowth found the object. Walk up to him."
-        : "Tangrowth spotted something ahead. Follow him to the object.",
+        ? `${TANGROWTH_NAME} found the object. Walk up to him.`
+        : `${TANGROWTH_NAME} spotted something ahead. Follow him to the object.`,
       nextConversation: "repairIntro"
     };
   }
@@ -89,15 +95,15 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Wh-What was that? Who's there?!"
+          text: "Impact confirmed. Who is still moving out there?"
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Gadzooks! what in the world is a human doing here?! I din't think there were any left!"
+          text: "A Builder? Good. I did not want to restore a planet with only anxiety and a clipboard."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Hm? There's sometning curious about you... Are you Really a human?",
+          text: "Your calibration is strange. Are you operational enough to help?",
           choices: HUMAN_CHOICES,
           responseKey: "humanClaim"
         }
@@ -106,81 +112,81 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "those simples eyes... that slack mouth... Hrm?! wait a moment..."
+          text: "Those quiet servos... that lost look... yes, definitely one of ours."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Are you a Ditto?! My, what an impressive transformation!"
+          text: "You are a Builder, which is more useful than panic and less emotionally complicated."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Huum, what's that sound? where it is comming from?!"
+          text: "That sound is a helper bot distress ping. We should find it before the silence does."
         }
       ];
     case "squirtleDiscovery":
       return [
         {
-          speaker: "Squirtle",
+          speaker: SANDBOTS_BOT_NAMES.hydro,
           text: SQUIRTLE_HELP_LINE
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Well, I'll be gobsmacked! if it isn't a Squirtle! And the'yre nearly all dried up!"
+          text: `That is ${SANDBOTS_BOT_NAMES.hydro}. Its tank is nearly dry. Embarrassing, but fixable.`
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Here I thought Squirtle were supposed to have an excellent command of water..."
+          text: "If Hydro can move water again, we can restore dry ground and thirsty trees."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Isin't there anything we can do to help?!"
+          text: "There has to be something we can do before the tank runs dry."
         }
       ];
     case "squirtleHelp":
       return [
         {
-          speaker: "Squirtle",
-          text: "Rrrgh... Usually i can spray all the water i want..."
+          speaker: SANDBOTS_BOT_NAMES.hydro,
+          text: "Rrrgh... Usually I can push water wherever I want..."
         },
         {
-          speaker: "Squirtle",
-          text: "Ahh, if only there were...another healthy squirtle around to help me..."
+          speaker: SANDBOTS_BOT_NAMES.hydro,
+          text: "Ahh, if only there were... another helpful Builder around to prime the pump..."
         }
       ];
     case "transformUnlock":
       return [
         {
           speaker: "",
-          text: "You used Transform!"
+          text: "Hydro Jet is ready."
         },
         {
           speaker: "",
-          text: "You learned Water gun!"
+          text: `You learned ${SANDBOTS_ITEM_NAMES.hydroTool}.`
         }
       ];
     case "waterGunPrompt":
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "I must say, I've seen better transformations in my time... but it looks like you can use Squirtle's move!"
+          text: `That was messy, but ${SANDBOTS_BOT_NAMES.hydro}'s water tool is yours now.`
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Can you use that move to squirtle?"
+          text: `Try ${SANDBOTS_ITEM_NAMES.hydroTool} near ${SANDBOTS_BOT_NAMES.hydro}.`
         }
       ];
     case "squirtleSaved":
       return [
         {
-          speaker: "Squirtle",
-          text: "Im saved, thank you! i really though i was done for"
+          speaker: SANDBOTS_BOT_NAMES.hydro,
+          text: "I'm online. Thank you. I really thought my last log was going to be a leak report."
         },
         {
-          speaker: "Squirtle",
-          text: "I owe you my life..."
+          speaker: SANDBOTS_BOT_NAMES.hydro,
+          text: "I owe you one..."
         },
         {
-          speaker: "Squirtle",
+          speaker: SANDBOTS_BOT_NAMES.hydro,
           text: "Huh? Something's beeping..."
         }
       ];
@@ -188,15 +194,15 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Oho! looks like that pokedex still works after all!"
+          text: `Oho! The ${SANDBOTS_WORLD_TERMS.codex} still works after all.`
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "though, it truly has veen an age since I last saw any other Pokemon"
+          text: "It has been an age since I last saw another helper bot moving."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "That Pokedex days of being useful may be long gone",
+          text: `The ${SANDBOTS_WORLD_TERMS.codex}'s days of being useful may be long gone, but so are mine and here we are.`,
           choices: POKEDEX_REACTION_CHOICES,
           responseKey: "pokedexReaction"
         }
@@ -209,11 +215,11 @@ export function getActTwoTutorialConversation(conversationId, state) {
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "I'd come to believe this world was down to a population of one-me."
+          text: "I'd come to believe this world was down to one anxious overseer and some decorative dust."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "But today, out of nowhere, I met the two of you! Hope springs a new!"
+          text: "But today, out of nowhere, I met the two of you. Hope springs anew, which is inconveniently pleasant."
         },
         {
           speaker: TANGROWTH_NAME,
@@ -223,41 +229,41 @@ export function getActTwoTutorialConversation(conversationId, state) {
     case "squirtlePast":
       return [
         {
-          speaker: "Squirtle",
+          speaker: SANDBOTS_BOT_NAMES.hydro,
           text: "Hum... I don't really remember too well..."
         },
         {
-          speaker: "Squirtle",
-          text: "I aways used to take naps next to a nice, celar pond."
+          speaker: SANDBOTS_BOT_NAMES.hydro,
+          text: "I used to idle beside a clear pond and pretend that counted as work."
         },
         {
-          speaker: "Squirtle",
-          text: "But this time...I woke up here, flat on the ground. Maybe i slept a little too much."
+          speaker: SANDBOTS_BOT_NAMES.hydro,
+          text: "This time I woke up flat on the ground. Maybe I slept a little too efficiently."
         }
       ];
     case "wastelandReply":
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Is that so? Facinating..."
+          text: "Is that so? Fascinating..."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "But this whole area's a total wasteland. I dont know of any ponds around here..."
+          text: "This whole area is a wasteland. I do not know of any ponds around here."
         }
       ];
     case "groundGreening":
       return [
         {
-          speaker: "Squirtle",
+          speaker: SANDBOTS_BOT_NAMES.hydro,
           text: "Forget about that, look at this!"
         },
         {
-          speaker: "Squirtle",
+          speaker: SANDBOTS_BOT_NAMES.hydro,
           text: "See, the ground around here turned green!"
         },
         {
-          speaker: "Squirtle",
+          speaker: SANDBOTS_BOT_NAMES.hydro,
           text: "I bet it grew because you sprayed water around here! That's so awesome!"
         }
       ];
@@ -265,25 +271,25 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Oho... It's true! the ground was parched, but now it's sprung back to life! It's only a bit, but it works just like it did in the good old days!"
+          text: "Oho... it is true. The ground was parched, and now one patch is alive again."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Name... It seems you might have some sort of mysterious power."
+          text: "That is not a miracle. Better. It is repeatable."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "What do you say? Will you water the ground and plants around here for us?"
+          text: `Use ${SANDBOTS_ITEM_NAMES.hydroTool} on dry ground and plants around here.`
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "If you do, this place could become so much nicer to live in-like it was before!"
+          text: "If the water loop holds, this place can become livable again."
         }
       ];
     case "squirtleAgreement":
       return [
         {
-          speaker: "Squirtle",
+          speaker: SANDBOTS_BOT_NAMES.hydro,
           text: "Yeah, great idea!"
         }
       ];
@@ -291,11 +297,11 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: "",
-          text: "You found a FieldDex! It still has a working entry for the Pokemon you just helped."
+          text: `You found a ${SANDBOTS_WORLD_TERMS.codex}. It still has a working entry for the bot you just helped.`
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "Oho! that's an old field device i found ages ago! It records island discoveries.",
+          text: "Oho! That old field device keeps notes on habitats and bot repairs.",
           choices: POKEDEX_CHOICES,
           responseKey: "pokedexChoice"
         }
@@ -304,15 +310,15 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Your human transformation really is quite impressove, you know."
+          text: "You are in better shape than most of our infrastructure."
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "And now that you have a pokedex, you just look like a pokemon trainer"
+          text: `And now that you have a ${SANDBOTS_WORLD_TERMS.codex}, you look almost official. Almost.`
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "could it be you've base that look of yours on your own Trainer?",
+          text: "Could you be carrying an old colony operator profile?",
           choices: TRAINER_MEMORY_CHOICES,
           responseKey: "trainerLookChoice"
         }
@@ -321,7 +327,7 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Hohoho! im's sure you and your trainer must have been splendid partners"
+          text: "Hohoho! I am sure that old operator profile had excellent posture."
         }
       ];
     case "namePrompt":
@@ -335,7 +341,7 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: `Ahhh, so you were called "${state.responses.playerName || state.playerName || "Ditto"}"?`,
+          text: `Ahhh, so you were called "${state.responses.playerName || state.playerName || "Builder"}"?`,
           choices: NAME_CONFIRM_CHOICES,
           responseKey: "nameConfirmation"
         }
@@ -344,7 +350,7 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "It's been quite some time i dont see an human around here",
+          text: "It has been a long time since humans could safely live around here.",
           choices: WORLD_QUESTION_CHOICES,
           responseKey: "worldQuestion"
         }
@@ -353,7 +359,7 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Ohh, you dont know what's happened here? Right then. Come with me."
+          text: "Ohh, you do not know what happened here? Right then. Come with me."
         }
       ];
     case "overlookInfo":
@@ -368,7 +374,7 @@ export function getActTwoTutorialConversation(conversationId, state) {
         },
         {
           speaker: TANGROWTH_NAME,
-          text: "What's tht on the ground over there? could it be a robot?!",
+          text: "What is that on the ground over there? A damaged repair unit?",
           cameraFocusTarget: "repairPlant"
         }
       ];
@@ -383,7 +389,7 @@ export function getActTwoTutorialConversation(conversationId, state) {
       return [
         {
           speaker: TANGROWTH_NAME,
-          text: "Oh, it's a plant! it needs to be fixed!"
+          text: "Oh, it is a plant tray. It needs repair before this soil can host anything useful."
         }
       ];
     default:

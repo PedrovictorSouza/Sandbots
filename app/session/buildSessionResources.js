@@ -925,7 +925,8 @@ export function buildSessionResources(session, assets, { worldTextureFactory }) 
     texture: billImage ? worldTextureFactory.fromImage(billImage) : null,
     position: [21.35, 0.05, -15.1],
     size: [1.65, 1.65],
-    visible: false
+    visible: true,
+    persistent: true
   };
   session.skyTexture = skyImage ?
     worldTextureFactory.fromImage(skyImage, { filter: worldTextureFactory.LINEAR }) :

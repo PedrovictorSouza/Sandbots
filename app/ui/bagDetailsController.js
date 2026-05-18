@@ -2,8 +2,21 @@ export function createBagDetailsController({
   iconElement,
   nameElement,
   countElement,
-  descriptionElement
+  descriptionElement,
+  getItemPurpose = null
 } = {}) {
+  function getDescriptionCopy(item) {
+    const description = item?.description || "";
+    const purpose = typeof getItemPurpose === "function" ?
+      getItemPurpose(item.id, item) :
+      item?.purpose || item?.playerFacingPurpose || "";
+
+    return [
+      description,
+      purpose ? `Purpose: ${purpose}` : ""
+    ].filter(Boolean).join("\n");
+  }
+
   function setItem(item = null, count = 0) {
     if (!item) {
       if (iconElement) {
@@ -38,7 +51,7 @@ export function createBagDetailsController({
     }
 
     if (descriptionElement) {
-      descriptionElement.textContent = item.description || "";
+      descriptionElement.textContent = getDescriptionCopy(item);
     }
   }
 

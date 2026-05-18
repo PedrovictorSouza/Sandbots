@@ -40,6 +40,8 @@ export function createWorldRenderer({
   const RESOURCE_MARKER_DRAW_DISTANCE_FROM_CAMERA_TARGET = 34;
   const WORLD_MARKER_DRAW_DISTANCE_FROM_CAMERA_TARGET = 46;
   const worldCurvatureOrigin = new Float32Array(3);
+  const fogColor = new Float32Array(3);
+  const fogOrigin = new Float32Array(3);
   const worldRenderTopology = createWrappedWorldTopology({
     id: "small-island-render-wrap",
     limit: WORLD_LIMIT,
@@ -51,6 +53,7 @@ export function createWorldRenderer({
     getPlanarDistanceSquared: worldRenderTopology.getPlanarDistanceSquared
   };
   let spritePassCameraTarget = null;
+  let scenePassFogCullDistance = 0;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -150,6 +153,11 @@ export function createWorldRenderer({
     border: [255, 240, 161, 230],
     outerBorder: [80, 52, 0, 198]
   });
+  const markedPowerRadiusGroundHighlightTexture = createGroundHighlightTexture({
+    fill: [91, 183, 255, 34],
+    border: [142, 219, 255, 132],
+    outerBorder: [7, 27, 48, 88]
+  });
 
   function syncPixelSnap() {
     pixelSnap[0] = worldCanvas.width * 0.5;
@@ -162,7 +170,29 @@ export function createWorldRenderer({
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }
 
-  function configureScenePass(viewProjection) {
+  function syncFogUniforms(psxDistanceFog) {
+    const cameraTarget = camera.getPose?.()?.target || [0, 0, 0];
+    fogOrigin[0] = cameraTarget[0] || 0;
+    fogOrigin[1] = cameraTarget[1] || 0;
+    fogOrigin[2] = cameraTarget[2] || 0;
+
+    const enabledFog = psxDistanceFog?.enabled ? psxDistanceFog : null;
+    const color = enabledFog?.color || [0, 0, 0];
+    fogColor[0] = color[0] || 0;
+    fogColor[1] = color[1] || 0;
+    fogColor[2] = color[2] || 0;
+
+    gl.uniform3fv(uniforms.fogOrigin, fogOrigin);
+    gl.uniform3fv(uniforms.fogColor, fogColor);
+    gl.uniform1f(uniforms.fogNear, enabledFog?.near ?? 1);
+    gl.uniform1f(uniforms.fogFar, enabledFog?.far ?? 1);
+    gl.uniform1f(uniforms.fogIntensity, enabledFog?.intensity ?? 0);
+  }
+
+  function configureScenePass(viewProjection, { psxDistanceFog = null } = {}) {
+    scenePassFogCullDistance = psxDistanceFog?.enabled ?
+      Number(psxDistanceFog.renderCullDistance || 0) :
+      0;
     gl.enable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
     gl.enable(gl.BLEND);
@@ -174,7 +204,24 @@ export function createWorldRenderer({
     syncPixelSnap();
     gl.uniform2fv(uniforms.pixelSnap, pixelSnap);
     gl.uniform1f(uniforms.time, performance.now() * 0.001);
+    syncFogUniforms(psxDistanceFog);
     gl.uniform1i(uniforms.texture, 0);
+  }
+
+  function shouldDrawFogCulledInstance(instance, sceneObject, cameraTarget) {
+    if (
+      !(scenePassFogCullDistance > 0) ||
+      sceneObject?.fogCullable === false ||
+      !Array.isArray(cameraTarget) ||
+      !Array.isArray(instance?.offset)
+    ) {
+      return true;
+    }
+
+    return worldRenderTopology.getPlanarDistanceSquared(
+      instance.offset,
+      cameraTarget
+    ) <= scenePassFogCullDistance * scenePassFogCullDistance;
   }
 
   function syncWorldCurvatureUniforms(targetUniforms) {
@@ -268,6 +315,10 @@ export function createWorldRenderer({
       }
 
       if (!shouldDrawSceneInstance(instance, sceneObject, cameraTarget, wrappedCullingOptions)) {
+        continue;
+      }
+
+      if (!shouldDrawFogCulledInstance(instance, sceneObject, cameraTarget)) {
         continue;
       }
 
@@ -366,6 +417,10 @@ export function createWorldRenderer({
     return selectedWaterGroundHighlightTexture;
   }
 
+  function isPowerRadiusGroundCell(groundCell) {
+    return groundCell?.highlightTargetState === "powerRadius";
+  }
+
   function prepareSpritePass(viewProjection) {
     const { right: quadRight, up: quadUp } = camera.getBillboardAxes();
     spritePassCameraTarget = camera.getPose?.()?.target || null;
@@ -458,14 +513,14 @@ export function createWorldRenderer({
   }
 
   return {
-    drawScene(viewProjection, sceneObjects, skyTexture = null) {
+    drawScene(viewProjection, sceneObjects, skyTexture = null, options = {}) {
       clearScenePass();
       drawSky(skyTexture);
 
       if (!sceneObjects.length) {
         return;
       }
-      configureScenePass(viewProjection);
+      configureScenePass(viewProjection, options);
       const cameraTarget = camera.getPose?.()?.target || null;
 
       for (const sceneObject of sceneObjects) {
@@ -498,9 +553,16 @@ export function createWorldRenderer({
       configureScenePass(viewProjection);
       gl.uniform1f(uniforms.jitterAmount, 0);
       gl.depthMask?.(false);
+      const powerRadiusCells = markedCells.filter(isPowerRadiusGroundCell);
+      const standardMarkedCells = markedCells.filter((groundCell) => !isPowerRadiusGroundCell(groundCell));
+      drawGroundHighlightCells(
+        markedPowerRadiusGroundHighlightTexture,
+        powerRadiusCells,
+        GROUND_HIGHLIGHT_MARKED_SCALE
+      );
       drawGroundHighlightCells(
         markedGroundHighlightTexture,
-        markedCells,
+        standardMarkedCells,
         GROUND_HIGHLIGHT_MARKED_SCALE
       );
       drawGroundHighlightCells(

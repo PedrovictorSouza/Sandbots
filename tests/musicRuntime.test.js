@@ -97,6 +97,31 @@ describe("createMusicRuntime", () => {
     expect(audioB.volume).toBe(0.5);
   });
 
+  it("keeps injected soundtrack randomness bounded to known tracks", () => {
+    const audioA = {
+      loop: false,
+      volume: 0,
+      currentTime: 0,
+      play: vi.fn(() => Promise.resolve())
+    };
+    const audioB = {
+      loop: false,
+      volume: 0,
+      currentTime: 0,
+      play: vi.fn(() => Promise.resolve())
+    };
+    const audioFactory = vi.fn((src) => src.includes("main-theme-b") ? audioB : audioA);
+    const randomValues = [2, -1, Infinity];
+    const music = createMusicRuntime({
+      audioFactory,
+      random: () => randomValues.shift()
+    });
+
+    expect(music.playRandomSoundtrack({ restart: true }).trackId).toBe(MUSIC_TRACK_IDS.MAIN_THEME_B);
+    expect(music.playRandomSoundtrack({ restart: true }).trackId).toBe(MUSIC_TRACK_IDS.MAIN_THEME);
+    expect(music.playRandomSoundtrack({ restart: true }).trackId).toBe(MUSIC_TRACK_IDS.MAIN_THEME);
+  });
+
   it("ducks background music while object music is active and resumes after cooldown", () => {
     const audio = {
       loop: false,

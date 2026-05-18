@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  MOTION_IMPACT_DESIGN_FIELDS,
   MOTION_IMPACT_PRESET_IDS,
+  MOTION_IMPACT_SCALE,
+  getMotionImpactDesignGaps,
   getMotionImpactPreset
 } from "../app/motion/motionImpactPresets.js";
 import { createMotionImpactController } from "../app/motion/createMotionImpactController.js";
@@ -17,8 +20,58 @@ describe("motion impact presets", () => {
       rotationJolt: { x: -0.08, y: 0.12, z: 0.04 },
       scalePulse: 1.04,
       blend: "sharp",
-      silhouetteBias: "camera-readable"
+      silhouetteBias: "camera-readable",
+      effectScale: MOTION_IMPACT_SCALE.SMALL,
+      designIntent: expect.stringContaining("clear tool hit")
     });
+  });
+
+  it("keeps impact scale proportional to the gameplay event", () => {
+    expect(MOTION_IMPACT_DESIGN_FIELDS).toEqual([
+      "effectScale",
+      "designIntent",
+      "blend",
+      "silhouetteBias"
+    ]);
+    expect(getMotionImpactDesignGaps()).toEqual([]);
+    expect(getMotionImpactPreset(MOTION_IMPACT_PRESET_IDS.TILE_RESTORE_POP).effectScale).toBe(
+      MOTION_IMPACT_SCALE.TINY
+    );
+    expect(getMotionImpactPreset(MOTION_IMPACT_PRESET_IDS.WORKBENCH_CRAFT).effectScale).toBe(
+      MOTION_IMPACT_SCALE.SMALL
+    );
+    expect(getMotionImpactPreset(MOTION_IMPACT_PRESET_IDS.TASK_COMPLETE).effectScale).toBe(
+      MOTION_IMPACT_SCALE.MEDIUM
+    );
+    expect(getMotionImpactPreset(MOTION_IMPACT_PRESET_IDS.CRASH_IMPACT)).toMatchObject({
+      effectScale: MOTION_IMPACT_SCALE.LARGE,
+      designIntent: expect.stringContaining("world-scale")
+    });
+    expect(getMotionImpactPreset(MOTION_IMPACT_PRESET_IDS.CRASH_IMPACT).durationMs)
+      .toBeGreaterThan(getMotionImpactPreset(MOTION_IMPACT_PRESET_IDS.TASK_COMPLETE).durationMs);
+  });
+
+  it("reports missing motion design metadata before runtime hooks use a preset", () => {
+    expect(getMotionImpactDesignGaps([
+      {
+        id: "bad-impact",
+        blend: "sharp",
+        silhouetteBias: "camera-readable",
+        effectScale: "massive"
+      },
+      {
+        id: "empty-impact"
+      }
+    ])).toEqual([
+      {
+        presetId: "bad-impact",
+        missing: ["designIntent", "knownEffectScale"]
+      },
+      {
+        presetId: "empty-impact",
+        missing: ["effectScale", "designIntent", "blend", "silhouetteBias"]
+      }
+    ]);
   });
 });
 

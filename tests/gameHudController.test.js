@@ -1,7 +1,20 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createGameHudController } from "../app/ui/gameHudController.js";
+import {
+  createGameHudController,
+  formatColonyCacheHudText,
+  formatColonyStatusHudText
+} from "../app/ui/gameHudController.js";
+import {
+  DEFAULT_GAME_HUD_INITIAL_STATUS,
+  resolveGameHudInitialStatus
+} from "../app/ui/gameHudControllerConfig.ts";
+import { renderInventoryCountHtml } from "../app/ui/uiTextValue.ts";
+import {
+  GAMEPAD_LAYOUT,
+  INPUT_DEVICE
+} from "../input/inputModality.js";
 
 function createController() {
   const currentActionElement = document.createElement("section");
@@ -33,6 +46,92 @@ describe("createGameHudController", () => {
     document.body.innerHTML = "";
   });
 
+  it("renders typed inventory count values without any", () => {
+    expect(renderInventoryCountHtml({ value: 3 })).toBe('<span class="inventory-count">3</span>');
+    expect(renderInventoryCountHtml({ value: "+2" })).toBe('<span class="inventory-count">+2</span>');
+    expect(renderInventoryCountHtml({ value: null })).toBe("");
+  });
+
+  it("uses a default initial status when the optional prop is omitted", () => {
+    expect(resolveGameHudInitialStatus()).toBe(DEFAULT_GAME_HUD_INITIAL_STATUS);
+    expect(resolveGameHudInitialStatus({})).toBe(DEFAULT_GAME_HUD_INITIAL_STATUS);
+    expect(resolveGameHudInitialStatus({ initialStatus: "Ready" })).toBe("Ready");
+  });
+
+  it("shows tracked workbench plans in colony language", () => {
+    const statusElement = document.createElement("div");
+    const controller = createGameHudController({
+      statusElement,
+      initialStatus: "Colony systems online."
+    });
+
+    controller.setTrackedRecipe({
+      name: "Bridge Repair Kit",
+      ingredients: [
+        { amount: 4, name: "Wood" },
+        { amount: 2, name: "Flax Fiber" }
+      ]
+    });
+
+    expect(statusElement.textContent).toBe(
+      "Colony systems online. | Plan: Bridge Repair Kit | 4 Wood, 2 Flax Fiber"
+    );
+  });
+
+  it("formats colony status as compact HUD meta instead of quest copy", () => {
+    expect(formatColonyStatusHudText({
+      activeTool: "Hydro Jet",
+      systems: [
+        { label: "Power", state: "active", detail: "Solar Station online." },
+        { label: "Water", state: "active", detail: "Hydro Jet selected." },
+        { label: "Soil", state: "active", detail: "4/10 dry grass restored." },
+        { label: "Shelter", state: "ready", detail: "House Kit ready." }
+      ]
+    })).toBe("Tool Hydro Jet • Power online • Water online • Soil 4/10 • Shelter ready");
+  });
+
+  it("formats colony cache supply counts for the HUD meta", () => {
+    expect(formatColonyCacheHudText({
+      totalItems: 0,
+      groupCounts: {}
+    })).toBe("");
+
+    expect(formatColonyCacheHudText({
+      totalItems: 4,
+      groupCounts: {
+        materials: 3
+      }
+    })).toBe("Cache build-ready: 4 supplies, 3 materials");
+  });
+
+  it("renders colony status into the existing HUD meta element", () => {
+    const hudMetaElement = document.createElement("span");
+    const controller = createGameHudController({
+      hudMetaElement
+    });
+
+    controller.syncSkillsUi({ waterGun: true }, "waterGun", {
+      flags: {
+        restoredGrassCount: 4
+      }
+    });
+    controller.syncHudMeta({
+      flags: {
+        strawBedPlacedInBulbasaurHabitat: true,
+        restoredGrassCount: 4,
+        leafDenBuildAvailable: true
+      }
+    }, {
+      waterGunTotem: 1,
+      leafDenKit: 1
+    });
+
+    expect(hudMetaElement.textContent).toBe(
+      "Tool Hydro Jet • Power online • Water online • Soil 4/10 • Shelter ready • Cache stocked: 2 supplies"
+    );
+    expect(hudMetaElement.dataset.colonyStatus).toBe("visible");
+  });
+
   it("shows immediate prompts as the current action instead of repeating quest copy", () => {
     const {
       controller,
@@ -40,10 +139,23 @@ describe("createGameHudController", () => {
       instructionsElement
     } = createController();
 
-    controller.syncHudInstructions({}, "[Enter] Mark dry ground for Squirtle \u2022 1 queued");
+    controller.syncHudInstructions({}, "[Enter] Mark dry ground for Hydro Bot \u2022 1 queued");
 
-    expect(instructionsElement.textContent).toBe("[Enter] Mark dry ground for Squirtle \u2022 1 queued");
+    expect(instructionsElement.textContent).toBe("[Enter] Mark dry ground for Hydro Bot \u2022 1 queued");
     expect(currentActionElement.dataset.actionKind).toBe("water");
+  });
+
+  it("classifies Sandbots bot names as talk actions when no stronger action term exists", () => {
+    const {
+      controller,
+      currentActionElement,
+      instructionsElement
+    } = createController();
+
+    controller.syncHudInstructions({}, "Talk to Grow Bot");
+
+    expect(instructionsElement.textContent).toBe("Talk to Grow Bot");
+    expect(currentActionElement.dataset.actionKind).toBe("talk");
   });
 
   it("falls back to quest guidance when no immediate prompt is available", () => {
@@ -57,6 +169,102 @@ describe("createGameHudController", () => {
 
     expect(instructionsElement.textContent).toBe("Restore one nearby patch.");
     expect(currentActionElement.dataset.actionKind).toBe("water");
+  });
+
+  it("uses errand quest HUD text before generic guidance", () => {
+    const instructionsElement = document.createElement("span");
+    const controller = createGameHudController({
+      hudInstructionsElement: instructionsElement,
+      questSystem: {
+        getActiveQuest: () => ({
+          id: "gather-first-supplies",
+          description: "Wake Hydro Bot.",
+          guidance: "Follow Chopper's marker.",
+          errandQuest: {
+            hudText: "Wake up Hydro Bot"
+          }
+        })
+      }
+    });
+
+    controller.syncHudInstructions({}, "");
+
+    expect(instructionsElement.textContent).toBe(
+      "Wake up Hydro Bot"
+    );
+  });
+
+  it("does not repeat the active quest title in the current-action instructions", () => {
+    const instructionsElement = document.createElement("span");
+    const controller = createGameHudController({
+      hudInstructionsElement: instructionsElement,
+      questSystem: {
+        getActiveQuest: () => ({
+          id: "gather-first-supplies",
+          title: "Wake up Hydro Bot",
+          description: "Bring Hydro Bot back online.",
+          guidance: "Follow Chopper's marker to Hydro Bot, then interact when the prompt appears.",
+          errandQuest: {
+            hudText: "Wake up Hydro Bot"
+          }
+        })
+      }
+    });
+
+    controller.syncHudInstructions({}, "");
+
+    expect(instructionsElement.textContent).toBe(
+      "Follow Chopper's marker to Hydro Bot, then interact when the prompt appears."
+    );
+  });
+
+  it("uses the input modality for the initial HUD guide", () => {
+    const instructionsElement = document.createElement("span");
+    const controller = createGameHudController({
+      hudInstructionsElement: instructionsElement,
+      getActiveQuest: () => null
+    });
+
+    controller.syncHudInstructions({}, "", {
+      device: INPUT_DEVICE.GAMEPAD,
+      gamepadLayout: GAMEPAD_LAYOUT.GENERIC
+    });
+
+    expect(instructionsElement.textContent).toBe(
+      "Use the left stick to reach Chopper. He will point out the first repair."
+    );
+  });
+
+  it("treats invalid nearby habitat values as an empty list", () => {
+    const hudChecklistElement = document.createElement("div");
+    const activeQuest = {
+      id: "makingHabitats",
+      title: "Making colony zones",
+      objectives: []
+    };
+    const controller = createGameHudController({
+      hudChecklistElement,
+      getActiveQuest: () => activeQuest
+    });
+    const storyState = { flags: {} };
+
+    expect(() => controller.setNearbyHabitats(null)).not.toThrow();
+    expect(() => controller.setNearbyHabitats("Tall Grass")).not.toThrow();
+    controller.syncQuestFocus(storyState);
+
+    let checklistItems = [...hudChecklistElement.querySelectorAll(".hud-checklist__item")];
+    expect(checklistItems.map((item) => item.textContent.replace(/\s+/g, " ").trim())).toEqual([
+      "Use Hydro Jet on a dry object",
+      "Find a restored habitat",
+      "Discover the tall grass clue"
+    ]);
+    expect(checklistItems[1]?.dataset.done).toBe("false");
+
+    controller.setNearbyHabitats(["Tall Grass", null, "Flower Bed"]);
+    controller.syncQuestFocus(storyState);
+
+    checklistItems = [...hudChecklistElement.querySelectorAll(".hud-checklist__item")];
+    expect(checklistItems[1]?.dataset.done).toBe("true");
   });
 
   it("renders the visible inventory as a field-use belt", () => {
@@ -87,11 +295,12 @@ describe("createGameHudController", () => {
           slotRole: "recipe"
         },
         lifeCoins: {
-          shortLabel: "Coins",
-          glyph: "$",
-          color: "#ffd45c",
-          ink: "#392406",
-          slotRole: "currency"
+          shortLabel: "Log",
+          glyph: "V",
+          color: "#7bc7ff",
+          ink: "#0b1f32",
+          slotRole: "key",
+          hiddenFromInventory: true
         },
         wood: {
           shortLabel: "Wood",
@@ -132,7 +341,7 @@ describe("createGameHudController", () => {
     expect(slots.some((slot) => slot.dataset.slotRole === "key")).toBe(false);
     expect(slots.some((slot) => slot.dataset.slotRole === "recipe")).toBe(false);
     expect(slots.some((slot) => slot.dataset.slotRole === "currency")).toBe(false);
-    expect(inventoryGridElement.textContent).not.toContain("$");
+    expect(inventoryGridElement.textContent).not.toContain("V");
     expect(inventoryGridElement.textContent).not.toContain("T");
     expect(inventoryGridElement.textContent).not.toContain("D");
 
@@ -249,7 +458,8 @@ describe("createGameHudController", () => {
     expect(companionHudElement?.querySelector(".active-companion-hud__switch-button")).toBeNull();
     expect(companionHudElement?.querySelector(".active-companion-hud__switch-icon")).toBeNull();
     expect(companionHudElement?.textContent).toContain("Water");
-    expect(companionHudElement?.textContent).toContain("Squirtle");
+    expect(companionHudElement?.textContent).toContain("Hydro Bot");
+    expect(companionHudElement?.getAttribute("aria-label")).toContain("Hydro Bot: Hydro Jet selected");
     expect(
       companionHudElement
         ?.querySelector(".active-companion-hud__hint-image")
@@ -262,7 +472,7 @@ describe("createGameHudController", () => {
       }
     });
 
-    expect(companionHudElement?.textContent).not.toContain("Squirtle will move over and restore it");
+    expect(companionHudElement?.textContent).not.toContain("Hydro Bot will move over and restore it");
     expect(
       companionHudElement
         ?.querySelector(".active-companion-hud__hint-image")
@@ -282,7 +492,7 @@ describe("createGameHudController", () => {
     ).toContain("Robot-2-thumb.png");
     expect(companionHudElement?.querySelectorAll(".active-companion-hud__portrait-image")).toHaveLength(1);
     expect(companionHudElement?.textContent).toContain("Leaf");
-    expect(companionHudElement?.textContent).toContain("Bulbasaur");
+    expect(companionHudElement?.textContent).toContain("Grow Bot");
     expect(
       companionHudElement
         ?.querySelector(".active-companion-hud__hint-image")
@@ -326,7 +536,7 @@ describe("createGameHudController", () => {
     controller.syncQuestFocus(storyState);
 
     expect(missionsStackElement.innerHTML).toContain('data-task-id="making-habitats"');
-    expect(hudChecklistElement.innerHTML).toContain("Making habitats");
+    expect(hudChecklistElement.innerHTML).toContain("Making colony zones");
     expect(controller.getNoticeMessage()).toBe("");
 
     storyState.flags.makingHabitatsComplete = true;
@@ -336,15 +546,28 @@ describe("createGameHudController", () => {
 
     expect(missionsStackElement.innerHTML).toContain('data-task-flashing="true"');
     expect(hudChecklistElement.innerHTML).toContain('data-task-flashing="true"');
-    expect(hudChecklistElement.innerHTML).toContain("Making habitats");
-    expect(controller.getNoticeMessage()).toBe("Task complete: Making habitats.");
+    expect(hudChecklistElement.innerHTML).toContain("Making colony zones");
+    expect(controller.getNoticeMessage()).toBe("Task complete: Making colony zones.");
 
     nowSpy.mockReturnValue(4601);
     controller.renderMissionCards(storyState, {}, "");
     controller.syncQuestFocus(storyState);
 
     expect(missionsStackElement.innerHTML).not.toContain('data-task-id="making-habitats"');
-    expect(hudChecklistElement.innerHTML).not.toContain("Making habitats");
-    expect(controller.getNoticeMessage()).toBe("Task complete: Making habitats.");
+    expect(hudChecklistElement.innerHTML).not.toContain("Making colony zones");
+    expect(controller.getNoticeMessage()).toBe("Task complete: Making colony zones.");
+  });
+
+  it("queues rapid notices instead of overwriting current feedback", () => {
+    const controller = createGameHudController({});
+
+    controller.pushNotice("+1 Wood", 1);
+    controller.pushNotice("New Workbench protocol available: Power.", 1);
+
+    expect(controller.getNoticeMessage()).toBe("+1 Wood");
+
+    controller.updateTransientNotice(1);
+
+    expect(controller.getNoticeMessage()).toBe("New Workbench protocol available: Power.");
   });
 });

@@ -23,29 +23,29 @@
 
 ## 3. Water Gun Runtime Hook Slice
 
-- [ ] Identify the single existing Water Gun hit event to own the first runtime
+- [x] Identify the single existing Water Gun hit event to own the first runtime
   trigger.
-- [ ] Add adapter support for applying motion frames to the selected target.
-- [ ] Trigger `water-gun-hit` without changing Water Gun gameplay rules.
-- [ ] Add focused tests for the selected hook or adapter behavior.
+- [x] Add adapter support for applying motion frames to the selected target.
+- [x] Trigger `water-gun-hit` without changing Water Gun gameplay rules.
+- [x] Add focused tests for the selected hook or adapter behavior.
 - [ ] Verify the hit pose is readable and does not obscure tile targeting.
 
 ## 4. Workbench And Crafting Slice
 
-- [ ] Trigger `workbench-craft` after a confirmed craft.
-- [ ] Keep the workbench modal flow unchanged.
-- [ ] Add focused test coverage for craft trigger dispatch.
+- [x] Trigger `workbench-craft` after a confirmed craft.
+- [x] Keep the workbench modal flow unchanged.
+- [x] Add focused test coverage for craft trigger dispatch.
 
 ## 5. Task Completion Slice
 
-- [ ] Trigger `task-complete` from the existing task-completion feedback path.
-- [ ] Keep current sound and HUD completion copy behavior intact.
-- [ ] Add focused tests for dispatch without duplicate task completion events.
+- [x] Trigger `task-complete` from the existing task-completion feedback path.
+- [x] Keep current sound and HUD completion copy behavior intact.
+- [x] Add focused tests for dispatch without duplicate task completion events.
 
 ## 6. Crash And Character Reaction Slice
 
-- [ ] Identify the existing crash impact timing owner.
-- [ ] Trigger `crash-impact` without rewriting camera choreography.
+- [x] Identify the existing crash impact timing owner.
+- [x] Trigger `crash-impact` without rewriting camera choreography.
 - [ ] Add robot/NPC bump reactions only through actor-owned adapters.
 - [ ] Verify opening readability manually because camera and scene flow are
   high-risk.

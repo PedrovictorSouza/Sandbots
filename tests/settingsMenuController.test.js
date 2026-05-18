@@ -25,9 +25,13 @@ describe("createSettingsMenuController", () => {
     expect(menu?.style.display).toBe("grid");
     expect(mount.querySelector('[data-settings-tab-panel="bag"]')?.hidden).toBe(false);
     expect(mount.querySelector('[data-settings-tab-panel="pokemons"]')?.hidden).toBe(true);
+    expect(mount.querySelector('[data-settings-tab-panel="controls"]')?.hidden).toBe(true);
     expect(mount.querySelector('[data-settings-tab-panel="settings"]')?.hidden).toBe(true);
-    expect(mount.querySelectorAll("[data-settings-tab]")).toHaveLength(3);
+    expect(mount.querySelectorAll("[data-settings-tab]")).toHaveLength(4);
     expect(mount.querySelectorAll("[data-settings-group-button]")).toHaveLength(4);
+    expect(mount.textContent).toContain("Bots");
+    expect(mount.textContent).not.toContain("Pokemons");
+    expect(mount.textContent).toContain("Colony log online");
     expect(mount.textContent).toContain("Camera");
     expect(mount.textContent).toContain("Follow Strength");
 
@@ -37,6 +41,7 @@ describe("createSettingsMenuController", () => {
 
     expect(mount.querySelector('[data-settings-tab-panel="bag"]')?.hidden).toBe(true);
     expect(mount.querySelector('[data-settings-tab-panel="pokemons"]')?.hidden).toBe(true);
+    expect(mount.querySelector('[data-settings-tab-panel="controls"]')?.hidden).toBe(true);
     expect(mount.querySelector('[data-settings-tab-panel="settings"]')?.hidden).toBe(false);
 
     mount.querySelector('[data-settings-group-button="volume"]')?.dispatchEvent(
@@ -102,7 +107,71 @@ describe("createSettingsMenuController", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a restart button when a restart action is provided", () => {
+  it("uses dialog semantics and standard tablist keyboard navigation", () => {
+    const mount = document.createElement("div");
+    document.body.append(mount);
+    const controller = createSettingsMenuController({
+      mount,
+      schema: SETTINGS_SCHEMA,
+      settingsState: createDefaultSettingsState()
+    });
+
+    controller.open();
+
+    const menu = mount.querySelector("[data-settings-menu]");
+    const bagTab = mount.querySelector('[data-settings-tab="bag"]');
+    const pokemonsTab = mount.querySelector('[data-settings-tab="pokemons"]');
+
+    expect(menu?.getAttribute("role")).toBe("dialog");
+    expect(menu?.getAttribute("aria-modal")).toBe("true");
+    expect(menu?.getAttribute("aria-describedby")).toBe("settings-menu-hint");
+    expect(bagTab?.getAttribute("role")).toBe("tab");
+    expect(bagTab?.getAttribute("aria-controls")).toBe("settings-menu-panel-bag");
+    expect(bagTab?.tabIndex).toBe(0);
+    expect(pokemonsTab?.tabIndex).toBe(-1);
+    expect(document.activeElement).toBe(bagTab);
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "ArrowRight" }))).toBe(true);
+    expect(mount.querySelector('[data-settings-tab-panel="pokemons"]')?.hidden).toBe(false);
+    expect(document.activeElement).toBe(pokemonsTab);
+    expect(bagTab?.tabIndex).toBe(-1);
+    expect(pokemonsTab?.tabIndex).toBe(0);
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "Home" }))).toBe(true);
+    expect(mount.querySelector('[data-settings-tab-panel="bag"]')?.hidden).toBe(false);
+    expect(document.activeElement).toBe(bagTab);
+
+    mount.remove();
+  });
+
+  it("keeps keyboard focus inside the open menu", () => {
+    const mount = document.createElement("div");
+    document.body.append(mount);
+    const controller = createSettingsMenuController({
+      mount,
+      schema: SETTINGS_SCHEMA,
+      settingsState: createDefaultSettingsState()
+    });
+
+    controller.open();
+
+    const closeButton = mount.querySelector("[data-settings-action='close']");
+    const bagTab = mount.querySelector('[data-settings-tab="bag"]');
+    expect(document.activeElement).toBe(bagTab);
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", {
+      code: "Tab",
+      shiftKey: true
+    }))).toBe(true);
+    expect(document.activeElement).toBe(closeButton);
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "Tab" }))).toBe(true);
+    expect(document.activeElement).toBe(bagTab);
+
+    mount.remove();
+  });
+
+  it("confirms restart inside the Settings menu before running the restart action", () => {
     const mount = document.createElement("div");
     const onRestartGame = vi.fn(() => false);
     const controller = createSettingsMenuController({
@@ -113,10 +182,27 @@ describe("createSettingsMenuController", () => {
     });
 
     controller.open();
+    controller.setActiveTab("settings", { focus: true });
     const restartButton = mount.querySelector("[data-settings-action='restart-game']");
     restartButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     expect(restartButton?.textContent).toBe("Restart Game");
+    expect(onRestartGame).not.toHaveBeenCalled();
+    expect(restartButton?.getAttribute("aria-expanded")).toBe("true");
+    expect(mount.querySelector("[data-settings-restart-confirm]")?.hidden).toBe(false);
+
+    mount.querySelector("[data-settings-restart-confirm-action='cancel']")?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true })
+    );
+
+    expect(onRestartGame).not.toHaveBeenCalled();
+    expect(mount.querySelector("[data-settings-restart-confirm]")?.hidden).toBe(true);
+
+    restartButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    mount.querySelector("[data-settings-restart-confirm-action='confirm']")?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true })
+    );
+
     expect(onRestartGame).toHaveBeenCalledTimes(1);
     expect(controller.isOpen()).toBe(true);
   });
@@ -156,7 +242,7 @@ describe("createSettingsMenuController", () => {
     const itemDefs = {
       campfire: {
         id: "campfire",
-        bagLabel: "Train House",
+        bagLabel: "Thermal Cabin",
         bagDetailsEligible: true,
         glyph: "H",
         color: "#f07d38",
@@ -201,7 +287,7 @@ describe("createSettingsMenuController", () => {
     const bagGrid = mount.querySelector("[data-settings-bag-grid]");
     expect(mount.querySelector('[data-settings-tab-panel="bag"]')?.hidden).toBe(false);
     expect(bagGrid?.querySelectorAll('[data-filled="true"]')).toHaveLength(3);
-    expect(bagGrid?.textContent).toContain("Train House");
+    expect(bagGrid?.textContent).toContain("Thermal Cabin");
     expect(bagGrid?.textContent).toContain("Sturdy stick");
     expect(bagGrid?.textContent).toContain("Leaves");
     expect(bagGrid?.textContent).toContain("3");
@@ -211,7 +297,7 @@ describe("createSettingsMenuController", () => {
     mount.remove();
   });
 
-  it("renders captured Pokemon in a dedicated Select menu tab", () => {
+  it("renders helper bots in a dedicated Select menu tab", () => {
     const mount = document.createElement("div");
     const storyState = {
       flags: {
@@ -235,17 +321,17 @@ describe("createSettingsMenuController", () => {
     const pokemonGrid = mount.querySelector("[data-settings-pokemon-grid]");
     expect(pokemonPanel?.hidden).toBe(false);
     expect(pokemonGrid?.querySelectorAll("[data-pokemon-id]")).toHaveLength(2);
-    expect(pokemonGrid?.textContent).toContain("Squirtle");
-    expect(pokemonGrid?.textContent).toContain("Bulbasaur");
+    expect(pokemonGrid?.textContent).toContain("Hydro Bot");
+    expect(pokemonGrid?.textContent).toContain("Grow Bot");
     expect(pokemonGrid?.textContent).not.toContain("Habitat:");
     expect(pokemonGrid?.textContent).not.toContain("Following");
     expect(pokemonGrid?.textContent).not.toContain("Captured");
-    expect(pokemonGrid?.textContent).not.toContain("Charmander");
+    expect(pokemonGrid?.textContent).not.toContain("Thermal Bot");
     expect(pokemonGrid?.querySelector('[data-pokemon-id="squirtle"]')?.dataset.following).toBe("true");
     expect(mount.querySelector(".settings-menu__pokemon-empty")?.hidden).toBe(true);
   });
 
-  it("shows the selected Pokemon ability description at the bottom of the Pokemon tab", () => {
+  it("shows the selected bot ability description at the bottom of the Bots tab", () => {
     const mount = document.createElement("div");
     const storyState = {
       flags: {
@@ -267,7 +353,8 @@ describe("createSettingsMenuController", () => {
     const abilityPanel = mount.querySelector("[data-settings-pokemon-ability]");
     expect(abilityPanel?.hidden).toBe(false);
     expect(mount.querySelector('[data-pokemon-id="squirtle"]')?.dataset.selected).toBe("true");
-    expect(abilityPanel?.textContent).toContain("Squirtle · Water Gun");
+    expect(abilityPanel?.textContent).toContain("Function");
+    expect(abilityPanel?.textContent).toContain("Hydro Bot · Hydro Jet");
     expect(abilityPanel?.textContent).toContain("revives thirsty trees");
 
     mount.querySelector('[data-pokemon-id="charmander"]')?.dispatchEvent(
@@ -275,11 +362,11 @@ describe("createSettingsMenuController", () => {
     );
 
     expect(mount.querySelector('[data-pokemon-id="charmander"]')?.dataset.selected).toBe("true");
-    expect(abilityPanel?.textContent).toContain("Charmander · Fire");
+    expect(abilityPanel?.textContent).toContain("Thermal Bot · Thermal Torch");
     expect(abilityPanel?.textContent).toContain("Carbon charges");
   });
 
-  it("dismisses a following Pokemon from the Select menu Pokemon tab", () => {
+  it("dismisses a following bot from the Select menu Bots tab", () => {
     const mount = document.createElement("div");
     const onDismissPokemonFollower = vi.fn();
     const onChange = vi.fn();
@@ -320,7 +407,7 @@ describe("createSettingsMenuController", () => {
     expect(mount.querySelector('[data-pokemon-dismiss="squirtle"]')).toBeNull();
   });
 
-  it("shows a move in action for captured Pokemon when the House is a valid home", () => {
+  it("shows a move in action for helper bots when the House is a valid home", () => {
     const mount = document.createElement("div");
     const storyState = {
       flags: {
@@ -341,11 +428,11 @@ describe("createSettingsMenuController", () => {
 
     expect(mount.querySelector('[data-pokemon-id="charmander"]')?.dataset.currentHomeId).toBe("");
     expect(mount.querySelector('[data-pokemon-move-in="charmander"]')?.getAttribute("aria-label")).toBe(
-      "Move Charmander into House"
+      "Assign Thermal Bot to the House"
     );
   });
 
-  it("moves a captured Pokemon into the House from the Select menu", () => {
+  it("moves a helper bot into the House from the Select menu", () => {
     const mount = document.createElement("div");
     const onMovePokemonIn = vi.fn();
     const onChange = vi.fn();
@@ -408,10 +495,55 @@ describe("createSettingsMenuController", () => {
     expect(mount.querySelector('[data-settings-tab-panel="pokemons"]')?.hidden).toBe(false);
 
     expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "PageDown" }))).toBe(true);
+    expect(mount.querySelector('[data-settings-tab-panel="controls"]')?.hidden).toBe(false);
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "PageDown" }))).toBe(true);
     expect(mount.querySelector('[data-settings-tab-panel="settings"]')?.hidden).toBe(false);
 
     expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "PageUp" }))).toBe(true);
-    expect(mount.querySelector('[data-settings-tab-panel="pokemons"]')?.hidden).toBe(false);
+    expect(mount.querySelector('[data-settings-tab-panel="controls"]')?.hidden).toBe(false);
+  });
+
+  it("rebounds keyboard controls from the Controls tab and can reset them", () => {
+    const mount = document.createElement("div");
+    document.body.append(mount);
+    const settingsState = createDefaultSettingsState();
+    const onChange = vi.fn();
+    const controller = createSettingsMenuController({
+      mount,
+      schema: SETTINGS_SCHEMA,
+      settingsState,
+      onChange
+    });
+
+    controller.open();
+    controller.setActiveTab("controls", { focus: true });
+
+    expect(mount.textContent).toContain("Rewire the pilot console");
+
+    const bagButton = mount.querySelector('[data-settings-control-binding="bag"]');
+    bagButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(mount.querySelector('[data-settings-control-binding="bag"]')?.dataset.capturing).toBe("true");
+
+    expect(controller.handleKeydown(new KeyboardEvent("keydown", { code: "KeyZ" }))).toBe(true);
+
+    expect(settingsState.controls.keyboard.bag).toBe("KeyZ");
+    expect(mount.querySelector('[data-settings-control-binding="bag"]')?.textContent).toContain("Z");
+    expect(onChange).toHaveBeenCalledWith(settingsState, expect.objectContaining({
+      groupId: "controls",
+      settingId: "keyboard.bag",
+      value: "KeyZ"
+    }));
+
+    mount.querySelector("[data-settings-controls-reset]")?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true })
+    );
+
+    expect(settingsState.controls.keyboard.bag).toBe("KeyX");
+    expect(onChange).toHaveBeenCalledWith(settingsState, expect.objectContaining({
+      groupId: "controls",
+      settingId: "keyboard"
+    }));
   });
 
   it("updates settings state and reports changes from controls", () => {

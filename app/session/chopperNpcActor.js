@@ -1,7 +1,12 @@
+import {
+  createExpressiveTurnPoseState,
+  updateExpressiveTurnPose
+} from "../motion/expressiveTurnPose.js";
+
 const CHOPPER_NPC_BASE_Y = 1.35;
 const CHOPPER_NPC_SCALE = 0.575;
 const CHOPPER_NPC_YAW = 0.65;
-const CHOPPER_NPC_MODEL_FACE_YAW_OFFSET = Math.PI;
+const CHOPPER_NPC_MODEL_FACE_YAW_OFFSET = 0;
 const CHOPPER_NPC_PROPELLER_SPEED = 26;
 const CHOPPER_NPC_PROPELLER_PIVOT = [0.125, 2, 0];
 const CHOPPER_NPC_FLIGHT_LIFT = 0.92;
@@ -14,6 +19,31 @@ const CHOPPER_PATROL_ARRIVE_DISTANCE = 0.22;
 const CHOPPER_GUIDE_ARRIVE_DISTANCE = 0.18;
 const CHOPPER_INVESTIGATION_ARRIVE_DISTANCE = 0.18;
 const CHOPPER_PATROL_RADIUS_MULTIPLIER = 3;
+const CHOPPER_TURN_POSE = Object.freeze({
+  yawResponsiveness: 9,
+  pitchResponsiveness: 7,
+  rollResponsiveness: 11,
+  yawLagForFullPose: Math.PI * 0.75,
+  maxPitch: 0.065,
+  maxRoll: 0.115
+});
+const CHOPPER_FREE_IDLE_MOTION = Object.freeze({
+  yaw: 0.035,
+  pitch: 0.025,
+  roll: 0.045,
+  x: 0.055,
+  y: 0.085,
+  z: 0.035
+});
+const CHOPPER_DIALOGUE_IDLE_MOTION = Object.freeze({
+  yaw: 0.015,
+  pitch: 0.018,
+  roll: 0.024,
+  x: 0.022,
+  y: 0.038,
+  z: 0.014,
+  listeningPitch: 0.014
+});
 const CHOPPER_PATROL_CENTER = [12.84, 0.02, -8.14];
 const CHOPPER_PATROL_BASE_POINTS = Object.freeze([
   [10.4, 0.02, -7.2],
@@ -70,6 +100,12 @@ function getChopperModelYaw(faceYaw) {
   return faceYaw + CHOPPER_NPC_MODEL_FACE_YAW_OFFSET;
 }
 
+function getChopperFaceYaw(npcActor) {
+  return Number.isFinite(npcActor?.faceYaw) ?
+    npcActor.faceYaw :
+    CHOPPER_NPC_YAW - CHOPPER_NPC_MODEL_FACE_YAW_OFFSET;
+}
+
 function getNearestPatrolPointIndex(position) {
   let nearestIndex = 0;
   let nearestDistance = Infinity;
@@ -95,34 +131,56 @@ function syncChopperNpcInstances(actor, {
   idleRoll = 0,
   idleX = 0,
   idleY = 0,
-  idleZ = 0
+  idleZ = 0,
+  turnPose = null
 } = {}) {
   const position = getNpcPosition(actor.npcActor);
-  const baseYaw = Number.isFinite(actor.npcActor?.faceYaw) ?
-    getChopperModelYaw(actor.npcActor.faceYaw) :
-    CHOPPER_NPC_YAW;
+  const visualFaceYaw = Number.isFinite(turnPose?.yaw) ?
+    turnPose.yaw :
+    getChopperFaceYaw(actor.npcActor);
+  const baseYaw = getChopperModelYaw(visualFaceYaw);
   const offset = [
     position[0] + idleX,
     position[1] + CHOPPER_NPC_BASE_Y + actor.flightLift + idleY,
     position[2] + idleZ
   ];
   const yaw = baseYaw + idleYaw;
+  const pitch = idlePitch + Number(turnPose?.pitch || 0);
+  const roll = idleRoll + Number(turnPose?.roll || 0);
 
   actor.bodyInstance.offset = offset;
   actor.bodyInstance.scale = CHOPPER_NPC_SCALE;
   actor.bodyInstance.yaw = yaw;
-  actor.bodyInstance.pitch = idlePitch;
-  actor.bodyInstance.roll = idleRoll;
+  actor.bodyInstance.pitch = pitch;
+  actor.bodyInstance.roll = roll;
   actor.bodyInstance.active = actor.active;
 
   actor.propellerInstance.offset = offset;
   actor.propellerInstance.scale = CHOPPER_NPC_SCALE;
   actor.propellerInstance.yaw = yaw;
-  actor.propellerInstance.pitch = idlePitch;
-  actor.propellerInstance.roll = idleRoll;
+  actor.propellerInstance.pitch = pitch;
+  actor.propellerInstance.roll = roll;
   actor.propellerInstance.localYaw = actor.propellerAngle;
   actor.propellerInstance.localPivot = CHOPPER_NPC_PROPELLER_PIVOT;
   actor.propellerInstance.active = actor.active;
+}
+
+function getChopperIdleMotion(time, dialogueActive) {
+  const motion = dialogueActive ?
+    CHOPPER_DIALOGUE_IDLE_MOTION :
+    CHOPPER_FREE_IDLE_MOTION;
+  const listeningPitch = dialogueActive ?
+    Math.sin(time * 3.4 + 0.3) * motion.listeningPitch :
+    0;
+
+  return {
+    idleYaw: Math.sin(time * 1.35) * motion.yaw,
+    idlePitch: Math.sin(time * 1.2 + 0.4) * motion.pitch + listeningPitch,
+    idleRoll: Math.sin(time * 1.45 + 0.8) * motion.roll,
+    idleX: Math.sin(time * 1.05) * motion.x,
+    idleY: Math.sin(time * 2.15) * motion.y,
+    idleZ: Math.cos(time * 0.95) * motion.z
+  };
 }
 
 export function createChopperNpcActor({ npcActor }) {
@@ -136,6 +194,9 @@ export function createChopperNpcActor({ npcActor }) {
     scriptedFlight: null,
     patrol: null,
     propellerAngle: 0,
+    turnPoseState: createExpressiveTurnPoseState({
+      initialYaw: getChopperFaceYaw(npcActor)
+    }),
     bodyInstance: {
       offset: [...getNpcPosition(npcActor)],
       scale: CHOPPER_NPC_SCALE,
@@ -373,12 +434,15 @@ export function updateChopperNpcActor(actor, {
   }
 
   const time = actor.elapsed;
+  const turnPose = updateExpressiveTurnPose(
+    actor.turnPoseState,
+    getChopperFaceYaw(actor.npcActor),
+    deltaTime,
+    CHOPPER_TURN_POSE
+  );
+  const idleMotion = getChopperIdleMotion(time, dialogueActive);
   syncChopperNpcInstances(actor, {
-    idleYaw: Math.sin(time * 1.35) * 0.035,
-    idlePitch: Math.sin(time * 1.2 + 0.4) * 0.025,
-    idleRoll: Math.sin(time * 1.45 + 0.8) * 0.045,
-    idleX: Math.sin(time * 1.05) * 0.055,
-    idleY: Math.sin(time * 2.15) * 0.085,
-    idleZ: Math.cos(time * 0.95) * 0.035
+    ...idleMotion,
+    turnPose
   });
 }

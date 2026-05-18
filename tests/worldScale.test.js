@@ -34,4 +34,17 @@ describe("world scale", () => {
     expect(terrain.instances.length).toBeLessThan(9000);
     expect(largeDistantMountainCount).toBeGreaterThan(0);
   });
+
+  it("keeps generated elevated terrain visual-only until its sides are readable", () => {
+    const terrain = buildElevatedTerrain({
+      tileSpan: 1,
+      tileHeight: 1,
+      tileScale: 1,
+      safeZones: []
+    });
+
+    expect(terrain.colliders.length).toBeGreaterThan(0);
+    expect(terrain.colliders.every((collider) => collider.visualOnly === true)).toBe(true);
+    expect(terrain.colliders.every((collider) => collider.blocksPlayer === false)).toBe(true);
+  });
 });

@@ -1,4 +1,15 @@
-import { GAME_INPUT_BINDINGS, GAMEPAD_BUTTONS } from "./gameInputBindings.js";
+import {
+  GAME_INPUT_ACTION_IDS,
+  GAME_INPUT_BINDINGS,
+  GAMEPAD_BUTTONS,
+  getKeyboardBindingCode,
+  normalizeKeyboardControls
+} from "./gameInputBindings.js";
+import {
+  createInputModalityTracker,
+  GAMEPAD_LAYOUT,
+  resolveGamepadLayout
+} from "./inputModality.js";
 
 function isTypingTarget(target) {
   if (!(target instanceof HTMLElement)) {
@@ -14,10 +25,6 @@ function isTypingTarget(target) {
   );
 }
 
-function isMovementKey(key) {
-  return key === "w" || key === "a" || key === "s" || key === "d";
-}
-
 const POINTER_YAW_SENSITIVITY = 0.0032;
 const POINTER_PITCH_SENSITIVITY = 0.0024;
 const GAMEPAD_LOOK_SPEED = 2.35;
@@ -27,6 +34,7 @@ const GAMEPAD_DIALOGUE_ANALOG_NAVIGATION_THRESHOLD = 0.45;
 const GAMEPAD_LEFT_SHOULDER_BUTTON = 4;
 const GAMEPAD_RIGHT_SHOULDER_BUTTON = 5;
 const GAMEPAD_FACE_BUTTON_PRESS_THRESHOLD = 0.55;
+const CINEMATIC_SKIP_KEY_CODES = new Set(["Enter", "KeyX", "Space", "Escape"]);
 
 function applyDeadzone(value) {
   const magnitude = Math.abs(value);
@@ -39,13 +47,7 @@ function applyDeadzone(value) {
 }
 
 function isNintendoStyleGamepad(gamepad) {
-  const id = String(gamepad?.id || "").toLowerCase();
-  return (
-    id.includes("nintendo") ||
-    id.includes("switch") ||
-    id.includes("joy-con") ||
-    id.includes("joycon")
-  );
+  return resolveGamepadLayout(gamepad) === GAMEPAD_LAYOUT.NINTENDO;
 }
 
 function resolveLogicalFaceButton(gamepad, button) {
@@ -100,7 +102,9 @@ export function createGameInputController({
   isSettingsOpen = () => false,
   handleSettingsKeydown = () => false,
   isGameplayDialogueActive = () => false,
+  isGameplayCinematicInputActive = () => false,
   inspectBag = () => {},
+  getKeyboardControls = () => null,
   windowRef = null
 }) {
   const cameraLookDelta = {
@@ -111,6 +115,7 @@ export function createGameInputController({
     x: 0,
     y: 0
   };
+  const inputModality = createInputModalityTracker();
   let gamepadActionButtonPressed = false;
   let gamepadRunButtonPressed = false;
   let gamepadJumpButtonPressed = false;
@@ -135,6 +140,7 @@ export function createGameInputController({
   let gamepadPreviousMoveButtonPressed = false;
   let gamepadNextMoveButtonPressed = false;
   let primaryActionPressed = false;
+  const cinematicSkipKeysDown = new Set();
   let cameraZoomCycleRequests = 0;
   let jumpRequests = 0;
   let placementRotationRequests = 0;
@@ -235,6 +241,7 @@ export function createGameInputController({
       isWorkbenchModalOpen() ||
       isSettingsOpen() ||
       isGameplayDialogueActive() ||
+      isGameplayCinematicInputActive() ||
       isPokedexOpen() ||
       sceneDirector.blocksGameplayInput() ||
       isBuilderPanelOpen() ||
@@ -242,50 +249,112 @@ export function createGameInputController({
     );
   }
 
+  function getEffectiveKeyboardControls() {
+    return normalizeKeyboardControls(getKeyboardControls?.());
+  }
+
+  function isKeyboardActionKey(event, actionId) {
+    const code = getKeyboardBindingCode(getEffectiveKeyboardControls(), actionId);
+    return Boolean(code) && event.code === code;
+  }
+
+  function getMovementLogicalKey(event) {
+    const controls = getEffectiveKeyboardControls();
+
+    if (event.code === getKeyboardBindingCode(controls, GAME_INPUT_ACTION_IDS.MOVE_UP)) {
+      return "w";
+    }
+
+    if (event.code === getKeyboardBindingCode(controls, GAME_INPUT_ACTION_IDS.MOVE_LEFT)) {
+      return "a";
+    }
+
+    if (event.code === getKeyboardBindingCode(controls, GAME_INPUT_ACTION_IDS.MOVE_DOWN)) {
+      return "s";
+    }
+
+    if (event.code === getKeyboardBindingCode(controls, GAME_INPUT_ACTION_IDS.MOVE_RIGHT)) {
+      return "d";
+    }
+
+    return "";
+  }
+
   function isRunKey(event) {
-    return GAME_INPUT_BINDINGS.run.keyboardCodes.includes(event.code);
+    const runCode = getKeyboardBindingCode(getEffectiveKeyboardControls(), GAME_INPUT_ACTION_IDS.RUN);
+    if (runCode === "ShiftLeft" || runCode === "ShiftRight") {
+      return event.code === "ShiftLeft" || event.code === "ShiftRight";
+    }
+    return event.code === runCode;
   }
 
   function isCameraZoomCycleKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.cameraZoomCycle.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.CAMERA_ZOOM_CYCLE);
   }
 
   function isPauseKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.pause.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.PAUSE);
   }
 
   function isPokedexKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.pokedex.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.POKEDEX);
   }
 
   function isBagKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.bag.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.BAG);
   }
 
   function isDestroyActionKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.destroyAction.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.DESTROY_ACTION);
   }
 
   function isFollowerCallKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.followerCall.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.FOLLOWER_CALL);
   }
 
   function isPreviousMoveKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.previousMove.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.PREVIOUS_MOVE);
   }
 
   function isNextMoveKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.nextMove.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.NEXT_MOVE);
   }
 
   function isJumpKey(event) {
-    return event.code === GAME_INPUT_BINDINGS.jump.keyboardCode;
+    return isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.JUMP);
+  }
+
+  function isCinematicSkipKey(event) {
+    return CINEMATIC_SKIP_KEY_CODES.has(event?.code);
+  }
+
+  function isActiveGamepadInput(gamepad) {
+    const hasActiveButton = Array.from(gamepad?.buttons || []).some((button) => (
+      Boolean(button?.pressed) ||
+      Number(button?.value || 0) > GAMEPAD_FACE_BUTTON_PRESS_THRESHOLD
+    ));
+
+    if (hasActiveButton) {
+      return true;
+    }
+
+    return Array.from(gamepad?.axes || []).some((axis) => (
+      Math.abs(Number(axis || 0)) >= GAMEPAD_DEADZONE
+    ));
   }
 
   function handleKeydown(event) {
-    const key = event.key.toLowerCase();
+    if (!event.repeat) {
+      inputModality.recordKeyboardInput();
+    }
+
+    const movementKey = getMovementLogicalKey(event);
     const typingTarget = isTypingTarget(event.target);
     const builderPanelOpen = isBuilderPanelOpen();
+
+    if (!event.repeat && isCinematicSkipKey(event)) {
+      cinematicSkipKeysDown.add(event.code);
+    }
 
     if (!typingTarget && isWorkbenchModalOpen()) {
       clearGameFlowInput();
@@ -317,6 +386,23 @@ export function createGameInputController({
 
       event.preventDefault();
       return;
+    }
+
+    if (!typingTarget && isGameplayCinematicInputActive()) {
+      clearGameFlowInput();
+      if (
+        isCinematicSkipKey(event) ||
+        movementKey ||
+        isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.INTERACT) ||
+        isBagKey(event) ||
+        isDestroyActionKey(event) ||
+        isFollowerCallKey(event) ||
+        isJumpKey(event) ||
+        isCameraZoomCycleKey(event)
+      ) {
+        event.preventDefault();
+        return;
+      }
     }
 
     if (sceneDirector.blocksGameplayInput()) {
@@ -391,13 +477,13 @@ export function createGameInputController({
 
     if (builderPanelOpen) {
       if (!typingTarget && (
-        event.code === GAME_INPUT_BINDINGS.primaryAction.keyboardCode ||
+        isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.PRIMARY_ACTION) ||
         isBagKey(event) ||
         isDestroyActionKey(event) ||
         isFollowerCallKey(event) ||
         isJumpKey(event) ||
-        event.code === "KeyE" ||
-        isMovementKey(key) ||
+        isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.INTERACT) ||
+        movementKey ||
         isRunKey(event) ||
         isCameraZoomCycleKey(event) ||
         isPauseKey(event)
@@ -429,7 +515,7 @@ export function createGameInputController({
       return;
     }
 
-    if (event.code === GAME_INPUT_BINDINGS.primaryAction.keyboardCode) {
+    if (isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.PRIMARY_ACTION)) {
       primaryActionPressed = true;
       if (!event.repeat) {
         requestHarvest({ source: "keyboardPrimary" });
@@ -438,7 +524,7 @@ export function createGameInputController({
       return;
     }
 
-    if (event.code === "KeyE") {
+    if (isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.INTERACT)) {
       if (!event.repeat) {
         requestInteract();
       }
@@ -446,19 +532,35 @@ export function createGameInputController({
       return;
     }
 
-    if (!isMovementKey(key)) {
+    if (!movementKey) {
       return;
     }
 
-    pressedKeys.add(key);
+    pressedKeys.add(movementKey);
     event.preventDefault();
   }
 
   function handleKeyup(event) {
-    const key = event.key.toLowerCase();
+    if (!event.repeat) {
+      inputModality.recordKeyboardInput();
+    }
 
-    if (event.code === GAME_INPUT_BINDINGS.primaryAction.keyboardCode) {
+    const movementKey = getMovementLogicalKey(event);
+
+    if (isCinematicSkipKey(event)) {
+      cinematicSkipKeysDown.delete(event.code);
+    }
+
+    if (isKeyboardActionKey(event, GAME_INPUT_ACTION_IDS.PRIMARY_ACTION)) {
       primaryActionPressed = false;
+    }
+
+    if (!isTypingTarget(event.target) && isGameplayCinematicInputActive()) {
+      clearGameFlowInput();
+      if (isCinematicSkipKey(event) || movementKey) {
+        event.preventDefault();
+        return;
+      }
     }
 
     if (isPokedexOpen()) {
@@ -490,8 +592,10 @@ export function createGameInputController({
     }
 
     if (isBuilderPanelOpen()) {
-      if (!isTypingTarget(event.target) && (isMovementKey(key) || isRunKey(event) || isCameraZoomCycleKey(event))) {
-        pressedKeys.delete(key);
+      if (!isTypingTarget(event.target) && (movementKey || isRunKey(event) || isCameraZoomCycleKey(event))) {
+        if (movementKey) {
+          pressedKeys.delete(movementKey);
+        }
         if (isRunKey(event)) {
           pressedKeys.delete("shift");
         }
@@ -532,27 +636,31 @@ export function createGameInputController({
       return;
     }
 
-    if (!isMovementKey(key)) {
+    if (!movementKey) {
       return;
     }
 
-    pressedKeys.delete(key);
+    pressedKeys.delete(movementKey);
     event.preventDefault();
   }
 
   function handlePointerMove(event) {
+    const pointerButtons = Number(event.buttons || 0);
+    const movementX = Number(event.movementX || 0);
+    const movementY = Number(event.movementY || 0);
+
+    if (pointerButtons !== 0 || movementX !== 0 || movementY !== 0) {
+      inputModality.recordPointerInput();
+    }
+
     if (shouldIgnoreLookInput(event.target)) {
       return;
     }
 
-    const pointerButtons = Number(event.buttons || 0);
     const secondaryButtonHeld = (pointerButtons & 2) === 2;
     if (!secondaryButtonHeld) {
       return;
     }
-
-    const movementX = Number(event.movementX || 0);
-    const movementY = Number(event.movementY || 0);
 
     if (movementX === 0 && movementY === 0) {
       return;
@@ -620,6 +728,10 @@ export function createGameInputController({
     for (const gamepad of gamepads) {
       if (!gamepad) {
         continue;
+      }
+
+      if (isActiveGamepadInput(gamepad)) {
+        inputModality.recordGamepadInput(gamepad);
       }
 
       actionButtonPressed = actionButtonPressed ||
@@ -748,6 +860,37 @@ export function createGameInputController({
       return;
     }
 
+    if (isGameplayCinematicInputActive()) {
+      clearGameFlowInput();
+      gamepadMovement.x = 0;
+      gamepadMovement.y = 0;
+      cameraLookDelta.yaw = 0;
+      cameraLookDelta.pitch = 0;
+      gamepadActionButtonPressed = actionButtonPressed;
+      gamepadRunButtonPressed = runButtonPressed;
+      gamepadJumpButtonPressed = jumpButtonPressed;
+      gamepadCameraZoomButtonPressed = zoomButtonPressed;
+      gamepadPauseButtonPressed = pauseButtonPressed;
+      gamepadPokedexButtonPressed = pokedexButtonPressed;
+      gamepadSettingsButtonPressed = settingsButtonPressed;
+      gamepadBagButtonPressed = bagButtonPressed;
+      gamepadDestroyActionButtonPressed = destroyActionButtonPressed;
+      gamepadFollowerCallButtonPressed = followerCallButtonPressed;
+      gamepadSettingsPreviousTabButtonPressed = settingsPreviousTabButtonPressed;
+      gamepadSettingsNextTabButtonPressed = settingsNextTabButtonPressed;
+      gamepadSettingsNavigateDownButtonPressed = settingsNavigateDownButtonPressed;
+      gamepadSettingsNavigateUpAxisPressed = false;
+      gamepadSettingsNavigateDownAxisPressed = false;
+      gamepadDialogueNavigateLeftAxisPressed = false;
+      gamepadDialogueNavigateRightAxisPressed = false;
+      gamepadDialogueNavigateUpAxisPressed = false;
+      gamepadDialogueNavigateDownAxisPressed = false;
+      gamepadPreviousMoveButtonPressed = previousMoveButtonPressed;
+      gamepadNextMoveButtonPressed = nextMoveButtonPressed;
+      primaryActionPressed = actionButtonPressed;
+      return;
+    }
+
     if (settingsOpen) {
       const settingsNavigateLeftAxisPressed =
         settingsNavigateAxisX <= -GAMEPAD_SETTINGS_ANALOG_NAVIGATION_THRESHOLD;
@@ -764,6 +907,10 @@ export function createGameInputController({
       }
 
       if (actionButtonPressed && !gamepadActionButtonPressed) {
+        handleSettingsKeydown(createPrimaryButtonEvent());
+      }
+
+      if (runButtonPressed && !gamepadRunButtonPressed) {
         handleSettingsKeydown(createPrimaryButtonEvent());
       }
 
@@ -1191,6 +1338,22 @@ export function createGameInputController({
     return primaryActionPressed;
   }
 
+  function isCinematicSkipActionActive() {
+    return Boolean(
+      primaryActionPressed ||
+      cinematicSkipKeysDown.size > 0 ||
+      gamepadBagButtonPressed ||
+      gamepadJumpButtonPressed
+    );
+  }
+
+  function getInputModalityState() {
+    return {
+      ...inputModality.getState(),
+      keyboardControls: getEffectiveKeyboardControls()
+    };
+  }
+
   return {
     handleKeydown,
     handleKeyup,
@@ -1203,7 +1366,9 @@ export function createGameInputController({
     consumePlacementRotationRequest,
     consumeDestroyActionRequest,
     getAnalogMovement,
+    getInputModalityState,
     isRunActive,
-    isPrimaryActionActive
+    isPrimaryActionActive,
+    isCinematicSkipActionActive
   };
 }

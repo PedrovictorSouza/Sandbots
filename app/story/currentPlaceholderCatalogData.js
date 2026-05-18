@@ -11,8 +11,8 @@ import {
 
 const OWNER_SYSTEM = Object.freeze({
   HABITAT_CATALOG: "Flyweight Habitat Catalog",
-  MOVE_CATALOG: "Move/Ability Catalog",
-  COMPANION_ABILITY_CATALOG: "Companion Ability Catalog"
+  MOVE_CATALOG: "Tool Function Catalog",
+  COMPANION_ABILITY_CATALOG: "Bot Function Catalog"
 });
 
 function deepFreeze(value) {
@@ -67,7 +67,7 @@ const CURRENT_HABITAT_PLACEHOLDERS = deepFreeze(SMALL_ISLAND_HABITATS.map((habit
     label: habitat.label,
     status: habitat.status,
     owner: OWNER_SYSTEM.HABITAT_CATALOG,
-    purpose: habitat.notes || "Catalogs a habitat recipe for current or future discovery.",
+    purpose: habitat.notes || "Catalogs a habitat protocol for current or future discovery.",
     replacementCondition: habitat.status === HABITAT_STATUS.ACTIVE
       ? "Playable habitat discovery is covered by current habitat tests."
       : "Promote through a focused habitat discovery spec before required progression uses it."
@@ -83,7 +83,7 @@ const CURRENT_MOVE_PLACEHOLDERS = deepFreeze(SMALL_ISLAND_MOVES.map((move) => {
     purpose: move.notes || "Catalogs a current or future player move.",
     replacementCondition: move.status === MOVE_STATUS.ACTIVE
       ? "Playable move guidance and presentation are covered by current move tests."
-      : "Promote through a focused ability progression spec before required gates use it."
+      : "Promote through a focused function progression spec before required gates use it."
   });
 }));
 
@@ -94,10 +94,10 @@ const CURRENT_COMPANION_ABILITY_PLACEHOLDERS = deepFreeze(
       label: ability.label,
       status: ability.status,
       owner: OWNER_SYSTEM.COMPANION_ABILITY_CATALOG,
-      purpose: ability.notes || "Catalogs a current or future companion ability.",
+      purpose: ability.notes || "Catalogs a current or future bot function.",
       replacementCondition: ability.status === COMPANION_ABILITY_STATUS.ACTIVE
-        ? "Playable companion ability is covered by current ability and move tests."
-        : "Promote through a focused companion ability spec before required gates use it."
+        ? "Playable bot function is covered by current function and tool tests."
+        : "Promote through a focused bot function spec before required gates use it."
     });
   })
 );

@@ -20,6 +20,7 @@ import {
   updateGameplayOpeningShipFall,
   updateGameplayOpeningShipPersistentSmoke
 } from "../session/gameplayOpeningShip.js";
+import { MOTION_IMPACT_PRESET_IDS } from "../motion/motionImpactPresets.js";
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -78,11 +79,13 @@ export function createGameplayCameraDirector({
   playerExitStartPosition = ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION,
   playerExitEndPosition = ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_END_POSITION,
   impactShakeDuration = ACT_TWO_GAMEPLAY_OPENING_IMPACT_SHAKE_DURATION,
-  smokeDuration = ACT_TWO_GAMEPLAY_OPENING_SHIP_SMOKE_DURATION
+  smokeDuration = ACT_TWO_GAMEPLAY_OPENING_SHIP_SMOKE_DURATION,
+  onCrashImpactMotionRequested = () => {}
 }) {
   let openingShot = null;
   let openingPlayed = false;
   let smokeUntil = null;
+  let crashImpactMotionRequested = false;
 
   function requestOpening() {
     if (openingPlayed) {
@@ -94,6 +97,7 @@ export function createGameplayCameraDirector({
       startedAt: null
     };
     smokeUntil = null;
+    crashImpactMotionRequested = false;
     return true;
   }
 
@@ -123,7 +127,19 @@ export function createGameplayCameraDirector({
     return isOpeningActive(now);
   }
 
-  function updateShip(ship, elapsed) {
+  function requestCrashImpactMotion(ship) {
+    if (crashImpactMotionRequested || !ship?.eventState?.impact) {
+      return;
+    }
+
+    crashImpactMotionRequested = true;
+    onCrashImpactMotionRequested({
+      motionId: MOTION_IMPACT_PRESET_IDS.CRASH_IMPACT,
+      position: Array.isArray(ship.position) ? [...ship.position] : null
+    });
+  }
+
+  function updateShip(ship, elapsed, { requestMotion = true } = {}) {
     updateGameplayOpeningShipFall(ship, {
       elapsed,
       shipStartTime,
@@ -132,6 +148,9 @@ export function createGameplayCameraDirector({
       shipLandPosition,
       shipSize
     });
+    if (requestMotion) {
+      requestCrashImpactMotion(ship);
+    }
   }
 
   function updatePersistentSmoke(ship, now) {
@@ -179,6 +198,75 @@ export function createGameplayCameraDirector({
     }
   }
 
+  function completeOpening({
+    now,
+    playerPosition,
+    canFollow = true,
+    spawnPlayer = null,
+    movePlayer = null,
+    ship = null,
+    spawnPosition = playerExitStartPosition,
+    phase = "released",
+    skipped = false
+  }) {
+    updateShip(ship, openingDuration, {
+      requestMotion: !skipped
+    });
+    smokeUntil = now + smokeDuration * 1000;
+
+    let currentPlayerPosition = Array.isArray(playerPosition) ? playerPosition : null;
+    if (!currentPlayerPosition && openingShot && !openingShot.playerSpawned) {
+      openingShot.playerSpawned = true;
+      currentPlayerPosition = spawnPlayer?.([...spawnPosition]) || null;
+    }
+
+    openingShot = null;
+    openingPlayed = true;
+
+    if (Array.isArray(currentPlayerPosition)) {
+      movePlayer?.([...playerExitEndPosition]);
+      releaseToFollow(playerExitEndPosition, canFollow);
+    }
+
+    return {
+      openingActive: false,
+      released: true,
+      skipped,
+      phase
+    };
+  }
+
+  function skipOpening({
+    now,
+    gameplayActive,
+    playerPosition,
+    canFollow = true,
+    spawnPlayer = null,
+    movePlayer = null,
+    ship = null
+  }) {
+    if (!openingShot || !gameplayActive || !isOpeningActive(now)) {
+      return {
+        openingActive: false,
+        released: false,
+        skipped: false,
+        phase: openingPlayed ? "played" : "idle"
+      };
+    }
+
+    return completeOpening({
+      now,
+      playerPosition,
+      canFollow,
+      spawnPlayer,
+      movePlayer,
+      ship,
+      spawnPosition: playerExitEndPosition,
+      phase: "skipped",
+      skipped: true
+    });
+  }
+
   function update({
     now,
     gameplayActive,
@@ -224,24 +312,14 @@ export function createGameplayCameraDirector({
     }
 
     if (openingShot && gameplayActive) {
-      updateShip(ship, openingDuration);
-      smokeUntil = now + smokeDuration * 1000;
-      const spawnedPlayerPosition = ensureOpeningPlayer(playerPosition, spawnPlayer);
-      const nextPlayerPosition = Array.isArray(spawnedPlayerPosition) ?
-        spawnedPlayerPosition :
-        null;
-
-      openingShot = null;
-      openingPlayed = true;
-      if (nextPlayerPosition) {
-        movePlayer?.([...playerExitEndPosition]);
-        releaseToFollow(playerExitEndPosition, canFollow);
-      }
-      return {
-        openingActive: false,
-        released: true,
-        phase: "released"
-      };
+      return completeOpening({
+        now,
+        playerPosition,
+        canFollow,
+        spawnPlayer,
+        movePlayer,
+        ship
+      });
     }
 
     if (openingPlayed) {
@@ -283,6 +361,7 @@ export function createGameplayCameraDirector({
       };
     },
     requestOpening,
+    skipOpening,
     update
   };
 }

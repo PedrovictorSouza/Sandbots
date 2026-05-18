@@ -2,7 +2,7 @@ node_modules/
 dist/
 *.log
 *.so
-material/*.pdf
+material/
 .playwright/
 .DS_Store
 test-results/

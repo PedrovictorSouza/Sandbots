@@ -9,6 +9,7 @@ import {
 } from "../../rendering/worldAssets.js";
 import { SQUIRTLE_POKEDEX_ENTRY_ID } from "../../pokedexEntries.js";
 import { createStartScreen } from "../../startScreen.js";
+import { SANDBOTS_WORLD_TERMS } from "../story/sandbotsLexicon.js";
 import {
   confirmPlayerName,
   hasConfirmedPlayerName
@@ -48,12 +49,12 @@ export function applyActTwoTutorialCompletionResult(result = {}, {
 
   if (result.foundPokedex && !result.repairPlantFixed) {
     unlockPokedexUi();
-    pushNotice("The Pokedex still works.", 3.6);
+    pushNotice(`The ${SANDBOTS_WORLD_TERMS.codex} still works.`, 3.6);
   }
   if (result.repairPlantFixed && session?.actTwoRepairPlant) {
     session.actTwoRepairPlant.fixed = true;
     unlockPokedexUi();
-    pushNotice("The plant is online again. The Pokedex is reacting.", 4.2);
+    pushNotice(`The plant is online again. The ${SANDBOTS_WORLD_TERMS.codex} is reacting.`, 4.2);
   }
   if (result.learnedWaterGun) {
     unlockPlayerSkill("transform");

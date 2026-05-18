@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createFrameSnapshotController } from "../app/runtime/frameSnapshotController.js";
+import {
+  createFrameSnapshotController,
+  setFrameWorldPrompt
+} from "../app/runtime/frameSnapshotController.js";
+import { resolvePsxDistanceFogSettings } from "../app/rendering/psxDistanceFogConfig.js";
 
 describe("createFrameSnapshotController", () => {
   it("builds a work-in-progress frame and commits it through the active buffer", () => {
@@ -273,5 +277,159 @@ describe("createFrameSnapshotController", () => {
     expect(groundCellHighlight.hide).toHaveBeenCalledTimes(1);
     expect(groundCellHighlight.show).not.toHaveBeenCalled();
     expect(groundCellHighlight.update).not.toHaveBeenCalled();
+  });
+
+  it("routes PSX fog only into the world scene render pass", () => {
+    const hud = {
+      syncQuestFocus: vi.fn(),
+      syncHudMeta: vi.fn(),
+      syncHudInstructions: vi.fn(),
+      renderMissionCards: vi.fn(),
+      setStatus: vi.fn()
+    };
+    const worldRenderer = {
+      drawScene: vi.fn(),
+      drawBillboards: vi.fn(),
+      drawWorldMarkers: vi.fn(),
+      drawWoodDrops: vi.fn(),
+      drawBillboard: vi.fn(),
+      drawCharacters: vi.fn()
+    };
+    const controller = createFrameSnapshotController({
+      camera: {},
+      mount: {
+        clientWidth: 1280,
+        clientHeight: 720
+      },
+      worldRenderer,
+      worldSpeech: null,
+      colliderGizmos: null,
+      groundCellHighlight: null,
+      actTwoTutorial: null,
+      hud
+    });
+    const viewProjection = new Float32Array(16);
+    const sceneObjects = [{ id: "ground" }];
+    const fog = resolvePsxDistanceFogSettings();
+    const frame = controller.beginFrame();
+
+    frame.hud.active = true;
+    frame.hud.storyState = { flags: {} };
+    frame.hud.inventory = {};
+    frame.render.viewProjection = viewProjection;
+    frame.render.sceneObjects = sceneObjects;
+    frame.render.psxDistanceFog = fog;
+
+    controller.commitFrame(frame);
+
+    expect(worldRenderer.drawScene).toHaveBeenCalledWith(
+      viewProjection,
+      sceneObjects,
+      null,
+      { psxDistanceFog: fog }
+    );
+    expect(worldRenderer.drawBillboards).toHaveBeenCalledWith(viewProjection, []);
+    expect(hud.syncHudInstructions).toHaveBeenCalledWith(frame.hud.storyState, "");
+    expect(hud.syncHudInstructions.mock.calls[0]).not.toContain(fog);
+
+    const nextFrame = controller.beginFrame();
+    expect(nextFrame.render.psxDistanceFog).toBeNull();
+  });
+
+  it("accepts typed world prompt states while preserving legacy prompt commits", () => {
+    const hud = {
+      syncQuestFocus: vi.fn(),
+      syncHudMeta: vi.fn(),
+      syncHudInstructions: vi.fn(),
+      renderMissionCards: vi.fn(),
+      setStatus: vi.fn()
+    };
+    const worldRenderer = {
+      drawScene: vi.fn(),
+      drawBillboards: vi.fn(),
+      drawWorldMarkers: vi.fn(),
+      drawWoodDrops: vi.fn(),
+      drawBillboard: vi.fn(),
+      drawCharacters: vi.fn()
+    };
+    const worldSpeech = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      update: vi.fn(),
+      setWorldPosition: vi.fn(),
+      showPrompt: vi.fn(),
+      hidePrompt: vi.fn(),
+      updatePrompt: vi.fn(),
+      setPromptWorldPosition: vi.fn()
+    };
+    const groundCellHighlight = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      update: vi.fn(),
+      setGroundCell: vi.fn()
+    };
+    const colliderGizmos = {
+      show: vi.fn(),
+      hide: vi.fn(),
+      update: vi.fn()
+    };
+    const actTwoTutorial = {
+      update: vi.fn()
+    };
+    const camera = {};
+    const mount = {
+      clientWidth: 1280,
+      clientHeight: 720
+    };
+
+    const controller = createFrameSnapshotController({
+      camera,
+      mount,
+      worldRenderer,
+      worldSpeech,
+      colliderGizmos,
+      groundCellHighlight,
+      actTwoTutorial,
+      hud
+    });
+
+    const firstFrame = controller.beginFrame();
+    expect(firstFrame.worldPrompt.state).toBeNull();
+    setFrameWorldPrompt(firstFrame, {
+      kind: "charging",
+      companionId: "squirtle",
+      abilityId: "waterGun",
+      worldPosition: [3, 0, 4]
+    });
+
+    controller.commitFrame();
+
+    expect(worldSpeech.showPrompt).toHaveBeenCalledWith({
+      text: "charging",
+      worldPosition: [3, 0, 4],
+      anchorHeight: 1.95
+    });
+    expect(worldSpeech.updatePrompt).toHaveBeenCalledWith(camera, 1280, 720);
+
+    const secondFrame = controller.beginFrame();
+    expect(secondFrame.worldPrompt.state).toBeNull();
+    setFrameWorldPrompt(secondFrame, {
+      kind: "charging",
+      companionId: "squirtle",
+      abilityId: "waterGun",
+      worldPosition: [6, 0, 8]
+    });
+
+    controller.commitFrame();
+
+    expect(worldSpeech.showPrompt).toHaveBeenCalledTimes(1);
+    expect(worldSpeech.setPromptWorldPosition).toHaveBeenCalledWith([6, 0, 8]);
+
+    const thirdFrame = controller.beginFrame();
+    setFrameWorldPrompt(thirdFrame, { kind: "hidden" });
+
+    controller.commitFrame();
+
+    expect(worldSpeech.hidePrompt).toHaveBeenCalledTimes(1);
   });
 });

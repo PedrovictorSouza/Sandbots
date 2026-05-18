@@ -60,8 +60,10 @@ describe("act two scene config", () => {
 
   it("drops the ship from the horizon before the player exits", () => {
     expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_START).toBeLessThan(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND);
+    expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_START).toBeLessThan(1);
+    expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND).toBeCloseTo(2.2, 1);
     expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND - ACT_TWO_GAMEPLAY_OPENING_SHIP_START)
-      .toBeGreaterThanOrEqual(3);
+      .toBeGreaterThanOrEqual(1.5);
     expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_START_POSITION[1])
       .toBeGreaterThan(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION[1] + 10);
     expect(ACT_TWO_GAMEPLAY_OPENING_SHIP_START_POSITION[2])
@@ -70,6 +72,7 @@ describe("act two scene config", () => {
       .toBeGreaterThan(ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND);
     expect(ACT_TWO_GAMEPLAY_OPENING_CAMERA_HOLD)
       .toBeGreaterThan(ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START);
+    expect(ACT_TWO_GAMEPLAY_OPENING_CAMERA_HOLD).toBeLessThan(7);
     expect(planarDistance(
       ACT_TWO_GAMEPLAY_OPENING_PLAYER_EXIT_START_POSITION,
       ACT_TWO_GAMEPLAY_OPENING_SHIP_LAND_POSITION

@@ -3,7 +3,7 @@ import { loadPropAssets } from "./assets/loadPropAssets.js";
 import { loadTerrainAssets } from "./assets/loadTerrainAssets.js";
 
 export async function loadSessionAssets({ gl, setStatus }) {
-  setStatus("Carregando assets...");
+  setStatus("Loading assets...");
 
   const [
     terrainAssets,

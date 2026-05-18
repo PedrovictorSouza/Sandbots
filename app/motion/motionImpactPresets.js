@@ -17,6 +17,20 @@ export const MOTION_IMPACT_SILHOUETTE_BIAS = Object.freeze({
   OBJECT_LOCAL: "object-local"
 });
 
+export const MOTION_IMPACT_SCALE = Object.freeze({
+  TINY: "tiny",
+  SMALL: "small",
+  MEDIUM: "medium",
+  LARGE: "large"
+});
+
+export const MOTION_IMPACT_DESIGN_FIELDS = Object.freeze([
+  "effectScale",
+  "designIntent",
+  "blend",
+  "silhouetteBias"
+]);
+
 export const WATER_GUN_HIT_DURATION_MS = 220;
 export const WATER_GUN_HIT_FREEZE_MS = 40;
 export const WATER_GUN_HIT_ANTICIPATION_MS = 30;
@@ -69,7 +83,9 @@ export const MOTION_IMPACT_PRESETS = Object.freeze([
     rotationJolt: WATER_GUN_HIT_ROTATION_JOLT,
     scalePulse: WATER_GUN_HIT_SCALE_PULSE,
     blend: MOTION_IMPACT_BLEND.SHARP,
-    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE
+    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE,
+    effectScale: MOTION_IMPACT_SCALE.SMALL,
+    designIntent: "Hydro Jet should read as a clear tool hit, not as a major world event."
   }),
   freezePreset({
     id: MOTION_IMPACT_PRESET_IDS.TILE_RESTORE_POP,
@@ -81,7 +97,9 @@ export const MOTION_IMPACT_PRESETS = Object.freeze([
     rotationJolt: { x: 0.03, y: 0, z: -0.025 },
     scalePulse: 1.035,
     blend: MOTION_IMPACT_BLEND.SHARP,
-    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE
+    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE,
+    effectScale: MOTION_IMPACT_SCALE.TINY,
+    designIntent: "A restored tile should pop enough to confirm state change without interrupting movement."
   }),
   freezePreset({
     id: MOTION_IMPACT_PRESET_IDS.ROBOT_BUMP,
@@ -93,7 +111,9 @@ export const MOTION_IMPACT_PRESETS = Object.freeze([
     rotationJolt: { x: -0.04, y: 0.08, z: 0.035 },
     scalePulse: 1.025,
     blend: MOTION_IMPACT_BLEND.SHARP,
-    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE
+    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE,
+    effectScale: MOTION_IMPACT_SCALE.SMALL,
+    designIntent: "Bot bumps should show physical presence while staying smaller than milestones."
   }),
   freezePreset({
     id: MOTION_IMPACT_PRESET_IDS.WORKBENCH_CRAFT,
@@ -105,7 +125,9 @@ export const MOTION_IMPACT_PRESETS = Object.freeze([
     rotationJolt: { x: 0.025, y: -0.05, z: 0.02 },
     scalePulse: 1.03,
     blend: MOTION_IMPACT_BLEND.SOFT,
-    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.OBJECT_LOCAL
+    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.OBJECT_LOCAL,
+    effectScale: MOTION_IMPACT_SCALE.SMALL,
+    designIntent: "Crafting should feel tactile and local to the workbench."
   }),
   freezePreset({
     id: MOTION_IMPACT_PRESET_IDS.TASK_COMPLETE,
@@ -117,7 +139,9 @@ export const MOTION_IMPACT_PRESETS = Object.freeze([
     rotationJolt: { x: -0.02, y: 0.04, z: -0.04 },
     scalePulse: 1.055,
     blend: MOTION_IMPACT_BLEND.SOFT,
-    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE
+    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE,
+    effectScale: MOTION_IMPACT_SCALE.MEDIUM,
+    designIntent: "Task completion should feel stronger than a tool hit but weaker than a cinematic impact."
   }),
   freezePreset({
     id: MOTION_IMPACT_PRESET_IDS.CRASH_IMPACT,
@@ -129,7 +153,9 @@ export const MOTION_IMPACT_PRESETS = Object.freeze([
     rotationJolt: { x: -0.12, y: 0.16, z: 0.08 },
     scalePulse: 1.035,
     blend: MOTION_IMPACT_BLEND.SHARP,
-    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE
+    silhouetteBias: MOTION_IMPACT_SILHOUETTE_BIAS.CAMERA_READABLE,
+    effectScale: MOTION_IMPACT_SCALE.LARGE,
+    designIntent: "The ship crash is a world-scale event and should remain the strongest early impact."
   })
 ]);
 
@@ -139,4 +165,22 @@ const MOTION_IMPACT_PRESET_BY_ID = new Map(
 
 export function getMotionImpactPreset(presetId) {
   return MOTION_IMPACT_PRESET_BY_ID.get(presetId) || null;
+}
+
+export function getMotionImpactDesignGaps(presets = MOTION_IMPACT_PRESETS) {
+  const knownScales = new Set(Object.values(MOTION_IMPACT_SCALE));
+
+  return presets
+    .map((preset) => {
+      const missing = MOTION_IMPACT_DESIGN_FIELDS.filter((field) => !preset?.[field]);
+      if (preset?.effectScale && !knownScales.has(preset.effectScale)) {
+        missing.push("knownEffectScale");
+      }
+
+      return {
+        presetId: preset?.id || "unknown",
+        missing
+      };
+    })
+    .filter((entry) => entry.missing.length > 0);
 }
